@@ -2050,16 +2050,23 @@ CREATE POLICY tenant_isolamento ON papel_permissao
 -- =============================================================================
 
 -- Papéis são globais do cluster: se já existirem (outro banco do mesmo cluster),
--- são reaproveitados, mas a migração aborta se algum puder ignorar o RLS.
+-- são reaproveitados, mas a migração aborta se algum tiver atributo que fure o
+-- RLS ou os GRANTs, ou for membro de outro papel (ex.: pg_read_all_data e
+-- pg_write_all_data ignoram GRANTs de tabela). `pnpm db:papeis` repete a checagem.
 DO $$
 DECLARE papel text;
 BEGIN
   FOREACH papel IN ARRAY ARRAY['ebisu_app', 'ebisu_auth'] LOOP
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = papel) THEN
-      EXECUTE format('CREATE ROLE %I NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS', papel);
-    ELSIF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = papel
-                   AND (rolsuper OR rolbypassrls OR rolcreaterole OR rolcreatedb)) THEN
-      RAISE EXCEPTION 'Papel % já existe com SUPERUSER/BYPASSRLS/CREATEROLE/CREATEDB; corrija antes de migrar', papel;
+      EXECUTE format(
+        'CREATE ROLE %I NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS', papel);
+    ELSIF EXISTS (
+      SELECT 1 FROM pg_roles r
+       WHERE r.rolname = papel
+         AND (r.rolsuper OR r.rolbypassrls OR r.rolcreaterole OR r.rolcreatedb OR r.rolreplication
+              OR EXISTS (SELECT 1 FROM pg_auth_members m WHERE m.member = r.oid))
+    ) THEN
+      RAISE EXCEPTION 'Papel % existe com SUPERUSER/BYPASSRLS/CREATEROLE/CREATEDB/REPLICATION ou é membro de outro papel; corrija antes de migrar', papel;
     END IF;
   END LOOP;
 END $$;

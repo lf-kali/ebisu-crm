@@ -119,24 +119,65 @@ describe('migração inicial e papéis de banco', () => {
     expect(saida).toContain('All migrations have been successfully applied');
   });
 
-  it('SEG-6: aborta a migração se um papel existente puder ignorar o RLS', async () => {
-    await admin.query('CREATE DATABASE banco_bypass');
-    await admin.query('ALTER ROLE ebisu_app BYPASSRLS');
-    try {
-      const url = new URL(banco.urlAdmin);
-      url.pathname = '/banco_bypass';
-      let saida = '';
+  // Cada caso deixa o papel existente inseguro, tenta migrar um banco novo e desfaz.
+  const PAPEIS_INSEGUROS = [
+    {
+      caso: 'BYPASSRLS',
+      papel: 'ebisu_app',
+      estragar: 'ALTER ROLE ebisu_app BYPASSRLS',
+      desfazer: 'ALTER ROLE ebisu_app NOBYPASSRLS',
+    },
+    {
+      caso: 'REPLICATION',
+      papel: 'ebisu_auth',
+      estragar: 'ALTER ROLE ebisu_auth REPLICATION',
+      desfazer: 'ALTER ROLE ebisu_auth NOREPLICATION',
+    },
+    {
+      caso: 'membro de pg_read_all_data',
+      papel: 'ebisu_app',
+      estragar: 'GRANT pg_read_all_data TO ebisu_app',
+      desfazer: 'REVOKE pg_read_all_data FROM ebisu_app',
+    },
+  ];
+
+  it.each(PAPEIS_INSEGUROS)(
+    'SEG-6: aborta a migração se um papel existente tiver $caso',
+    async ({ papel, estragar, desfazer }) => {
+      const nomeBanco = `banco_${randomUUID().replaceAll('-', '')}`;
+      await admin.query(`CREATE DATABASE ${nomeBanco}`);
+      await admin.query(estragar);
       try {
-        rodarNoPacote('pnpm', ['exec', 'prisma', 'migrate', 'deploy'], {
-          DATABASE_URL: url.toString(),
-        });
-      } catch (erro) {
-        const { stdout = '', stderr = '' } = erro as { stdout?: string; stderr?: string };
-        saida = stdout + stderr;
+        const url = new URL(banco.urlAdmin);
+        url.pathname = `/${nomeBanco}`;
+        let saida = '';
+        try {
+          rodarNoPacote('pnpm', ['exec', 'prisma', 'migrate', 'deploy'], {
+            DATABASE_URL: url.toString(),
+          });
+        } catch (erro) {
+          const { stdout = '', stderr = '' } = erro as { stdout?: string; stderr?: string };
+          saida = stdout + stderr;
+        }
+        expect(saida).toContain(`Papel ${papel} existe com SUPERUSER/BYPASSRLS`);
+      } finally {
+        await admin.query(desfazer);
       }
-      expect(saida).toContain('Papel ebisu_app já existe com SUPERUSER/BYPASSRLS');
+    },
+  );
+
+  it('SEG-6: configurar-papeis recusa liberar LOGIN de papel alterado depois da migração', async () => {
+    await admin.query('GRANT pg_write_all_data TO ebisu_app');
+    try {
+      expect(() =>
+        rodarNoPacote('node', ['scripts/configurar-papeis.mjs'], {
+          DATABASE_URL: banco.urlAdmin,
+          DB_APP_PASSWORD: 'senha-app-teste',
+          DB_AUTH_PASSWORD: 'senha-auth-teste',
+        }),
+      ).toThrow(/Papel ebisu_app tem SUPERUSER\/BYPASSRLS/);
     } finally {
-      await admin.query('ALTER ROLE ebisu_app NOBYPASSRLS');
+      await admin.query('REVOKE pg_write_all_data FROM ebisu_app');
     }
   });
 

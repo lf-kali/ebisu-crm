@@ -22,9 +22,20 @@ const cliente = new pg.Client({ connectionString: obrigatoria('DATABASE_URL') })
 await cliente.connect();
 try {
   for (const { nome, senha } of papeis) {
-    const existe = await cliente.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [nome]);
-    if (existe.rowCount !== 1) {
+    const { rows } = await cliente.query(
+      `SELECT (r.rolsuper OR r.rolbypassrls OR r.rolcreaterole OR r.rolcreatedb OR r.rolreplication
+               OR EXISTS (SELECT 1 FROM pg_auth_members m WHERE m.member = r.oid)) AS inseguro
+         FROM pg_roles r WHERE r.rolname = $1`,
+      [nome],
+    );
+    if (rows.length !== 1) {
       throw new Error(`Papel ${nome} não existe; rode as migrações antes (prisma migrate deploy)`);
+    }
+    // Mesma checagem da migração: o papel pode ter sido alterado depois dela.
+    if (rows[0].inseguro) {
+      throw new Error(
+        `Papel ${nome} tem SUPERUSER/BYPASSRLS/CREATEROLE/CREATEDB/REPLICATION ou é membro de outro papel; corrija antes de liberar o LOGIN`,
+      );
     }
     // ALTER ROLE não aceita parâmetros: nome é constante e a senha vai como literal escapado.
     // A senha trafega no statement: não rode com log_statement = 'ddl'/'all' no servidor.
