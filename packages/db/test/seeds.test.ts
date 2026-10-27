@@ -13,7 +13,9 @@ import {
   TIPOS_ACESSORIO,
   semearCatalogoPermissoes,
   semearPadroesEmpresa,
+  semearDemo,
   semearPadroesTenant,
+  TENANT_DEMO_ID,
 } from '../src/seeds/index.js';
 import { comTenant } from '../src/tenancy.js';
 import { type BancoDeTeste, criarBancoDeTeste } from './banco-de-teste.js';
@@ -162,6 +164,60 @@ describe('semeadura no banco', () => {
     });
     expect(await contar(tenants[1], empresas[1])).toEqual(esperado);
     expect(await contar(tenants[0], empresas[0])).toEqual(esperado);
+  });
+
+  it('seed de demonstração cria a base uma vez só (idempotente)', async () => {
+    const primeira = await semearDemo(admin);
+    expect(primeira).toMatchObject({ criado: true, empresas: 2, contatos: 30 });
+    expect(await semearDemo(admin)).toEqual({ criado: false, tenantId: TENANT_DEMO_ID });
+  });
+
+  it('seed de demonstração é coerente com as regras (CRM-2, CRM-4, DSP-2)', async () => {
+    const r = await comTenant(app, TENANT_DEMO_ID, async (tx) => ({
+      membros: await tx.membro.count({ where: { status: 'ATIVO' } }),
+      contatos: await tx.contato.count(),
+      negocios: await tx.negocio.groupBy({
+        by: ['status'],
+        _count: true,
+        orderBy: { status: 'asc' },
+      }),
+      perdidosSemMotivo: await tx.negocio.count({
+        where: { status: 'PERDIDO', motivo_perda_id: null },
+      }),
+      // Diagnóstico exige dispositivo; o dono atual tem exatamente um vínculo vigente.
+      diagnosticoSemDispositivo: await tx.negocio.count({
+        where: { etapa: { nome: 'Diagnóstico / Orçamento' }, dispositivo_id: null },
+      }),
+      dispositivos: await tx.dispositivo.findMany({
+        select: {
+          proprietario_atual_id: true,
+          proprietarios: { where: { ate: null }, select: { contato_id: true } },
+        },
+      }),
+      // LEAD_QUALIFICADO = requisitos da Qualificação atendidos: canal preferido + consentimento.
+      qualificadosSemConsentimento: await tx.contato.count({
+        where: {
+          ciclo_vida: 'LEAD_QUALIFICADO',
+          OR: [{ canal_preferido: null }, { consentimentos: { none: { concedido: true } } }],
+        },
+      }),
+      funisPadrao: await tx.funil.count({ where: { padrao: true } }),
+    }));
+    expect(r.membros).toBe(PAPEIS_PADRAO.length);
+    expect(r.contatos).toBe(30);
+    expect(r.negocios.map((n) => [n.status, n._count])).toEqual([
+      ['ABERTO', 25],
+      ['PERDIDO', 2],
+      ['NUTRICAO', 3],
+    ]);
+    expect(r.perdidosSemMotivo).toBe(0);
+    expect(r.diagnosticoSemDispositivo).toBe(0);
+    expect(r.dispositivos).toHaveLength(6);
+    for (const d of r.dispositivos) {
+      expect(d.proprietarios).toEqual([{ contato_id: d.proprietario_atual_id }]);
+    }
+    expect(r.qualificadosSemConsentimento).toBe(0);
+    expect(r.funisPadrao).toBe(2);
   });
 
   it('SEG-1: o RLS impede semear com o contexto de outro tenant', async () => {

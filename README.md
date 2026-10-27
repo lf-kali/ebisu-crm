@@ -13,6 +13,8 @@ docker compose up -d     # Postgres, Redis, SeaweedFS (S3) e Mailpit
 pnpm install
 pnpm db:migrate          # aplica as migrações (packages/db)
 pnpm db:papeis           # define LOGIN/senha de ebisu_app e ebisu_auth
+pnpm db:seed             # catálogo global de permissões
+pnpm db:seed:demo        # opcional: tenant de demonstração (usuários *@demo.ebisu.local)
 pnpm dev                 # api, worker e web
 ```
 
