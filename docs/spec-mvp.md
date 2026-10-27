@@ -84,14 +84,14 @@ SSO/2FA, webhooks de saída, campos customizados, app mobile nativo.
 
 | ID | Escolha |
 |---|---|
-| D-T01 | Node.js 24 LTS, TypeScript 5.9 `strict`, pnpm workspaces + Turborepo |
+| D-T01 | Node.js 24 LTS (obrigatório: a API em CommonJS importa pacotes ESM via `require(esm)`), TypeScript 5.9 `strict`, pnpm workspaces + Turborepo |
 | D-T02 | API: NestJS 11; validação com Zod (pipe próprio); OpenAPI via `@asteasolutions/zod-to-openapi` |
 | D-T03 | Banco: PostgreSQL 16 + Prisma 6; migrações versionadas (`prisma migrate`) com SQL complementar anexado |
 | D-T04 | Filas: Redis 7 + BullMQ |
 | D-T05 | Auth: senha com argon2id; access token JWT de 15 min; refresh token rotativo em cookie httpOnly (web); API key no header `X-Api-Key` |
 | D-T06 | Web: React 19 + Vite + TanStack Router + TanStack Query + shadcn/ui + Tailwind; formulários com React Hook Form + Zod |
 | D-T07 | Testes: Vitest (unidade), Testcontainers + Supertest (integração), Playwright (E2E) |
-| D-T08 | Dev local: Docker Compose com Postgres, Redis, MinIO e Mailpit |
+| D-T08 | Dev local: Docker Compose com Postgres, Redis, SeaweedFS (S3; substitui o MinIO, que deixou de publicar imagens) e Mailpit. Cliente S3 (AWS SDK v3) com `requestChecksumCalculation: 'WHEN_REQUIRED'`, senão a URL pré-assinada de upload embute checksum do corpo vazio e o PUT falha com `BadDigest` |
 | D-T09 | Observabilidade: logs Pino em JSON com `request_id`, OpenTelemetry, Sentry |
 | D-T10 | Qualidade: ESLint (flat config) + Prettier; Conventional Commits; CI no GitHub Actions |
 | D-T11 | Provedores (adapters plugáveis): WhatsApp Cloud API (Meta), SMS Zenvia, e-mail Resend; em dev/test, adapters falsos |
@@ -205,7 +205,7 @@ graph LR
 ### F0 — Fundação do monorepo e CI
 
 - **Escopo:** pnpm + Turborepo; tsconfig base `strict`; ESLint/Prettier; esqueleto de `apps/api`,
-  `apps/worker`, `apps/web` e `packages/*`; Docker Compose (Postgres 16, Redis 7, MinIO, Mailpit);
+  `apps/worker`, `apps/web` e `packages/*`; Docker Compose (Postgres 16, Redis 7, SeaweedFS, Mailpit);
   `.env.example`; CI com jobs `lint`, `typecheck`, `test`, `build`, `db-invariantes`; Conventional Commits.
 - **Depende de:** nada.
 - **Pronto quando:** `pnpm i && pnpm dev` sobe API (`GET /v1/saude` → 200), worker e web; o CI roda
