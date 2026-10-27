@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  qualidade:
+    name: ${{ matrix.tarefa }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        tarefa: [lint, typecheck, test, build]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - if: matrix.tarefa == 'lint'
+        run: pnpm format:check
+      - run: pnpm ${{ matrix.tarefa }}
+
+  db-invariantes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16.15-alpine
+        env:
+          POSTGRES_USER: ebisu
+          POSTGRES_PASSWORD: ebisu
+          POSTGRES_DB: ebisu
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ebisu" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: ebisu
+      PGPASSWORD: ebisu
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - run: psql --version
+      - run: pnpm db:invariantes
+
+  infra:
+    name: docker compose
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - run: cp .env.example .env
+      - run: docker compose up -d --wait
+      - name: Aguardar criação do bucket
+        run: |
+          for _ in $(seq 1 30); do
+            estado=$(docker compose ps -a seaweedfs-init --format '{{.State}} {{.ExitCode}}')
+            case "$estado" in
+              "exited 0") echo "Bucket pronto"; exit 0 ;;
+              exited*) docker compose logs seaweedfs-init; exit 1 ;;
+            esac
+            sleep 2
+          done
+          docker compose logs seaweedfs-init
+          exit 1
+      - if: failure()
+        run: docker compose logs
+      - if: always()
+        run: docker compose down -v
+
+  commits:
+    name: conventional commits
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: >-
+          pnpm exec commitlint --verbose
+          --from ${{ github.event.pull_request.base.sha }}
+          --to ${{ github.event.pull_request.head.sha }}
