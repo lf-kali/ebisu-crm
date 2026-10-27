@@ -84,7 +84,7 @@ SSO/2FA, webhooks de saída, campos customizados, app mobile nativo.
 
 | ID | Escolha |
 |---|---|
-| D-T01 | Node.js 22 LTS, TypeScript `strict`, pnpm workspaces + Turborepo |
+| D-T01 | Node.js 24 LTS, TypeScript 5.9 `strict`, pnpm workspaces + Turborepo |
 | D-T02 | API: NestJS 11; validação com Zod (pipe próprio); OpenAPI via `@asteasolutions/zod-to-openapi` |
 | D-T03 | Banco: PostgreSQL 16 + Prisma 6; migrações versionadas (`prisma migrate`) com SQL complementar anexado |
 | D-T04 | Filas: Redis 7 + BullMQ |
