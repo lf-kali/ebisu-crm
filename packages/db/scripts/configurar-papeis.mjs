@@ -27,6 +27,8 @@ try {
       throw new Error(`Papel ${nome} não existe; rode as migrações antes (prisma migrate deploy)`);
     }
     // Configurações por papel (ALTER ROLE ... SET) não fazem parte do desenho: descarta.
+    // Se um superusuário as criou e este script roda sem ser superusuário, o RESET não as
+    // remove e a checagem abaixo aborta: nesse caso, um superusuário precisa limpar à mão.
     const banco = cliente.escapeIdentifier(
       (await cliente.query('SELECT current_database() AS d')).rows[0].d,
     );
