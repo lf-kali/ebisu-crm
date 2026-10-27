@@ -26,7 +26,8 @@ pnpm dev                 # api, worker e web
 As portas de Postgres e Redis fogem das padrão para não conflitar com instalações nativas; ajuste
 no `.env` se quiser. O bucket é criado pelo serviço `seaweedfs-init` alguns segundos depois do `up`.
 
-`docker compose down -v` apaga a infraestrutura e os dados locais.
+`docker compose down -v` apaga a infraestrutura e os dados locais. Usuário, senha e banco do
+Postgres só valem na criação do volume: para trocá-los, rode `down -v` antes.
 
 ## Comandos
 
