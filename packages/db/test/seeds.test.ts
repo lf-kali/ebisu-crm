@@ -38,6 +38,28 @@ describe('dados de referência (puros)', () => {
     }
   });
 
+  it('GERENTE tem lista fechada: tudo menos gestão de acesso e anonimização LGPD', () => {
+    const gerente = PAPEIS_PADRAO.find((p) => p.chave === 'GERENTE')!;
+    const fora = [
+      'config.empresa',
+      'config.membros',
+      'config.rbac',
+      'config.api_keys',
+      'lgpd.anonimizar',
+    ];
+    expect(Object.keys(gerente.permissoes).sort()).toEqual(
+      [...CHAVES_PERMISSAO].filter((c) => !fora.includes(c)).sort(),
+    );
+    expect(new Set(Object.values(gerente.permissoes))).toEqual(new Set(['EMPRESA']));
+  });
+
+  it('lgpd.anonimizar (irreversível) é só de OWNER e ADMIN', () => {
+    const comAnonimizar = PAPEIS_PADRAO.filter((p) => 'lgpd.anonimizar' in p.permissoes).map(
+      (p) => p.chave,
+    );
+    expect(comAnonimizar.sort()).toEqual(['ADMIN', 'OWNER']);
+  });
+
   it('SEG-5: só papéis que lidam com custo recebem financeiro.ver_custos', () => {
     const comCusto = PAPEIS_PADRAO.filter((p) => 'financeiro.ver_custos' in p.permissoes).map(
       (p) => p.chave,

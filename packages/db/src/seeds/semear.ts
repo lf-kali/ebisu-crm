@@ -5,6 +5,10 @@ import { PAPEIS_PADRAO } from './papeis-padrao.js';
 import { CHECKLISTS, TIPOS_ACESSORIO } from './padroes-tenant.js';
 
 // Todas as funções são idempotentes: rodar de novo não duplica nem altera o que já existe.
+// Elas NÃO convergem: um tenant já semeado não recebe mudanças posteriores nos padrões
+// (permissão nova ou revogada, item de checklist etc.). Mudança de papel padrão em tenants
+// existentes exige migração de dados própria. Execuções concorrentes no mesmo tenant: uma
+// vence e as demais falham por unicidade (rollback, sem duplicar) — quem chama deve repetir.
 
 type Cliente = PrismaClient | Prisma.TransactionClient;
 

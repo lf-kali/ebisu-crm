@@ -13,10 +13,9 @@ export interface DefinicaoPapel {
   readonly permissoes: Readonly<Record<string, Escopo>>;
 }
 
-const todas = (escopo: Escopo, exceto: readonly string[] = []) =>
-  Object.fromEntries(
-    CATALOGO_PERMISSOES.filter((p) => !exceto.includes(p.chave)).map((p) => [p.chave, escopo]),
-  );
+// Só OWNER e ADMIN recebem o catálogo inteiro (inclusive permissões futuras).
+const todas = (escopo: Escopo) =>
+  Object.fromEntries(CATALOGO_PERMISSOES.map((p) => [p.chave, escopo]));
 
 const com = (escopo: Escopo, chaves: readonly string[]) =>
   Object.fromEntries(chaves.map((chave) => [chave, escopo]));
@@ -37,12 +36,70 @@ export const PAPEIS_PADRAO: readonly DefinicaoPapel[] = [
   {
     chave: 'GERENTE',
     nome: 'Gerente',
-    descricao: 'Opera e acompanha a empresa; não gerencia acessos',
-    permissoes: todas('EMPRESA', [
-      'config.empresa',
-      'config.membros',
-      'config.rbac',
-      'config.api_keys',
+    descricao: 'Opera e acompanha a empresa; não gerencia acessos nem anonimiza (LGPD)',
+    // Lista fechada (decisão do dono): permissão nova no catálogo não entra sozinha.
+    permissoes: com('EMPRESA', [
+      'config.crm',
+      'config.bancada',
+      'config.notificacoes',
+      'contato.read',
+      'contato.create',
+      'contato.update',
+      'contato.delete',
+      'lead.create',
+      'lead.bulk_create',
+      'lead.bulk_update',
+      'lead.bulk_delete',
+      'negocio.read',
+      'negocio.create',
+      'negocio.update',
+      'negocio.delete',
+      'atividade.read',
+      'atividade.create',
+      'atividade.update',
+      'atividade.delete',
+      'tarefa.read',
+      'tarefa.create',
+      'tarefa.update',
+      'tarefa.delete',
+      'dispositivo.read',
+      'dispositivo.create',
+      'dispositivo.update',
+      'dispositivo.delete',
+      'inspecao.read',
+      'inspecao.create',
+      'orcamento.read',
+      'orcamento.create',
+      'orcamento.update',
+      'orcamento.delete',
+      'orcamento.enviar',
+      'orcamento.decidir',
+      'orcamento.cancelar',
+      'os.read',
+      'os.create',
+      'os.update',
+      'os.delete',
+      'os.change_status',
+      'os.itens',
+      'os.entregar',
+      'estoque.read',
+      'estoque.create',
+      'estoque.update',
+      'estoque.delete',
+      'estoque.ajuste',
+      'compra.read',
+      'compra.create',
+      'compra.update',
+      'compra.receber',
+      'compra.cancelar',
+      'financeiro.read',
+      'financeiro.receber',
+      'financeiro.pagar',
+      'financeiro.ver_custos',
+      'relatorio.crm',
+      'relatorio.bancada',
+      'relatorio.financeiro',
+      'relatorio.estoque',
     ]),
   },
   {
