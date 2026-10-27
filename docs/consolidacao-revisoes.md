@@ -113,7 +113,7 @@ que diferencia o produto. A saída é entregar **as funcionalidades, mas não os
 
 **Entram:** `idempotencia_requisicao` e os campos do termo de responsabilidade na `inspecao`.
 
-**Resultado:** cerca de 48 tabelas, com o núcleo intacto.
+**Resultado:** 49 tabelas, com o núcleo intacto.
 
 Alterações estruturais:
 
@@ -245,11 +245,11 @@ RETURNING estoque_atual, custo_medio;
 - Compra recebida gera título a pagar.
 - Estorno de pagamento é um novo registro, nunca DELETE.
 
-### 4.4 Respostas propostas para as perguntas em aberto
+### 4.4 Decisões para as perguntas em aberto (aprovadas)
 
 | Pergunta | Proposta |
 |---|---|
-| Guardar senha de desbloqueio? | **Não no MVP.** Desbloqueio presencial mais termo de responsabilidade. Se voltar, com consentimento explícito e log de acesso |
+| Guardar senha de desbloqueio? | **Não.** O cliente remove o bloqueio ao entregar o dispositivo; a inspeção de entrada registra isso e o termo de responsabilidade explica a política |
 | Clientes compartilhados entre empresas do tenant? | Não (escopo por CNPJ). Sem transferência de estoque entre empresas |
 | Estoque negativo? | Não (CHECK). Peça faltante vira `A_COMPRAR` |
 | Custeio | Custo médio ponderado móvel por empresa, para gestão e não para o fiscal |
@@ -297,8 +297,10 @@ RETURNING estoque_atual, custo_medio;
 
 ---
 
-## 5. Próximos passos
+## 5. Situação
 
-1. Validar as decisões da §4.4, principalmente: 1 orçamento = 1 OS, sem senha de desbloqueio, caixa no P1.
-2. Gerar o `schema.prisma` v0.2-MVP com as mudanças da §4.2, validado com o Prisma, e `docs/invariantes.md` com as tabelas de estado e as regras da §4.3.
-3. Submeter os dois arquivos numa branch com PR para revisão.
+- Decisões da §4.4 aprovadas.
+- Schema v0.2-MVP em [`schema.prisma`](./schema.prisma) (v0.1 em [`historico/`](./historico/schema-v0.1.prisma)).
+- Regras, estados e comandos em [`invariantes.md`](./invariantes.md); constraints e RLS em
+  [`sql/complemento-v0.2.sql`](./sql/complemento-v0.2.sql), testadas por
+  [`sql/testes-invariantes.sh`](./sql/testes-invariantes.sh).
