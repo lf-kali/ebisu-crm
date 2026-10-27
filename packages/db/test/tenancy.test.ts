@@ -2,7 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
 import type pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { clienteDoTenant, comTenant, TenantInvalidoError } from '../src/tenancy.js';
+import {
+  clienteDoTenant,
+  comTenant,
+  TenantInvalidoError,
+  TransacaoNoClienteDoTenantError,
+} from '../src/tenancy.js';
 import { type BancoDeTeste, criarBancoDeTeste } from './banco-de-teste.js';
 
 // Dois tenants, uma empresa cada; T1 com 2 contatos e T2 com 1.
@@ -172,6 +177,34 @@ describe('tenancy (comTenant e clienteDoTenant) — SEG-1, SEG-6', () => {
     expect(await t1.contato.count()).toBe(3);
     await t1.contato.delete({ where: { id } });
     expect(await t1.contato.count()).toBe(2);
+  });
+
+  it('SEG-6: clienteDoTenant roda set_config e a operação na MESMA transação', async () => {
+    const consultas: string[] = [];
+    const comLog = new PrismaClient({
+      datasourceUrl: urlComPool(banco.urlDoPapel('ebisu_app'), 1),
+      log: [{ emit: 'event', level: 'query' }],
+    });
+    comLog.$on('query', (evento) => consultas.push(evento.query));
+    try {
+      expect(await clienteDoTenant(comLog, T1).contato.count()).toBe(2);
+    } finally {
+      await comLog.$disconnect();
+    }
+    const normalizadas = consultas.map((sql) => sql.replace(/\s+/g, ' ').trim());
+    expect(normalizadas).toHaveLength(4);
+    expect(normalizadas[0]).toBe('BEGIN');
+    expect(normalizadas[1]).toBe("SELECT set_config('app.tenant_id', $1, true)");
+    expect(normalizadas[2]).toMatch(/^SELECT COUNT\(\*\).*"contato"/);
+    expect(normalizadas[3]).toBe('COMMIT');
+  });
+
+  it('clienteDoTenant recusa $transaction (interativa e em lote) e aponta para comTenant', () => {
+    const t1 = clienteDoTenant(app, T1);
+    // O tipo já impede a chamada (`$transaction(): never`); aqui provamos o bloqueio em runtime.
+    const transacao = t1.$transaction as unknown as (arg: unknown) => unknown;
+    expect(() => transacao(async () => 1)).toThrow(TransacaoNoClienteDoTenantError);
+    expect(() => transacao([t1.contato.count()])).toThrow(/use comTenant/);
   });
 
   it.each(['', 'nao-e-uuid', `${T1}'; SELECT 1; --`, '00000000-0000-0000-0000-00000000000g'])(

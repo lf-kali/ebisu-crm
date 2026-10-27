@@ -19,7 +19,9 @@
     "test": "prisma generate && vitest run",
     "migrate:deploy": "prisma migrate deploy",
     "migrate:status": "prisma migrate status",
-    "papeis": "node scripts/configurar-papeis.mjs"
+    "papeis": "node scripts/configurar-papeis.mjs",
+    "seed": "node dist/seeds/cli.js catalogo",
+    "seed:demo": "node dist/seeds/cli.js demo"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
