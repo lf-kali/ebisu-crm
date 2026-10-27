@@ -1,2 +1,8 @@
-// Esqueleto: cliente Prisma com extensão de tenancy e helper comTenant entram na F1.
-export {};
+export { Prisma, PrismaClient } from '@prisma/client';
+export {
+  clienteDoTenant,
+  comTenant,
+  TenantInvalidoError,
+  type ClienteDoTenant,
+  type OpcoesTransacao,
+} from './tenancy.js';

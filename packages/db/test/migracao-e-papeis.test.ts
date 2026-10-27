@@ -124,6 +124,8 @@ describe('migração inicial e papéis de banco', () => {
     motivo: string;
     papel: string;
     estragar: (banco: string) => string[];
+    /** SQL rodado conectado ao banco novo, depois de `estragar`. */
+    noBanco?: string[];
     desfazer: (banco: string) => string[];
   }> = [
     ...(['SUPERUSER', 'BYPASSRLS', 'CREATEROLE', 'CREATEDB', 'REPLICATION'] as const).map(
@@ -147,6 +149,25 @@ describe('migração inicial e papéis de banco', () => {
       desfazer: (b) => [`DROP DATABASE ${b}`],
     },
     {
+      motivo: 'dono de schema',
+      papel: 'ebisu_app',
+      estragar: (b) => [`CREATE DATABASE ${b}`],
+      noBanco: ['CREATE SCHEMA intruso AUTHORIZATION ebisu_app'],
+      desfazer: () => [],
+    },
+    {
+      motivo: 'dono de objeto',
+      papel: 'ebisu_app',
+      estragar: (b) => [`CREATE DATABASE ${b}`],
+      // Fora do schema public: com public não vazio o próprio Prisma recusa o deploy (P3005).
+      noBanco: [
+        'CREATE SCHEMA extra',
+        'CREATE TABLE extra.intrusa (id int)',
+        'ALTER TABLE extra.intrusa OWNER TO ebisu_app',
+      ],
+      desfazer: () => [],
+    },
+    {
       motivo: 'configuração própria (ALTER ROLE ... SET)',
       papel: 'ebisu_app',
       estragar: (b) => [
@@ -159,12 +180,20 @@ describe('migração inicial e papéis de banco', () => {
 
   it.each(PAPEIS_INSEGUROS)(
     'SEG-6: aborta a migração se um papel existente for inseguro ($motivo)',
-    async ({ motivo, papel, estragar, desfazer }) => {
+    async ({ motivo, papel, estragar, noBanco = [], desfazer }) => {
       const nomeBanco = `banco_${randomUUID().replaceAll('-', '')}`;
+      const url = new URL(banco.urlAdmin);
+      url.pathname = `/${nomeBanco}`;
       for (const sql of estragar(nomeBanco)) await admin.query(sql);
       try {
-        const url = new URL(banco.urlAdmin);
-        url.pathname = `/${nomeBanco}`;
+        if (noBanco.length > 0) {
+          const conexao = await banco.conectar(url.toString());
+          try {
+            for (const sql of noBanco) await conexao.query(sql);
+          } finally {
+            await conexao.end();
+          }
+        }
         let saida = '';
         try {
           rodarNoPacote('pnpm', ['exec', 'prisma', 'migrate', 'deploy'], {
