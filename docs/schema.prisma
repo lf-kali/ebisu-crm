@@ -1,17 +1,24 @@
 // =============================================================================
-// ebisuCRM — Modelo de dados de referência v0.1
+// ebisuCRM — Modelo de dados v0.2-MVP
 // -----------------------------------------------------------------------------
+// Evolução da v0.1 (docs/historico/schema-v0.1.prisma) conforme
+// docs/consolidacao-revisoes.md. Regras de negócio em docs/invariantes.md.
+//
 // Convenções
-// - PostgreSQL 16. IDs UUIDv7 (ordenáveis por tempo).
-// - Toda tabela de negócio carrega `tenant_id` (isolamento via Row Level
-//   Security: `tenant_id = current_setting('app.tenant_id')::uuid`) e, quando o
-//   dado pertence a um CNPJ, `empresa_id` (escopo LGPD/estoque/fiscal).
-// - Dinheiro: Decimal(14,2). Quantidade: Decimal(14,3).
-// - Soft delete via `deleted_at` em entidades que o usuário apaga pela UI.
-// - Ledgers (movimento de estoque, histórico de status, eventos de dispositivo,
-//   eventos de pontuação, audit log) são append-only.
-// - Referências polimórficas (`entidade_tipo` + `entidade_id`) não têm FK.
-// - Mapeamento com o Ogun indicado em comentários `Ogun:`.
+// - PostgreSQL 16. IDs UUIDv7. Nomes em português, snake_case.
+// - tenant_id em toda tabela de negócio (RLS: tenant_id = current_setting('app.tenant_id')).
+// - empresa_id nos dados que pertencem a um CNPJ.
+// - INTEGRIDADE ENTRE EMPRESAS: toda relação de negócio usa FK COMPOSTA
+//   (tenant_id, empresa_id) → empresa e (empresa_id, x_id) → x. Assim é
+//   impossível, no banco, ligar uma OS da empresa A a um contato da empresa B.
+//   Relações opcionais compostas usam onDelete: Restrict (SetNull anularia empresa_id).
+// - Dinheiro Decimal(14,2); quantidade Decimal(14,3).
+// - Soft delete (deleted_at) nas entidades apagáveis pela UI.
+// - Ledgers e históricos são append-only; correção = novo registro (estorno).
+// - Trava otimista: versao_registro em orçamento e OS (UPDATE ... WHERE versao_registro = $v).
+// - Única referência genérica (entidade_tipo + entidade_id): audit_log.
+// - Constraints que o Prisma não expressa (CHECK, índices parciais, RLS) estão
+//   em docs/invariantes.md §7 e vão para migrações SQL.
 // =============================================================================
 
 generator client {
@@ -45,15 +52,19 @@ model Tenant {
   created_at DateTime     @default(now())
   updated_at DateTime     @updatedAt
 
-  empresas Empresa[]
-  membros  Membro[]
-  papeis   Papel[]
-  api_keys ApiKey[]
+  empresas        Empresa[]
+  membros         Membro[]
+  papeis          Papel[]
+  tipos_acessorio TipoAcessorio[]
+  checklists      ChecklistModelo[]
+  idempotencias   IdempotenciaRequisicao[]
 
   @@map("tenant")
 }
 
-/// Empresa = CNPJ. É o controlador LGPD dos dados de clientes e dona do estoque.
+/// Empresa = CNPJ. Controladora LGPD dos dados de clientes e dona do estoque.
+/// config: validade_orcamento_dias, garantia_padrao_dias, prazo_padrao_dias,
+///         pesos de scoring (P1), horário de envio de notificações etc.
 model Empresa {
   id            String    @id @default(uuid(7)) @db.Uuid
   tenant_id     String    @db.Uuid
@@ -67,7 +78,6 @@ model Empresa {
   logo_url      String?
   timezone      String    @default("America/Sao_Paulo")
   moeda         String    @default("BRL")
-  /// validade_orcamento_dias, garantia_padrao_dias, prazo_padrao_dias, etc.
   config        Json      @default("{}")
   ativo         Boolean   @default(true)
   created_at    DateTime  @default(now())
@@ -76,37 +86,40 @@ model Empresa {
 
   tenant Tenant @relation(fields: [tenant_id], references: [id])
 
-  atribuicoes         AtribuicaoPapel[]
-  api_keys            ApiKey[]
-  sequencias          SequenciaDocumento[]
-  contatos            Contato[]
-  origens             OrigemLead[]
-  capturas            CapturaLead[]
-  funis               Funil[]
-  negocios            Negocio[]
-  motivos_perda       MotivoPerda[]
-  atividades          Atividade[]
-  tarefas             Tarefa[]
-  regras_pontuacao    RegraPontuacao[]
-  regras_proxima_acao RegraProximaAcao[]
-  sugestoes_acao      SugestaoAcao[]
-  tags                Tag[]
-  dispositivos        Dispositivo[]
-  inspecoes           Inspecao[]
-  orcamentos          Orcamento[]
-  ordens_servico      OrdemServico[]
-  fornecedores        Fornecedor[]
-  categorias_item     CategoriaItem[]
-  itens               Item[]
-  compras             Compra[]
-  movimentos_estoque  MovimentoEstoque[]
-  vendas              Venda[]
-  titulos             TituloFinanceiro[]
-  modelos_mensagem    ModeloMensagem[]
-  config_notificacoes ConfigNotificacaoEvento[]
-  notificacoes        Notificacao[]
-  jobs_lote           JobLote[]
+  atribuicoes     AtribuicaoPapel[]
+  api_keys        ApiKey[]
+  sequencias      SequenciaDocumento[]
+  contatos        Contato[]
+  origens         OrigemLead[]
+  capturas        CapturaLead[]
+  consentimentos  Consentimento[]
+  funis           Funil[]
+  negocios        Negocio[]
+  motivos_perda   MotivoPerda[]
+  atividades      Atividade[]
+  tarefas         Tarefa[]
+  dispositivos    Dispositivo[]
+  proprietarios   DispositivoProprietario[]
+  eventos_disp    DispositivoEvento[]
+  acessorios      AcessorioRecebido[]
+  inspecoes       Inspecao[]
+  orcamentos      Orcamento[]
+  orcamento_itens OrcamentoItem[]
+  ordens_servico  OrdemServico[]
+  os_itens        OrdemServicoItem[]
+  anexos          Anexo[]
+  fornecedores    Fornecedor[]
+  itens           Item[]
+  compras         Compra[]
+  compra_itens    CompraItem[]
+  movimentos      MovimentoEstoque[]
+  titulos         TituloFinanceiro[]
+  pagamentos      Pagamento[]
+  modelos_msg     ModeloMensagem[]
+  notificacoes    Notificacao[]
+  jobs_lote       JobLote[]
 
+  @@unique([tenant_id, id])
   @@unique([tenant_id, cnpj])
   @@index([tenant_id])
   @@map("empresa")
@@ -120,7 +133,6 @@ model Usuario {
   telefone     String?
   senha_hash   String?
   avatar_url   String?
-  mfa_secret   String? /// cifrado
   ultimo_login DateTime?
   ativo        Boolean   @default(true)
   created_at   DateTime  @default(now())
@@ -136,7 +148,7 @@ model RefreshToken {
   id          String    @id @default(uuid(7)) @db.Uuid
   usuario_id  String    @db.Uuid
   token_hash  String    @unique
-  familia     String    @db.Uuid /// rotação: reuse detection invalida a família
+  familia     String    @db.Uuid /// rotação: reuso detectado invalida a família
   user_agent  String?
   ip          String?
   expira_em   DateTime
@@ -168,19 +180,19 @@ model Membro {
   tenant  Tenant  @relation(fields: [tenant_id], references: [id])
   usuario Usuario @relation(fields: [usuario_id], references: [id])
 
-  atribuicoes         AtribuicaoPapel[]
-  contatos            Contato[]         @relation("ContatoResponsavel")
-  negocios            Negocio[]         @relation("NegocioResponsavel")
-  tarefas             Tarefa[]          @relation("TarefaResponsavel")
-  ordens_como_tecnico OrdemServico[]    @relation("OSTecnico")
-  apontamentos        ApontamentoOS[]
+  atribuicoes AtribuicaoPapel[]
+  contatos    Contato[]         @relation("ContatoResponsavel")
+  negocios    Negocio[]         @relation("NegocioResponsavel")
+  tarefas     Tarefa[]          @relation("TarefaResponsavel")
+  ordens_tec  OrdemServico[]    @relation("OSTecnico")
 
   @@unique([tenant_id, usuario_id])
+  @@unique([tenant_id, id])
   @@map("membro")
 }
 
 /// Papéis padrão (sistema=true, semeados por tenant): OWNER, ADMIN, GERENTE,
-/// ATENDENTE (comercial), TECNICO, ESTOQUISTA, FINANCEIRO.
+/// ATENDENTE, TECNICO, ESTOQUISTA, FINANCEIRO. Editor de papéis = P1.
 model Papel {
   id         String   @id @default(uuid(7)) @db.Uuid
   tenant_id  String   @db.Uuid
@@ -196,12 +208,12 @@ model Papel {
   atribuicoes AtribuicaoPapel[]
 
   @@unique([tenant_id, chave])
+  @@unique([tenant_id, id])
   @@map("papel")
 }
 
-/// Catálogo fixo de permissões no formato `recurso.acao`
-/// ex.: lead.create, lead.bulk_delete, os.change_status, estoque.ajuste,
-/// financeiro.ver_custos, config.rbac.
+/// Catálogo fixo `recurso.acao`: lead.create, lead.bulk_delete, os.change_status,
+/// estoque.ajuste, financeiro.ver_custos, config.rbac …
 model Permissao {
   chave     String @id
   recurso   String
@@ -234,36 +246,37 @@ model PapelPermissao {
 /// Papel do membro em uma empresa (empresa_id nulo = todas as empresas do tenant).
 model AtribuicaoPapel {
   id         String   @id @default(uuid(7)) @db.Uuid
+  tenant_id  String   @db.Uuid
   membro_id  String   @db.Uuid
   papel_id   String   @db.Uuid
   empresa_id String?  @db.Uuid
   created_at DateTime @default(now())
 
-  membro  Membro   @relation(fields: [membro_id], references: [id], onDelete: Cascade)
-  papel   Papel    @relation(fields: [papel_id], references: [id], onDelete: Cascade)
-  empresa Empresa? @relation(fields: [empresa_id], references: [id])
+  membro  Membro   @relation(fields: [tenant_id, membro_id], references: [tenant_id, id], onDelete: Cascade)
+  papel   Papel    @relation(fields: [tenant_id, papel_id], references: [tenant_id, id], onDelete: Cascade)
+  empresa Empresa? @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id], onDelete: Restrict)
 
   @@unique([membro_id, papel_id, empresa_id])
   @@map("atribuicao_papel")
 }
 
-/// Chaves para integrações máquina-a-máquina (formulários do site, n8n, etc.).
+/// Chaves para integrações máquina-a-máquina (formulários do site, n8n…).
 model ApiKey {
-  id          String    @id @default(uuid(7)) @db.Uuid
-  tenant_id   String    @db.Uuid
-  empresa_id  String    @db.Uuid
-  nome        String
-  prefixo     String    @unique /// exibido: ebk_live_ab12…
-  hash        String
-  escopos     String[] /// ex.: ["lead.create", "lead.update"]
-  ultimo_uso  DateTime?
-  expira_em   DateTime?
-  revogada_em DateTime?
-  criado_por  String?   @db.Uuid
-  created_at  DateTime  @default(now())
+  id           String    @id @default(uuid(7)) @db.Uuid
+  tenant_id    String    @db.Uuid
+  empresa_id   String    @db.Uuid
+  nome         String
+  prefixo      String    @unique /// exibido: ebk_live_ab12…
+  hash         String
+  escopos      String[] /// ex.: ["lead.create", "lead.update"]
+  origens_cors String[] /// domínios autorizados a usar /public/*
+  ultimo_uso   DateTime?
+  expira_em    DateTime?
+  revogada_em  DateTime?
+  criado_por   String?   @db.Uuid
+  created_at   DateTime  @default(now())
 
-  tenant  Tenant  @relation(fields: [tenant_id], references: [id])
-  empresa Empresa @relation(fields: [empresa_id], references: [id])
+  empresa Empresa @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
 
   @@map("api_key")
 }
@@ -272,10 +285,10 @@ enum TipoDocumentoSequencia {
   ORCAMENTO
   ORDEM_SERVICO
   COMPRA
-  VENDA
 }
 
-/// Numeração humana por empresa. Ogun: autoname "ORC-{DD}{MM}{YY}-{####}".
+/// Numeração humana por empresa (Ogun: "ORC-{DD}{MM}{YY}-{####}").
+/// Incremento via UPDATE … SET proximo = proximo + 1 RETURNING (lock de linha).
 model SequenciaDocumento {
   id         String                 @id @default(uuid(7)) @db.Uuid
   tenant_id  String                 @db.Uuid
@@ -285,12 +298,14 @@ model SequenciaDocumento {
   periodo    String                 @default("") /// chave de reinício (ex.: "2610")
   proximo    Int                    @default(1)
 
-  empresa Empresa @relation(fields: [empresa_id], references: [id])
+  empresa Empresa @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
 
   @@unique([empresa_id, tipo, periodo])
   @@map("sequencia_documento")
 }
 
+/// Append-only. Única tabela com referência genérica: só recebe INSERT,
+/// é lida apenas pela API e já carrega empresa_id para escopo/RLS.
 model AuditLog {
   id              String   @id @default(uuid(7)) @db.Uuid
   tenant_id       String   @db.Uuid
@@ -299,7 +314,7 @@ model AuditLog {
   ator_api_key_id String?  @db.Uuid
   entidade_tipo   String
   entidade_id     String   @db.Uuid
-  acao            String /// create | update | delete | status_change | bulk_*
+  acao            String /// create | update | delete | status_change | bulk_* | anonimizar
   diff            Json?
   ip              String?
   request_id      String?
@@ -308,6 +323,31 @@ model AuditLog {
   @@index([tenant_id, entidade_tipo, entidade_id])
   @@index([tenant_id, ocorreu_em])
   @@map("audit_log")
+}
+
+enum StatusIdempotencia {
+  EM_PROCESSAMENTO
+  CONCLUIDA
+}
+
+/// Guarda o resultado de POSTs com Idempotency-Key. Repetição com o mesmo
+/// hash devolve a resposta salva; hash diferente → 422; EM_PROCESSAMENTO → 409.
+model IdempotenciaRequisicao {
+  tenant_id    String             @db.Uuid
+  chave        String
+  rota         String
+  hash_payload String
+  status       StatusIdempotencia @default(EM_PROCESSAMENTO)
+  status_http  Int?
+  resposta     Json?
+  criado_em    DateTime           @default(now())
+  expira_em    DateTime
+
+  tenant Tenant @relation(fields: [tenant_id], references: [id])
+
+  @@id([tenant_id, chave])
+  @@index([expira_em])
+  @@map("idempotencia_requisicao")
 }
 
 // =============================================================================
@@ -325,14 +365,15 @@ enum CanalComunicacao {
   SMS
 }
 
-/// Lifecycle (inspirado em HubSpot/RD Station), no nível da pessoa.
+/// Lifecycle da pessoa — DERIVADO dos negócios/OS pelo serviço de domínio,
+/// nunca editado à mão (ver invariantes CRM-2).
 enum CicloVida {
-  LEAD /// só nome + contato
-  LEAD_QUALIFICADO /// perfil mínimo completo (dispositivo + interesse + canal)
-  OPORTUNIDADE /// tem orçamento em andamento
-  CLIENTE /// 1ª OS aprovada (conversão)
-  RECORRENTE /// 2+ OS
-  INATIVO /// sem interação há N meses / opt-out
+  LEAD
+  LEAD_QUALIFICADO
+  OPORTUNIDADE
+  CLIENTE
+  RECORRENTE
+  INATIVO
 }
 
 enum Temperatura {
@@ -341,24 +382,23 @@ enum Temperatura {
   QUENTE
 }
 
-/// Quadrante Fit × Engajamento — responde "o que faço com este lead agora?"
+/// Quadrante Fit × Engajamento — "o que faço com este lead agora?"
 enum QuadranteLead {
-  PRONTO_PARA_COMPRAR /// fit alto + engajamento alto → abordar/fechar já
+  PRONTO_PARA_COMPRAR /// fit alto + engajamento alto → fechar já
   CULTIVAR /// fit alto + engajamento baixo → nutrir agora
-  PROSPECTAR /// fit baixo + engajamento alto → falta dado: completar perfil
+  PROSPECTAR /// fit baixo + engajamento alto → completar perfil
   TRABALHAR_DEPOIS /// fit baixo + engajamento baixo → baixa prioridade
 }
 
-/// Pessoa/empresa atendida. Lead e Cliente são a MESMA entidade em estágios
-/// diferentes de ciclo de vida (evita a "conversão com cópia" do Salesforce).
-/// Ogun: Customer (ERPNext).
+/// Lead e cliente são a MESMA entidade. Campos de inteligência são calculados
+/// por regras no código (versão em score_regras_versao) e explicados em score_motivos.
 model Contato {
   id                String            @id @default(uuid(7)) @db.Uuid
   tenant_id         String            @db.Uuid
   empresa_id        String            @db.Uuid
   tipo_pessoa       TipoPessoa        @default(PF)
   nome              String
-  documento         String? /// CPF/CNPJ (opcional até o fechamento)
+  documento         String?
   email             String?
   email_normalizado String?
   telefone_e164     String?
@@ -370,44 +410,47 @@ model Contato {
   origem_id         String?           @db.Uuid
   responsavel_id    String?           @db.Uuid
 
-  // --- inteligência (recalculada por job; nunca editada à mão) ---
+  // --- inteligência (somente o serviço de scoring escreve) ---
   score_fit           Int           @default(0) /// 0–50
-  score_engajamento   Int           @default(0) /// 0–50 com decaimento
+  score_engajamento   Int           @default(0) /// 0–50, decaimento calculado na hora
   score_total         Int           @default(0)
   temperatura         Temperatura   @default(FRIO)
   quadrante           QuadranteLead @default(TRABALHAR_DEPOIS)
   completude_perfil   Int           @default(0) /// % de requisitos atendidos
   campos_faltantes    String[] /// ex.: ["dispositivo", "canal_preferido"]
+  score_motivos       Json          @default("[]") /// [{regra, dimensao, pontos, motivo}]
+  score_regras_versao String?
+  score_calculado_em  DateTime?
+  nba_adiada_ate      DateTime? /// próxima ação "lembrar depois"
   ultima_interacao_em DateTime?
   convertido_em       DateTime?
   ltv                 Decimal       @default(0) @db.Decimal(14, 2)
 
-  observacoes      String?
-  erp_customer_ref String?
-  created_at       DateTime  @default(now())
-  updated_at       DateTime  @updatedAt
-  deleted_at       DateTime?
+  observacoes    String?
+  anonimizado_em DateTime? /// LGPD: dados pessoais zerados, UUID preservado
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+  deleted_at     DateTime?
 
-  empresa     Empresa     @relation(fields: [empresa_id], references: [id])
-  origem      OrigemLead? @relation(fields: [origem_id], references: [id])
-  responsavel Membro?     @relation("ContatoResponsavel", fields: [responsavel_id], references: [id])
+  empresa     Empresa     @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
+  origem      OrigemLead? @relation(fields: [empresa_id, origem_id], references: [empresa_id, id], onDelete: Restrict)
+  responsavel Membro?     @relation("ContatoResponsavel", fields: [tenant_id, responsavel_id], references: [tenant_id, id], onDelete: Restrict)
 
   capturas       CapturaLead[]
   consentimentos Consentimento[]
   negocios       Negocio[]
   atividades     Atividade[]
   tarefas        Tarefa[]
-  eventos_score  EventoPontuacao[]
-  sugestoes_acao SugestaoAcao[]
   propriedades   DispositivoProprietario[]
   dispositivos   Dispositivo[]
   orcamentos     Orcamento[]
   ordens_servico OrdemServico[]
-  vendas         Venda[]
   titulos        TituloFinanceiro[]
   notificacoes   Notificacao[]
+  anexos         Anexo[]
 
-  // dedupe por empresa (índices parciais WHERE deleted_at IS NULL na migração)
+  // dedupe: índices ÚNICOS PARCIAIS (WHERE deleted_at IS NULL) na migração SQL
+  @@unique([empresa_id, id])
   @@index([empresa_id, email_normalizado])
   @@index([empresa_id, telefone_e164])
   @@index([empresa_id, whatsapp_e164])
@@ -439,11 +482,12 @@ model OrigemLead {
   tipo       TipoOrigem
   ativo      Boolean    @default(true)
 
-  empresa  Empresa       @relation(fields: [empresa_id], references: [id])
+  empresa  Empresa       @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
   contatos Contato[]
   capturas CapturaLead[]
 
   @@unique([empresa_id, nome])
+  @@unique([empresa_id, id])
   @@map("origem_lead")
 }
 
@@ -454,15 +498,15 @@ enum StatusCaptura {
   REJEITADA
 }
 
-/// Cada toque de entrada (form, orçamento online abandonado, msg WhatsApp…),
-/// guardado bruto + atribuição de marketing.
+/// Cada toque de entrada (form, orçamento online, msg WhatsApp…), bruto + atribuição.
+/// Também é fonte de eventos de engajamento para o scoring.
 model CapturaLead {
   id              String        @id @default(uuid(7)) @db.Uuid
   tenant_id       String        @db.Uuid
   empresa_id      String        @db.Uuid
   contato_id      String?       @db.Uuid
   origem_id       String?       @db.Uuid
-  evento          String /// ex.: form_contato, orcamento_iniciado, orcamento_abandonado
+  evento          String /// form_contato | orcamento_iniciado | orcamento_abandonado | mensagem_recebida
   payload         Json
   utm_source      String?
   utm_medium      String?
@@ -478,12 +522,13 @@ model CapturaLead {
   erro            String?
   recebido_em     DateTime      @default(now())
 
-  empresa Empresa     @relation(fields: [empresa_id], references: [id])
-  contato Contato?    @relation(fields: [contato_id], references: [id])
-  origem  OrigemLead? @relation(fields: [origem_id], references: [id])
+  empresa Empresa     @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
+  contato Contato?    @relation(fields: [empresa_id, contato_id], references: [empresa_id, id], onDelete: Restrict)
+  origem  OrigemLead? @relation(fields: [empresa_id, origem_id], references: [empresa_id, id], onDelete: Restrict)
 
   @@unique([empresa_id, idempotency_key])
   @@index([empresa_id, recebido_em])
+  @@index([contato_id, recebido_em])
   @@map("captura_lead")
 }
 
@@ -492,10 +537,12 @@ enum FinalidadeConsentimento {
   MARKETING /// ofertas, nutrição (base legal: consentimento)
 }
 
-/// LGPD — prova de consentimento/opt-out por canal e finalidade.
+/// LGPD — prova de consentimento/opt-out por canal e finalidade (append-only:
+/// revogação = novo registro com concedido=false).
 model Consentimento {
   id          String                  @id @default(uuid(7)) @db.Uuid
   tenant_id   String                  @db.Uuid
+  empresa_id  String                  @db.Uuid
   contato_id  String                  @db.Uuid
   canal       CanalComunicacao
   finalidade  FinalidadeConsentimento
@@ -503,14 +550,15 @@ model Consentimento {
   base_legal  String /// consentimento | execucao_contrato | legitimo_interesse
   evidencia   Json? /// texto exibido, ip, url, captura_id
   coletado_em DateTime                @default(now())
-  revogado_em DateTime?
 
-  contato Contato @relation(fields: [contato_id], references: [id], onDelete: Cascade)
+  empresa Empresa @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
+  contato Contato @relation(fields: [empresa_id, contato_id], references: [empresa_id, id], onDelete: Cascade)
 
-  @@index([contato_id, canal, finalidade])
+  @@index([contato_id, canal, finalidade, coletado_em])
   @@map("consentimento")
 }
 
+/// MVP: um funil padrão por empresa (nomes/ordem editáveis). Múltiplos funis = P1.
 model Funil {
   id         String   @id @default(uuid(7)) @db.Uuid
   tenant_id  String   @db.Uuid
@@ -520,10 +568,11 @@ model Funil {
   ativo      Boolean  @default(true)
   created_at DateTime @default(now())
 
-  empresa  Empresa      @relation(fields: [empresa_id], references: [id])
+  empresa  Empresa      @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
   etapas   EtapaFunil[]
   negocios Negocio[]
 
+  @@unique([empresa_id, id])
   @@map("funil")
 }
 
@@ -534,7 +583,7 @@ enum TipoEtapa {
   NUTRICAO
 }
 
-/// Etapas padrão: Novo contato → Qualificação → Diagnóstico/Orçamento →
+/// Padrão: Novo contato → Qualificação → Diagnóstico/Orçamento →
 /// Orçamento enviado → Negociação → Ganho | Perdido | Nutrição.
 model EtapaFunil {
   id            String    @id @default(uuid(7)) @db.Uuid
@@ -542,8 +591,8 @@ model EtapaFunil {
   nome          String
   ordem         Int
   tipo          TipoEtapa @default(ABERTA)
-  probabilidade Int       @default(0) /// % para forecast
-  sla_horas     Int? /// "rotting" estilo Pipedrive
+  probabilidade Int       @default(0)
+  sla_horas     Int? /// negócio parado além disso entra na fila de próximas ações
   cor           String?
 
   funil      Funil            @relation(fields: [funil_id], references: [id], onDelete: Cascade)
@@ -551,26 +600,26 @@ model EtapaFunil {
   negocios   Negocio[]
 
   @@unique([funil_id, ordem])
+  @@unique([funil_id, id])
   @@map("etapa_funil")
 }
 
 enum TipoRequisito {
-  CAMPO /// um campo precisa estar preenchido (ex.: contato.whatsapp_e164)
-  TAREFA /// uma tarefa precisa estar concluída (gerada automaticamente)
-  REGRA /// expressão (ex.: orcamento.status == ENVIADO)
+  CAMPO /// campo preenchido (ex.: contato.whatsapp_e164, negocio.dispositivo_id)
+  TAREFA /// tarefa concluída (criada automaticamente ao entrar na etapa)
+  REGRA /// chave de regra implementada no código (ex.: orcamento_enviado)
 }
 
-/// "Blueprint" (Zoho): o que é preciso para SAIR desta etapa.
-/// Alimenta a completude do perfil e gera tarefas automaticamente.
+/// "O que falta" para SAIR da etapa. Alimenta completude, campos_faltantes e tarefas.
 model RequisitoEtapa {
   id            String        @id @default(uuid(7)) @db.Uuid
   etapa_id      String        @db.Uuid
   tipo          TipoRequisito
-  chave         String /// caminho do campo ou chave da regra
-  descricao     String /// texto exibido ao usuário ("Identificar o dispositivo")
-  obrigatorio   Boolean       @default(true) /// false = recomendado (só pesa na completude)
+  chave         String
+  descricao     String /// "Identificar o dispositivo"
+  obrigatorio   Boolean       @default(true) /// false = só pesa na completude
   ordem         Int           @default(0)
-  titulo_tarefa String? /// quando tipo=TAREFA, título da tarefa a criar
+  titulo_tarefa String?
 
   etapa   EtapaFunil @relation(fields: [etapa_id], references: [id], onDelete: Cascade)
   tarefas Tarefa[]
@@ -601,8 +650,7 @@ enum StatusNegocio {
   NUTRICAO
 }
 
-/// Oportunidade (deal). Um contato pode ter várias (um por demanda/dispositivo).
-/// GANHO = orçamento aprovado convertido em OS.
+/// Demanda comercial. GANHO = orçamento aprovado convertido em OS.
 model Negocio {
   id                  String           @id @default(uuid(7)) @db.Uuid
   tenant_id           String           @db.Uuid
@@ -617,7 +665,6 @@ model Negocio {
   descricao_problema  String?
   urgencia            Urgencia?
   valor_estimado      Decimal?         @db.Decimal(14, 2)
-  probabilidade       Int? /// sobrescreve a da etapa
   previsao_fechamento DateTime?        @db.Date
   status              StatusNegocio    @default(ABERTO)
   motivo_perda_id     String?          @db.Uuid
@@ -625,25 +672,28 @@ model Negocio {
   entrou_etapa_em     DateTime         @default(now())
   fechado_em          DateTime?
   completude          Int              @default(0)
+  nba_adiada_ate      DateTime?
+  versao_registro     Int              @default(0)
   created_at          DateTime         @default(now())
   updated_at          DateTime         @updatedAt
   deleted_at          DateTime?
 
-  empresa      Empresa      @relation(fields: [empresa_id], references: [id])
-  contato      Contato      @relation(fields: [contato_id], references: [id])
-  funil        Funil        @relation(fields: [funil_id], references: [id])
-  etapa        EtapaFunil   @relation(fields: [etapa_id], references: [id])
-  dispositivo  Dispositivo? @relation(fields: [dispositivo_id], references: [id])
-  motivo_perda MotivoPerda? @relation(fields: [motivo_perda_id], references: [id])
-  responsavel  Membro?      @relation("NegocioResponsavel", fields: [responsavel_id], references: [id])
+  empresa      Empresa      @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
+  contato      Contato      @relation(fields: [empresa_id, contato_id], references: [empresa_id, id])
+  funil        Funil        @relation(fields: [empresa_id, funil_id], references: [empresa_id, id])
+  etapa        EtapaFunil   @relation(fields: [funil_id, etapa_id], references: [funil_id, id])
+  dispositivo  Dispositivo? @relation(fields: [empresa_id, dispositivo_id], references: [empresa_id, id], onDelete: Restrict)
+  motivo_perda MotivoPerda? @relation(fields: [empresa_id, motivo_perda_id], references: [empresa_id, id], onDelete: Restrict)
+  responsavel  Membro?      @relation("NegocioResponsavel", fields: [tenant_id, responsavel_id], references: [tenant_id, id], onDelete: Restrict)
 
   historico_etapas HistoricoEtapaNegocio[]
   atividades       Atividade[]
   tarefas          Tarefa[]
-  sugestoes_acao   SugestaoAcao[]
   orcamentos       Orcamento[]
   ordens_servico   OrdemServico[]
+  notificacoes     Notificacao[]
 
+  @@unique([empresa_id, id])
   @@index([empresa_id, status, etapa_id])
   @@index([contato_id])
   @@map("negocio")
@@ -653,12 +703,14 @@ model MotivoPerda {
   id         String  @id @default(uuid(7)) @db.Uuid
   tenant_id  String  @db.Uuid
   empresa_id String  @db.Uuid
-  nome       String /// preço, prazo, sem retorno, conserto inviável, comprou novo…
+  nome       String
   ativo      Boolean @default(true)
 
-  empresa  Empresa   @relation(fields: [empresa_id], references: [id])
+  empresa  Empresa   @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
   negocios Negocio[]
 
+  @@unique([empresa_id, nome])
+  @@unique([empresa_id, id])
   @@map("motivo_perda")
 }
 
@@ -685,6 +737,7 @@ enum TipoAtividade {
   VISITA_LOJA
   REUNIAO
   NOTA
+  NOTA_TECNICA /// diário do técnico na bancada (antes: apontamento_os)
   FORMULARIO
   SISTEMA
 }
@@ -695,7 +748,8 @@ enum DirecaoAtividade {
   INTERNA
 }
 
-/// Timeline única de interações (contato, negócio e OS).
+/// Timeline única de interações (contato, negócio e OS). Também é fonte de
+/// eventos de engajamento para o scoring.
 model Atividade {
   id         String           @id @default(uuid(7)) @db.Uuid
   tenant_id  String           @db.Uuid
@@ -708,14 +762,15 @@ model Atividade {
   assunto    String?
   conteudo   String?
   resultado  String? /// atendeu, não atendeu, pediu retorno…
+  minutos    Int? /// NOTA_TECNICA: tempo gasto
   membro_id  String?          @db.Uuid
   metadados  Json?
   ocorreu_em DateTime         @default(now())
 
-  empresa Empresa       @relation(fields: [empresa_id], references: [id])
-  contato Contato?      @relation(fields: [contato_id], references: [id])
-  negocio Negocio?      @relation(fields: [negocio_id], references: [id])
-  os      OrdemServico? @relation(fields: [os_id], references: [id])
+  empresa Empresa       @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
+  contato Contato?      @relation(fields: [empresa_id, contato_id], references: [empresa_id, id], onDelete: Restrict)
+  negocio Negocio?      @relation(fields: [empresa_id, negocio_id], references: [empresa_id, id], onDelete: Restrict)
+  os      OrdemServico? @relation(fields: [empresa_id, os_id], references: [empresa_id, id], onDelete: Restrict)
 
   @@index([contato_id, ocorreu_em])
   @@index([negocio_id, ocorreu_em])
@@ -744,80 +799,7 @@ enum OrigemTarefa {
   AUTOMACAO
 }
 
-model Tarefa {
-  id             String       @id @default(uuid(7)) @db.Uuid
-  tenant_id      String       @db.Uuid
-  empresa_id     String       @db.Uuid
-  contato_id     String?      @db.Uuid
-  negocio_id     String?      @db.Uuid
-  os_id          String?      @db.Uuid
-  titulo         String
-  descricao      String?
-  status         StatusTarefa @default(PENDENTE)
-  prioridade     Prioridade   @default(NORMAL)
-  origem         OrigemTarefa @default(MANUAL)
-  requisito_id   String?      @db.Uuid
-  vence_em       DateTime?
-  responsavel_id String?      @db.Uuid
-  concluida_em   DateTime?
-  created_at     DateTime     @default(now())
-  updated_at     DateTime     @updatedAt
-
-  empresa     Empresa         @relation(fields: [empresa_id], references: [id])
-  contato     Contato?        @relation(fields: [contato_id], references: [id])
-  negocio     Negocio?        @relation(fields: [negocio_id], references: [id])
-  os          OrdemServico?   @relation(fields: [os_id], references: [id])
-  requisito   RequisitoEtapa? @relation(fields: [requisito_id], references: [id])
-  responsavel Membro?         @relation("TarefaResponsavel", fields: [responsavel_id], references: [id])
-  sugestao    SugestaoAcao?
-
-  @@index([empresa_id, responsavel_id, status, vence_em])
-  @@map("tarefa")
-}
-
-enum DimensaoScore {
-  FIT
-  ENGAJAMENTO
-}
-
-/// Regras configuráveis de lead scoring (estilo RD Station: Perfil × Interesse).
-/// condicao: {"campo":"negocio.dispositivo_id","op":"preenchido"} ou
-///           {"evento":"orcamento_abandonado"}
-model RegraPontuacao {
-  id             String        @id @default(uuid(7)) @db.Uuid
-  tenant_id      String        @db.Uuid
-  empresa_id     String        @db.Uuid
-  nome           String
-  dimensao       DimensaoScore
-  condicao       Json
-  pontos         Int /// pode ser negativo
-  meia_vida_dias Int? /// só ENGAJAMENTO: pontos decaem com o tempo
-  ativo          Boolean       @default(true)
-
-  empresa Empresa           @relation(fields: [empresa_id], references: [id])
-  eventos EventoPontuacao[]
-
-  @@map("regra_pontuacao")
-}
-
-/// Ledger de pontos — torna o score explicável ("por que este lead está quente?").
-model EventoPontuacao {
-  id         String        @id @default(uuid(7)) @db.Uuid
-  tenant_id  String        @db.Uuid
-  contato_id String        @db.Uuid
-  regra_id   String?       @db.Uuid
-  dimensao   DimensaoScore
-  pontos     Int
-  motivo     String
-  ocorreu_em DateTime      @default(now())
-
-  contato Contato         @relation(fields: [contato_id], references: [id], onDelete: Cascade)
-  regra   RegraPontuacao? @relation(fields: [regra_id], references: [id])
-
-  @@index([contato_id, ocorreu_em])
-  @@map("evento_pontuacao")
-}
-
+/// Ações da fila "próximas ações" (calculada por regras no código, sem tabela).
 enum TipoAcao {
   LIGAR
   ENVIAR_WHATSAPP
@@ -833,84 +815,36 @@ enum TipoAcao {
   PEDIR_AVALIACAO
 }
 
-/// Next Best Action — regras priorizadas avaliadas por job.
-/// ex.: "Orçamento ENVIADO há > 48h sem resposta" → FOLLOW_UP_ORCAMENTO via canal preferido.
-model RegraProximaAcao {
-  id                 String   @id @default(uuid(7)) @db.Uuid
-  tenant_id          String   @db.Uuid
-  empresa_id         String   @db.Uuid
-  nome               String
-  prioridade         Int /// menor = mais importante
-  condicao           Json
-  acao               TipoAcao
-  modelo_mensagem_id String?  @db.Uuid
-  prazo_horas        Int      @default(24)
-  ativo              Boolean  @default(true)
+model Tarefa {
+  id             String       @id @default(uuid(7)) @db.Uuid
+  tenant_id      String       @db.Uuid
+  empresa_id     String       @db.Uuid
+  contato_id     String?      @db.Uuid
+  negocio_id     String?      @db.Uuid
+  os_id          String?      @db.Uuid
+  titulo         String
+  descricao      String?
+  status         StatusTarefa @default(PENDENTE)
+  prioridade     Prioridade   @default(NORMAL)
+  origem         OrigemTarefa @default(MANUAL)
+  requisito_id   String?      @db.Uuid
+  acao           TipoAcao? /// quando origem = PROXIMA_ACAO
+  regra_chave    String? /// regra de próxima ação que originou (código)
+  vence_em       DateTime?
+  responsavel_id String?      @db.Uuid
+  concluida_em   DateTime?
+  created_at     DateTime     @default(now())
+  updated_at     DateTime     @updatedAt
 
-  empresa   Empresa        @relation(fields: [empresa_id], references: [id])
-  sugestoes SugestaoAcao[]
+  empresa     Empresa         @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
+  contato     Contato?        @relation(fields: [empresa_id, contato_id], references: [empresa_id, id], onDelete: Restrict)
+  negocio     Negocio?        @relation(fields: [empresa_id, negocio_id], references: [empresa_id, id], onDelete: Restrict)
+  os          OrdemServico?   @relation(fields: [empresa_id, os_id], references: [empresa_id, id], onDelete: Restrict)
+  requisito   RequisitoEtapa? @relation(fields: [requisito_id], references: [id], onDelete: SetNull)
+  responsavel Membro?         @relation("TarefaResponsavel", fields: [tenant_id, responsavel_id], references: [tenant_id, id], onDelete: Restrict)
 
-  @@map("regra_proxima_acao")
-}
-
-enum StatusSugestao {
-  SUGERIDA
-  ACEITA /// virou tarefa ou foi executada
-  DESCARTADA
-  EXPIRADA
-}
-
-model SugestaoAcao {
-  id         String         @id @default(uuid(7)) @db.Uuid
-  tenant_id  String         @db.Uuid
-  empresa_id String         @db.Uuid
-  contato_id String         @db.Uuid
-  negocio_id String?        @db.Uuid
-  regra_id   String?        @db.Uuid
-  acao       TipoAcao
-  titulo     String
-  motivo     String /// explicação exibida ("Orçamento sem resposta há 3 dias")
-  peso       Int /// ordenação na fila do vendedor
-  status     StatusSugestao @default(SUGERIDA)
-  tarefa_id  String?        @unique @db.Uuid
-  expira_em  DateTime?
-  created_at DateTime       @default(now())
-  updated_at DateTime       @updatedAt
-
-  empresa Empresa           @relation(fields: [empresa_id], references: [id])
-  contato Contato           @relation(fields: [contato_id], references: [id], onDelete: Cascade)
-  negocio Negocio?          @relation(fields: [negocio_id], references: [id])
-  regra   RegraProximaAcao? @relation(fields: [regra_id], references: [id])
-  tarefa  Tarefa?           @relation(fields: [tarefa_id], references: [id])
-
-  @@index([empresa_id, status, peso])
-  @@map("sugestao_acao")
-}
-
-model Tag {
-  id         String  @id @default(uuid(7)) @db.Uuid
-  tenant_id  String  @db.Uuid
-  empresa_id String  @db.Uuid
-  nome       String
-  cor        String?
-
-  empresa  Empresa       @relation(fields: [empresa_id], references: [id])
-  vinculos EntidadeTag[]
-
-  @@unique([empresa_id, nome])
-  @@map("tag")
-}
-
-model EntidadeTag {
-  tag_id        String @db.Uuid
-  entidade_tipo String /// contato | negocio | os | dispositivo
-  entidade_id   String @db.Uuid
-
-  tag Tag @relation(fields: [tag_id], references: [id], onDelete: Cascade)
-
-  @@id([tag_id, entidade_tipo, entidade_id])
-  @@index([entidade_tipo, entidade_id])
-  @@map("entidade_tag")
+  @@index([empresa_id, responsavel_id, status, vence_em])
+  @@map("tarefa")
 }
 
 // =============================================================================
@@ -926,38 +860,25 @@ enum TipoDispositivo {
   OUTRO
 }
 
-/// Catálogo de marcas/modelos (global quando tenant_id é nulo) — autocomplete,
-/// compatibilidade de peças e relatórios "reparos por modelo".
-model ModeloDispositivo {
-  id             String          @id @default(uuid(7)) @db.Uuid
-  tenant_id      String?         @db.Uuid
-  tipo           TipoDispositivo
-  marca          String
-  modelo         String
-  nome_comercial String?
-  ano            Int?
-  specs          Json?
-
-  dispositivos     Dispositivo[]
-  compatibilidades ItemCompatibilidade[]
-
-  @@unique([tenant_id, tipo, marca, modelo])
-  @@map("modelo_dispositivo")
-}
-
 enum StatusDispositivo {
   ATIVO
   INATIVO
   DESCARTADO
 }
 
-/// Base comum. Ogun: Celular + Notebook (campos comuns subiram para cá).
+/// Base comum (Ogun: Celular + Notebook). Campos pesquisáveis são colunas;
+/// specs por tipo ficam em `especificacoes` (JSONB validado por Zod por tipo):
+///  CELULAR/TABLET: {sistema_operacional, versao_so, saude_bateria_pct, dual_chip, esim}
+///  NOTEBOOK/DESKTOP/ALL_IN_ONE: {familia_linha, sku_fabricante, processador, arquitetura,
+///    memoria_ram_gb, tipo_armazenamento, capacidade_armazenamento, gpu_tipo, gpu_marca,
+///    gpu_modelo, sistema_operacional, potencia_fonte_watts}
+/// Não guarda senha/padrão de desbloqueio: o cliente remove o bloqueio ao
+/// entregar o aparelho (registrado em inspecao.bloqueio_removido).
 model Dispositivo {
   id                    String            @id @default(uuid(7)) @db.Uuid
   tenant_id             String            @db.Uuid
   empresa_id            String            @db.Uuid
   tipo                  TipoDispositivo
-  modelo_catalogo_id    String?           @db.Uuid
   marca                 String?
   modelo                String?
   cor                   String?
@@ -965,97 +886,46 @@ model Dispositivo {
   imei                  String?
   imei_2                String?
   armazenamento_gb      Int?
+  especificacoes        Json              @default("{}")
   proprietario_atual_id String?           @db.Uuid
-  /// senha/padrão de desbloqueio: cifrado (AES-GCM, chave por tenant), visível só p/ técnico da OS
-  desbloqueio_cifrado   String?
   status                StatusDispositivo @default(ATIVO)
   observacoes           String?
   created_at            DateTime          @default(now())
   updated_at            DateTime          @updatedAt
   deleted_at            DateTime?
 
-  empresa            Empresa            @relation(fields: [empresa_id], references: [id])
-  modelo_catalogo    ModeloDispositivo? @relation(fields: [modelo_catalogo_id], references: [id])
-  proprietario_atual Contato?           @relation(fields: [proprietario_atual_id], references: [id])
+  empresa            Empresa  @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
+  proprietario_atual Contato? @relation(fields: [empresa_id, proprietario_atual_id], references: [empresa_id, id], onDelete: Restrict)
 
-  celular       DispositivoCelular?
-  computador    DispositivoComputador?
   proprietarios DispositivoProprietario[]
   eventos       DispositivoEvento[]
   negocios      Negocio[]
   inspecoes     Inspecao[]
   orcamentos    Orcamento[]
   ordens        OrdemServico[]
+  anexos        Anexo[]
 
+  @@unique([empresa_id, id])
   @@index([empresa_id, imei])
   @@index([empresa_id, numero_serie])
   @@index([proprietario_atual_id])
   @@map("dispositivo")
 }
 
-/// Extensão 1:1 para CELULAR/TABLET.
-model DispositivoCelular {
-  dispositivo_id      String   @id @db.Uuid
-  sistema_operacional String? /// iOS, Android
-  versao_so           String?
-  saude_bateria_pct   Int?
-  dual_chip           Boolean?
-  esim                Boolean?
-
-  dispositivo Dispositivo @relation(fields: [dispositivo_id], references: [id], onDelete: Cascade)
-
-  @@map("dispositivo_celular")
-}
-
-enum ArquiteturaCPU {
-  X86
-  X64
-  ARM
-}
-
-enum TipoArmazenamento {
-  HD
-  SSD_SATA
-  SSD_NVME
-  EMMC
-}
-
-enum TipoGPU {
-  INTEGRADA
-  DEDICADA
-}
-
-/// Extensão 1:1 para NOTEBOOK/DESKTOP/ALL_IN_ONE. Ogun: Notebook.
-model DispositivoComputador {
-  dispositivo_id           String             @id @db.Uuid
-  familia_linha            String?
-  sku_fabricante           String?
-  processador              String?
-  arquitetura              ArquiteturaCPU?
-  memoria_ram_gb           Int?
-  tipo_armazenamento       TipoArmazenamento?
-  capacidade_armazenamento String?
-  gpu_tipo                 TipoGPU?
-  gpu_marca                String?
-  gpu_modelo               String?
-  sistema_operacional      String?
-  potencia_fonte_watts     Int?
-
-  dispositivo Dispositivo @relation(fields: [dispositivo_id], references: [id], onDelete: Cascade)
-
-  @@map("dispositivo_computador")
-}
-
-/// Histórico de posse (aparelho revendido/trocado de dono).
+/// Histórico de posse. No máximo um registro aberto (ate IS NULL) por dispositivo
+/// — índice único parcial na migração.
 model DispositivoProprietario {
   id             String    @id @default(uuid(7)) @db.Uuid
+  tenant_id      String    @db.Uuid
+  empresa_id     String    @db.Uuid
   dispositivo_id String    @db.Uuid
   contato_id     String    @db.Uuid
   desde          DateTime  @default(now())
   ate            DateTime?
 
-  dispositivo Dispositivo @relation(fields: [dispositivo_id], references: [id], onDelete: Cascade)
-  contato     Contato     @relation(fields: [contato_id], references: [id])
+  empresa     Empresa     @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
+  dispositivo Dispositivo @relation(fields: [empresa_id, dispositivo_id], references: [empresa_id, id], onDelete: Cascade)
+  contato     Contato     @relation(fields: [empresa_id, contato_id], references: [empresa_id, id])
 
   @@index([dispositivo_id, desde])
   @@map("dispositivo_proprietario")
@@ -1076,11 +946,13 @@ enum TipoEventoDispositivo {
   OBSERVACAO
 }
 
-/// Prontuário do aparelho (append-only). Escrito automaticamente pelos
-/// fluxos de orçamento/OS/estoque e manualmente via "observação".
+/// Prontuário técnico (append-only). Escrito pelos comandos de domínio de
+/// orçamento/OS/estoque e manualmente via "observação". Não contém dados
+/// pessoais do proprietário — só referências.
 model DispositivoEvento {
   id             String                @id @default(uuid(7)) @db.Uuid
   tenant_id      String                @db.Uuid
+  empresa_id     String                @db.Uuid
   dispositivo_id String                @db.Uuid
   tipo           TipoEventoDispositivo
   descricao      String
@@ -1091,7 +963,11 @@ model DispositivoEvento {
   dados          Json?
   ocorreu_em     DateTime              @default(now())
 
-  dispositivo Dispositivo @relation(fields: [dispositivo_id], references: [id], onDelete: Cascade)
+  empresa     Empresa       @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
+  dispositivo Dispositivo   @relation(fields: [empresa_id, dispositivo_id], references: [empresa_id, id], onDelete: Cascade)
+  os          OrdemServico? @relation(fields: [empresa_id, os_id], references: [empresa_id, id], onDelete: Restrict)
+  orcamento   Orcamento?    @relation(fields: [empresa_id, orcamento_id], references: [empresa_id, id], onDelete: Restrict)
+  item        Item?         @relation(fields: [empresa_id, item_id], references: [empresa_id, id], onDelete: Restrict)
 
   @@index([dispositivo_id, ocorreu_em])
   @@map("dispositivo_evento")
@@ -1121,9 +997,11 @@ model TipoAcessorio {
   tem_layout                Boolean            @default(false)
   ativo                     Boolean            @default(true)
 
+  tenant    Tenant              @relation(fields: [tenant_id], references: [id])
   recebidos AcessorioRecebido[]
 
   @@unique([tenant_id, nome])
+  @@unique([tenant_id, id])
   @@map("tipo_acessorio")
 }
 
@@ -1175,11 +1053,12 @@ enum LayoutTeclado {
   OUTRO
 }
 
-/// Ogun: Acessorio Cliente (child table) — aqui ligado a orçamento OU OS,
+/// Ogun: Acessorio Cliente — ligado a orçamento OU OS (CHECK na migração),
 /// com controle de devolução na entrega.
 model AcessorioRecebido {
   id                String            @id @default(uuid(7)) @db.Uuid
   tenant_id         String            @db.Uuid
+  empresa_id        String            @db.Uuid
   orcamento_id      String?           @db.Uuid
   os_id             String?           @db.Uuid
   tipo_acessorio_id String            @db.Uuid
@@ -1194,9 +1073,10 @@ model AcessorioRecebido {
   detalhes          String?
   devolvido_em      DateTime?
 
-  tipo_acessorio TipoAcessorio @relation(fields: [tipo_acessorio_id], references: [id])
-  orcamento      Orcamento?    @relation(fields: [orcamento_id], references: [id], onDelete: Cascade)
-  os             OrdemServico? @relation(fields: [os_id], references: [id], onDelete: Cascade)
+  empresa        Empresa       @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
+  tipo_acessorio TipoAcessorio @relation(fields: [tenant_id, tipo_acessorio_id], references: [tenant_id, id])
+  orcamento      Orcamento?    @relation(fields: [empresa_id, orcamento_id], references: [empresa_id, id], onDelete: Cascade)
+  os             OrdemServico? @relation(fields: [empresa_id, os_id], references: [empresa_id, id], onDelete: Cascade)
 
   @@map("acessorio_recebido")
 }
@@ -1206,89 +1086,64 @@ enum MomentoInspecao {
   SAIDA
 }
 
-enum TipoResposta {
-  BOOLEANO
-  OPCOES
-  TEXTO
-  NUMERO
-}
-
-/// Checklist configurável por tipo de dispositivo. O modelo padrão de CELULAR
-/// replica o Ogun: liga_normalmente, tela, display, toque, bateria, áudio,
-/// câmera traseira/frontal.
+/// Checklist configurável por tipo de dispositivo e momento. `itens` (JSONB):
+/// [{chave, rotulo, tipo_resposta: BOOLEANO|OPCOES|TEXTO|NUMERO, opcoes[],
+///   obrigatorio, depende_de: {chave, igual}}]
+/// O modelo padrão de CELULAR replica o Ogun: liga_normalmente, tela, display,
+/// toque, bateria, áudio, câmera traseira/frontal.
 model ChecklistModelo {
   id               String          @id @default(uuid(7)) @db.Uuid
   tenant_id        String          @db.Uuid
   nome             String
   tipo_dispositivo TipoDispositivo
   momento          MomentoInspecao
+  versao           Int             @default(1)
+  itens            Json
   ativo            Boolean         @default(true)
 
-  itens     ChecklistModeloItem[]
+  tenant    Tenant     @relation(fields: [tenant_id], references: [id])
   inspecoes Inspecao[]
 
+  @@unique([tenant_id, id])
   @@map("checklist_modelo")
 }
 
-model ChecklistModeloItem {
-  id            String       @id @default(uuid(7)) @db.Uuid
-  modelo_id     String       @db.Uuid
-  ordem         Int
-  chave         String /// ex.: bateria
-  rotulo        String /// ex.: "Bateria"
-  tipo_resposta TipoResposta
-  opcoes        String[] /// ex.: ["Ok","Danificada","Ausente","Inchada","Não carrega"]
-  obrigatorio   Boolean      @default(false)
-  /// ex.: {"chave":"liga_normalmente","igual":true} (Ogun: depends_on)
-  depende_de    Json?
-
-  modelo    ChecklistModelo    @relation(fields: [modelo_id], references: [id], onDelete: Cascade)
-  respostas InspecaoResposta[]
-
-  @@unique([modelo_id, chave])
-  @@map("checklist_modelo_item")
-}
-
-/// Ogun: campos de checklist duplicados em Orcamento/OS + Checklist Inicial.
+/// Inspeção de entrada/saída + termo de responsabilidade.
+/// `itens_snapshot` congela o checklist usado; `respostas` = {chave: valor}.
 model Inspecao {
-  id               String          @id @default(uuid(7)) @db.Uuid
-  tenant_id        String          @db.Uuid
-  empresa_id       String          @db.Uuid
-  dispositivo_id   String          @db.Uuid
-  orcamento_id     String?         @db.Uuid
-  os_id            String?         @db.Uuid
-  modelo_id        String?         @db.Uuid
-  momento          MomentoInspecao
-  estado_externo   String /// obrigatório (Ogun: reqd)
-  liga_normalmente Boolean?
-  observacoes      String?
-  realizada_por    String?         @db.Uuid
-  ciente_cliente   Boolean         @default(false) /// cliente confirmou o estado
-  realizada_em     DateTime        @default(now())
+  id                  String          @id @default(uuid(7)) @db.Uuid
+  tenant_id           String          @db.Uuid
+  empresa_id          String          @db.Uuid
+  dispositivo_id      String          @db.Uuid
+  orcamento_id        String?         @db.Uuid
+  os_id               String?         @db.Uuid
+  modelo_id           String?         @db.Uuid
+  momento             MomentoInspecao
+  itens_snapshot      Json
+  respostas           Json            @default("{}")
+  estado_externo      String /// obrigatório (Ogun: reqd)
+  liga_normalmente    Boolean?
+  /// Política: o cliente remove senha/padrão/biometria ao entregar o aparelho.
+  /// ENTRADA exige true ou bloqueio_observacao (ex.: "aparelho não liga").
+  bloqueio_removido   Boolean         @default(false)
+  bloqueio_observacao String?
+  observacoes         String?
+  // --- termo de responsabilidade ---
+  termo_versao        String? /// versão do texto aceito
+  termo_aceito_em     DateTime?
+  termo_aceito_por    String? /// nome de quem aceitou (cliente ou portador)
+  termo_canal         CanalDecisao?
+  realizada_por       String?         @db.Uuid
+  realizada_em        DateTime        @default(now())
 
-  empresa     Empresa            @relation(fields: [empresa_id], references: [id])
-  dispositivo Dispositivo        @relation(fields: [dispositivo_id], references: [id])
-  orcamento   Orcamento?         @relation(fields: [orcamento_id], references: [id])
-  os          OrdemServico?      @relation(fields: [os_id], references: [id])
-  modelo      ChecklistModelo?   @relation(fields: [modelo_id], references: [id])
-  respostas   InspecaoResposta[]
+  empresa     Empresa          @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
+  dispositivo Dispositivo      @relation(fields: [empresa_id, dispositivo_id], references: [empresa_id, id])
+  orcamento   Orcamento?       @relation(fields: [empresa_id, orcamento_id], references: [empresa_id, id], onDelete: Restrict)
+  os          OrdemServico?    @relation(fields: [empresa_id, os_id], references: [empresa_id, id], onDelete: Restrict)
+  modelo      ChecklistModelo? @relation(fields: [tenant_id, modelo_id], references: [tenant_id, id], onDelete: Restrict)
 
+  @@index([os_id, momento])
   @@map("inspecao")
-}
-
-model InspecaoResposta {
-  id          String  @id @default(uuid(7)) @db.Uuid
-  inspecao_id String  @db.Uuid
-  item_id     String? @db.Uuid
-  chave       String
-  valor       Json
-  observacao  String?
-
-  inspecao Inspecao             @relation(fields: [inspecao_id], references: [id], onDelete: Cascade)
-  item     ChecklistModeloItem? @relation(fields: [item_id], references: [id])
-
-  @@unique([inspecao_id, chave])
-  @@map("inspecao_resposta")
 }
 
 // =============================================================================
@@ -1303,8 +1158,8 @@ enum StatusOrcamento {
   APROVADO_PARCIAL
   REPROVADO
   EXPIRADO
-  CANCELADO
-  CONVERTIDO /// virou OS
+  CANCELADO /// inclui versão substituída por revisão
+  CONVERTIDO
 }
 
 enum CanalDecisao {
@@ -1323,15 +1178,17 @@ enum CanalEntrada {
   COLETA
 }
 
-/// Ogun: Orcamento. Dispositivo opcional: permite orçamento remoto
-/// ("quanto custa a tela do iPhone 12?") antes de o aparelho chegar.
+/// Ogun: Orcamento. Cada VERSÃO é uma linha (mesmo `numero`, `versao` crescente).
+/// Imutável após ENVIADO (itens e valores); alteração = nova versão e a anterior
+/// vira CANCELADO. Uma única versão não cancelada por número (índice parcial).
+/// Dispositivo opcional: permite orçamento remoto.
 model Orcamento {
   id                  String          @id @default(uuid(7)) @db.Uuid
   tenant_id           String          @db.Uuid
   empresa_id          String          @db.Uuid
   numero              String
   versao              Int             @default(1)
-  orcamento_pai_id    String?         @db.Uuid /// revisões
+  orcamento_pai_id    String?         @db.Uuid
   contato_id          String          @db.Uuid
   negocio_id          String?         @db.Uuid
   tipo_dispositivo    TipoDispositivo
@@ -1346,25 +1203,28 @@ model Orcamento {
   subtotal            Decimal         @default(0) @db.Decimal(14, 2)
   desconto            Decimal         @default(0) @db.Decimal(14, 2)
   total               Decimal         @default(0) @db.Decimal(14, 2)
+  total_aprovado      Decimal?        @db.Decimal(14, 2)
   condicoes           String?
   observacoes         String?
-  token_publico       String          @unique /// link de visualização/aprovação
+  token_publico       String          @unique /// link de visualização/aprovação desta versão
   enviado_em          DateTime?
   visualizado_em      DateTime?
   decidido_em         DateTime?
   decidido_via        CanalDecisao?
+  decisao_evidencia   Json? /// ip, user-agent, nome digitado, membro que registrou
   motivo_reprovacao   String?
   responsavel_id      String?         @db.Uuid
   criado_por          String?         @db.Uuid
+  versao_registro     Int             @default(0)
   created_at          DateTime        @default(now())
   updated_at          DateTime        @updatedAt
   deleted_at          DateTime?
 
-  empresa       Empresa      @relation(fields: [empresa_id], references: [id])
-  contato       Contato      @relation(fields: [contato_id], references: [id])
-  negocio       Negocio?     @relation(fields: [negocio_id], references: [id])
-  dispositivo   Dispositivo? @relation(fields: [dispositivo_id], references: [id])
-  orcamento_pai Orcamento?   @relation("RevisaoOrcamento", fields: [orcamento_pai_id], references: [id])
+  empresa       Empresa      @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
+  contato       Contato      @relation(fields: [empresa_id, contato_id], references: [empresa_id, id])
+  negocio       Negocio?     @relation(fields: [empresa_id, negocio_id], references: [empresa_id, id], onDelete: Restrict)
+  dispositivo   Dispositivo? @relation(fields: [empresa_id, dispositivo_id], references: [empresa_id, id], onDelete: Restrict)
+  orcamento_pai Orcamento?   @relation("RevisaoOrcamento", fields: [empresa_id, orcamento_pai_id], references: [empresa_id, id], onDelete: Restrict)
   revisoes      Orcamento[]  @relation("RevisaoOrcamento")
 
   itens         OrcamentoItem[]
@@ -1372,8 +1232,12 @@ model Orcamento {
   inspecoes     Inspecao[]
   historico     OrcamentoStatusHistorico[]
   ordem_servico OrdemServico?
+  eventos_disp  DispositivoEvento[]
+  notificacoes  Notificacao[]
+  anexos        Anexo[]
 
-  @@unique([empresa_id, numero])
+  @@unique([empresa_id, numero, versao])
+  @@unique([empresa_id, id])
   @@index([empresa_id, status, validade])
   @@index([contato_id])
   @@map("orcamento")
@@ -1402,8 +1266,10 @@ enum TipoItem {
 /// Ogun: Item Fluxo (linha de orçamento).
 model OrcamentoItem {
   id             String   @id @default(uuid(7)) @db.Uuid
+  tenant_id      String   @db.Uuid
+  empresa_id     String   @db.Uuid
   orcamento_id   String   @db.Uuid
-  item_id        String?  @db.Uuid /// nulo = item avulso (não catalogado)
+  item_id        String?  @db.Uuid /// nulo = item avulso
   tipo           TipoItem
   descricao      String
   quantidade     Decimal  @default(1) @db.Decimal(14, 3)
@@ -1411,13 +1277,15 @@ model OrcamentoItem {
   desconto       Decimal  @default(0) @db.Decimal(14, 2)
   total          Decimal  @db.Decimal(14, 2)
   custo_unitario Decimal? @db.Decimal(14, 2) /// snapshot p/ margem prevista
-  opcional       Boolean  @default(false) /// cliente pode recusar
-  aprovado       Boolean? /// aprovação parcial item a item
+  opcional       Boolean  @default(false)
+  aprovado       Boolean? /// decisão item a item (aprovação parcial)
   ordem          Int      @default(0)
 
-  orcamento Orcamento @relation(fields: [orcamento_id], references: [id], onDelete: Cascade)
-  item      Item?     @relation(fields: [item_id], references: [id])
+  empresa   Empresa   @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
+  orcamento Orcamento @relation(fields: [empresa_id, orcamento_id], references: [empresa_id, id], onDelete: Cascade)
+  item      Item?     @relation(fields: [empresa_id, item_id], references: [empresa_id, id], onDelete: Restrict)
 
+  @@index([orcamento_id])
   @@map("orcamento_item")
 }
 
@@ -1441,8 +1309,8 @@ enum TipoOS {
   CORTESIA
 }
 
-/// Ogun: Ordem De Servico. Pode nascer de orçamento aprovado (orcamento_id)
-/// ou direto na bancada (orcamento_id nulo).
+/// Ogun: Ordem De Servico. Nasce de orçamento aprovado (orcamento_id, 1:1) ou
+/// direto na bancada. Transições só pelo comando de domínio (invariantes OS-*).
 model OrdemServico {
   id                   String       @id @default(uuid(7)) @db.Uuid
   tenant_id            String       @db.Uuid
@@ -1451,62 +1319,66 @@ model OrdemServico {
   tipo                 TipoOS       @default(REPARO)
   contato_id           String       @db.Uuid
   dispositivo_id       String       @db.Uuid
-  orcamento_id         String?      @unique @db.Uuid
+  orcamento_id         String?      @db.Uuid /// 1 orçamento → no máximo 1 OS
   negocio_id           String?      @db.Uuid
   os_origem_id         String?      @db.Uuid /// retorno em garantia
   status               StatusOS     @default(ABERTA)
   prioridade           Prioridade   @default(NORMAL)
   canal_entrada        CanalEntrada @default(BALCAO)
-  descricao_problema   String /// relato do cliente
+  descricao_problema   String
   diagnostico_tecnico  String?
   solucao_aplicada     String?
   tecnico_id           String?      @db.Uuid
-  local_bancada        String? /// gaveta/prateleira
+  local_bancada        String?
   prazo                DateTime
   recebido_em          DateTime     @default(now())
   iniciado_em          DateTime?
   concluido_em         DateTime?
   entregue_em          DateTime?
+  entregue_a           String? /// nome de quem retirou
   garantia_dias        Int?
   garantia_ate         DateTime?    @db.Date
   subtotal             Decimal      @default(0) @db.Decimal(14, 2)
   desconto             Decimal      @default(0) @db.Decimal(14, 2)
   total                Decimal      @default(0) @db.Decimal(14, 2)
-  total_pago           Decimal      @default(0) @db.Decimal(14, 2)
-  custo_total          Decimal      @default(0) @db.Decimal(14, 2) /// peças (custo médio) — margem
+  custo_total          Decimal      @default(0) @db.Decimal(14, 2) /// peças ao custo médio
   observacoes_internas String?
   criado_por           String?      @db.Uuid
+  versao_registro      Int          @default(0)
   created_at           DateTime     @default(now())
   updated_at           DateTime     @updatedAt
   deleted_at           DateTime?
 
-  empresa     Empresa        @relation(fields: [empresa_id], references: [id])
-  contato     Contato        @relation(fields: [contato_id], references: [id])
-  dispositivo Dispositivo    @relation(fields: [dispositivo_id], references: [id])
-  orcamento   Orcamento?     @relation(fields: [orcamento_id], references: [id])
-  negocio     Negocio?       @relation(fields: [negocio_id], references: [id])
-  tecnico     Membro?        @relation("OSTecnico", fields: [tecnico_id], references: [id])
-  os_origem   OrdemServico?  @relation("RetornoGarantia", fields: [os_origem_id], references: [id])
+  empresa     Empresa        @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
+  contato     Contato        @relation(fields: [empresa_id, contato_id], references: [empresa_id, id])
+  dispositivo Dispositivo    @relation(fields: [empresa_id, dispositivo_id], references: [empresa_id, id])
+  orcamento   Orcamento?     @relation(fields: [empresa_id, orcamento_id], references: [empresa_id, id], onDelete: Restrict)
+  negocio     Negocio?       @relation(fields: [empresa_id, negocio_id], references: [empresa_id, id], onDelete: Restrict)
+  tecnico     Membro?        @relation("OSTecnico", fields: [tenant_id, tecnico_id], references: [tenant_id, id], onDelete: Restrict)
+  os_origem   OrdemServico?  @relation("RetornoGarantia", fields: [empresa_id, os_origem_id], references: [empresa_id, id], onDelete: Restrict)
   retornos    OrdemServico[] @relation("RetornoGarantia")
 
   itens        OrdemServicoItem[]
   acessorios   AcessorioRecebido[]
   inspecoes    Inspecao[]
   historico    OSStatusHistorico[]
-  apontamentos ApontamentoOS[]
   atividades   Atividade[]
   tarefas      Tarefa[]
-  vendas       Venda[]
   titulos      TituloFinanceiro[]
+  eventos_disp DispositivoEvento[]
+  notificacoes Notificacao[]
+  anexos       Anexo[]
 
   @@unique([empresa_id, numero])
+  @@unique([empresa_id, id])
+  @@unique([empresa_id, orcamento_id])
   @@index([empresa_id, status, prazo])
   @@index([empresa_id, tecnico_id, status])
   @@index([dispositivo_id])
   @@map("ordem_servico")
 }
 
-/// Base de SLA/TAT e da timeline da bancada; dispara notificações.
+/// Base de SLA/TAT e gatilho de notificação (o id entra na chave_dedupe).
 model OSStatusHistorico {
   id          String    @id @default(uuid(7)) @db.Uuid
   os_id       String    @db.Uuid
@@ -1523,16 +1395,19 @@ model OSStatusHistorico {
   @@map("os_status_historico")
 }
 
+/// Sem reservas no MVP: a peça sai do estoque quando APLICADA.
 enum StatusPeca {
-  A_COMPRAR
-  RESERVADA
-  APLICADA
-  DEVOLVIDA
+  PENDENTE /// prevista, ainda não aplicada
+  A_COMPRAR /// sem saldo; aguardando compra
+  APLICADA /// gerou SAIDA_OS no ledger
+  DEVOLVIDA /// estornada ao estoque (DEVOLUCAO_CLIENTE / ESTORNO)
 }
 
-/// Ogun: Item Fluxo (linha de OS). Peças movimentam estoque ao serem APLICADAS.
+/// Ogun: Item Fluxo (linha de OS).
 model OrdemServicoItem {
   id             String      @id @default(uuid(7)) @db.Uuid
+  tenant_id      String      @db.Uuid
+  empresa_id     String      @db.Uuid
   os_id          String      @db.Uuid
   item_id        String?     @db.Uuid
   tipo           TipoItem
@@ -1547,34 +1422,14 @@ model OrdemServicoItem {
   garantia_dias  Int?
   ordem          Int         @default(0)
 
-  os         OrdemServico       @relation(fields: [os_id], references: [id], onDelete: Cascade)
-  item       Item?              @relation(fields: [item_id], references: [id])
-  reservas   ReservaEstoque[]
+  empresa    Empresa            @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
+  os         OrdemServico       @relation(fields: [empresa_id, os_id], references: [empresa_id, id], onDelete: Cascade)
+  item       Item?              @relation(fields: [empresa_id, item_id], references: [empresa_id, id], onDelete: Restrict)
   movimentos MovimentoEstoque[]
 
+  @@unique([empresa_id, id])
+  @@index([os_id])
   @@map("ordem_servico_item")
-}
-
-enum TipoApontamento {
-  NOTA_TECNICA
-  TEMPO
-}
-
-/// Diário do técnico na bancada (notas e tempo gasto).
-model ApontamentoOS {
-  id         String          @id @default(uuid(7)) @db.Uuid
-  os_id      String          @db.Uuid
-  membro_id  String          @db.Uuid
-  tipo       TipoApontamento
-  texto      String?
-  minutos    Int?
-  ocorreu_em DateTime        @default(now())
-
-  os     OrdemServico @relation(fields: [os_id], references: [id], onDelete: Cascade)
-  membro Membro       @relation(fields: [membro_id], references: [id])
-
-  @@index([os_id, ocorreu_em])
-  @@map("apontamento_os")
 }
 
 enum CategoriaAnexo {
@@ -1587,34 +1442,44 @@ enum CategoriaAnexo {
   OUTRO
 }
 
-/// Arquivos (S3/R2) ligados a qualquer entidade.
+/// Arquivos (S3/R2). FKs concretas, EXATAMENTE UMA preenchida (CHECK num_nonnulls = 1).
 model Anexo {
-  id            String         @id @default(uuid(7)) @db.Uuid
-  tenant_id     String         @db.Uuid
-  empresa_id    String         @db.Uuid
-  entidade_tipo String
-  entidade_id   String         @db.Uuid
-  categoria     CategoriaAnexo @default(OUTRO)
-  nome          String
-  mime          String
-  tamanho_bytes Int
-  storage_key   String
-  publico       Boolean        @default(false) /// visível no link do cliente
-  enviado_por   String?        @db.Uuid
-  created_at    DateTime       @default(now())
+  id             String         @id @default(uuid(7)) @db.Uuid
+  tenant_id      String         @db.Uuid
+  empresa_id     String         @db.Uuid
+  contato_id     String?        @db.Uuid
+  orcamento_id   String?        @db.Uuid
+  os_id          String?        @db.Uuid
+  dispositivo_id String?        @db.Uuid
+  compra_id      String?        @db.Uuid
+  categoria      CategoriaAnexo @default(OUTRO)
+  nome           String
+  mime           String
+  tamanho_bytes  Int
+  storage_key    String
+  publico        Boolean        @default(false) /// visível no link do cliente
+  enviado_por    String?        @db.Uuid
+  created_at     DateTime       @default(now())
 
-  @@index([entidade_tipo, entidade_id])
+  empresa     Empresa       @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
+  contato     Contato?      @relation(fields: [empresa_id, contato_id], references: [empresa_id, id], onDelete: Restrict)
+  orcamento   Orcamento?    @relation(fields: [empresa_id, orcamento_id], references: [empresa_id, id], onDelete: Restrict)
+  os          OrdemServico? @relation(fields: [empresa_id, os_id], references: [empresa_id, id], onDelete: Restrict)
+  dispositivo Dispositivo?  @relation(fields: [empresa_id, dispositivo_id], references: [empresa_id, id], onDelete: Restrict)
+  compra      Compra?       @relation(fields: [empresa_id, compra_id], references: [empresa_id, id], onDelete: Restrict)
+
+  @@index([os_id])
+  @@index([orcamento_id])
+  @@index([dispositivo_id])
   @@map("anexo")
 }
 
 // =============================================================================
-// 5. ESTOQUE, COMPRAS, VENDAS E FINANCEIRO (simplificado)
+// 5. ESTOQUE, COMPRAS E FINANCEIRO (gerencial)
 // -----------------------------------------------------------------------------
-// O usuário vê: nome, quantidade, descrição, preço de compra, preço de venda,
-// fornecedor, histórico. Por baixo: ledger de estoque com custo médio móvel,
-// títulos a pagar/receber e margem por OS — mapeáveis para ERPNext
-// (Item, Supplier, Purchase Receipt/Invoice, Stock Ledger Entry, Sales Invoice,
-// Payment Entry) via IntegracaoRef.
+// Usuário: "Comprei / Usei / Ajustei / Devolvi". Por baixo: ledger com custo
+// médio ponderado móvel por empresa; cache em item atualizado por UPDATE
+// condicional na mesma transação do movimento (invariantes EST-*).
 // =============================================================================
 
 model Fornecedor {
@@ -1634,31 +1499,18 @@ model Fornecedor {
   updated_at         DateTime  @updatedAt
   deleted_at         DateTime?
 
-  empresa Empresa            @relation(fields: [empresa_id], references: [id])
+  empresa Empresa            @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
   itens   Item[]
   compras Compra[]
   titulos TituloFinanceiro[]
 
+  @@unique([empresa_id, id])
   @@map("fornecedor")
 }
 
-model CategoriaItem {
-  id         String  @id @default(uuid(7)) @db.Uuid
-  tenant_id  String  @db.Uuid
-  empresa_id String  @db.Uuid
-  nome       String /// Telas, Baterias, Conectores, Mão de obra…
-  pai_id     String? @db.Uuid
-
-  empresa Empresa         @relation(fields: [empresa_id], references: [id])
-  pai     CategoriaItem?  @relation("ArvoreCategoria", fields: [pai_id], references: [id])
-  filhas  CategoriaItem[] @relation("ArvoreCategoria")
-  itens   Item[]
-
-  @@unique([empresa_id, nome])
-  @@map("categoria_item")
-}
-
-/// Produto (peça/acessório) ou serviço (mão de obra). Ogun: ERPNext Item + Item Price.
+/// Produto (peça/acessório) ou serviço (mão de obra).
+/// estoque_atual/custo_medio: cache do ledger (CHECK estoque_atual >= 0).
+/// Mudança de preço registrada no audit_log.
 model Item {
   id                   String    @id @default(uuid(7)) @db.Uuid
   tenant_id            String    @db.Uuid
@@ -1667,127 +1519,99 @@ model Item {
   sku                  String?
   nome                 String
   descricao            String?
-  categoria_id         String?   @db.Uuid
+  categoria            String? /// texto livre no MVP (Telas, Baterias, Mão de obra…)
   unidade              String    @default("UN")
   controla_estoque     Boolean   @default(true) /// SERVICO sempre false
   preco_venda          Decimal   @default(0) @db.Decimal(14, 2)
   preco_compra         Decimal?  @db.Decimal(14, 2) /// último preço pago (informativo)
-  custo_medio          Decimal   @default(0) @db.Decimal(14, 2) /// calculado pelo ledger
-  estoque_atual        Decimal   @default(0) @db.Decimal(14, 3) /// cache do ledger
-  estoque_reservado    Decimal   @default(0) @db.Decimal(14, 3)
+  custo_medio          Decimal   @default(0) @db.Decimal(14, 4)
+  estoque_atual        Decimal   @default(0) @db.Decimal(14, 3)
   estoque_minimo       Decimal   @default(0) @db.Decimal(14, 3)
   fornecedor_padrao_id String?   @db.Uuid
-  tempo_estimado_min   Int? /// SERVICO
+  tempo_estimado_min   Int?
   garantia_dias        Int?
   ativo                Boolean   @default(true)
   created_at           DateTime  @default(now())
   updated_at           DateTime  @updatedAt
   deleted_at           DateTime?
 
-  empresa           Empresa        @relation(fields: [empresa_id], references: [id])
-  categoria         CategoriaItem? @relation(fields: [categoria_id], references: [id])
-  fornecedor_padrao Fornecedor?    @relation(fields: [fornecedor_padrao_id], references: [id])
+  empresa           Empresa     @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
+  fornecedor_padrao Fornecedor? @relation(fields: [empresa_id, fornecedor_padrao_id], references: [empresa_id, id], onDelete: Restrict)
 
-  compatibilidades ItemCompatibilidade[]
-  historico_precos HistoricoPreco[]
   linhas_orcamento OrcamentoItem[]
   linhas_os        OrdemServicoItem[]
   linhas_compra    CompraItem[]
-  linhas_venda     VendaItem[]
   movimentos       MovimentoEstoque[]
-  reservas         ReservaEstoque[]
+  eventos_disp     DispositivoEvento[]
 
   @@unique([empresa_id, sku])
+  @@unique([empresa_id, id])
   @@index([empresa_id, nome])
   @@map("item")
 }
 
-/// "Esta tela serve no iPhone 12 e 12 Pro" — sugestão de peças no orçamento.
-model ItemCompatibilidade {
-  item_id   String @db.Uuid
-  modelo_id String @db.Uuid
-
-  item   Item              @relation(fields: [item_id], references: [id], onDelete: Cascade)
-  modelo ModeloDispositivo @relation(fields: [modelo_id], references: [id], onDelete: Cascade)
-
-  @@id([item_id, modelo_id])
-  @@map("item_compatibilidade")
-}
-
-enum TipoPreco {
-  VENDA
-  COMPRA
-}
-
-model HistoricoPreco {
-  id             String    @id @default(uuid(7)) @db.Uuid
-  item_id        String    @db.Uuid
-  tipo           TipoPreco
-  valor_anterior Decimal?  @db.Decimal(14, 2)
-  valor_novo     Decimal   @db.Decimal(14, 2)
-  membro_id      String?   @db.Uuid
-  ocorreu_em     DateTime  @default(now())
-
-  item Item @relation(fields: [item_id], references: [id], onDelete: Cascade)
-
-  @@index([item_id, ocorreu_em])
-  @@map("historico_preco")
-}
-
 enum StatusCompra {
   RASCUNHO
-  RECEBIDA /// gera ENTRADA no estoque + título a pagar
-  CANCELADA /// estorno
+  RECEBIDA /// gera ENTRADA_COMPRA no ledger + título a pagar
+  CANCELADA /// após RECEBIDA: estorno de cada movimento
 }
 
-/// "Comprei" — entrada de mercadoria (ERPNext: Purchase Receipt + Purchase Invoice).
+/// "Comprei" — entrada de mercadoria. Frete/despesas rateados proporcionalmente
+/// ao valor dos itens, de forma SÍNCRONA no recebimento.
 model Compra {
   id               String       @id @default(uuid(7)) @db.Uuid
   tenant_id        String       @db.Uuid
   empresa_id       String       @db.Uuid
   numero           String
   fornecedor_id    String?      @db.Uuid
-  documento_fiscal String? /// nº NF
+  documento_fiscal String?
   data             DateTime     @db.Date
   status           StatusCompra @default(RASCUNHO)
-  frete            Decimal      @default(0) @db.Decimal(14, 2) /// rateado no custo dos itens
+  frete            Decimal      @default(0) @db.Decimal(14, 2)
   outras_despesas  Decimal      @default(0) @db.Decimal(14, 2)
   total            Decimal      @default(0) @db.Decimal(14, 2)
   observacoes      String?
   criado_por       String?      @db.Uuid
+  recebida_em      DateTime?
+  versao_registro  Int          @default(0)
   created_at       DateTime     @default(now())
   updated_at       DateTime     @updatedAt
 
-  empresa    Empresa            @relation(fields: [empresa_id], references: [id])
-  fornecedor Fornecedor?        @relation(fields: [fornecedor_id], references: [id])
+  empresa    Empresa            @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
+  fornecedor Fornecedor?        @relation(fields: [empresa_id, fornecedor_id], references: [empresa_id, id], onDelete: Restrict)
   itens      CompraItem[]
   titulos    TituloFinanceiro[]
+  anexos     Anexo[]
 
   @@unique([empresa_id, numero])
+  @@unique([empresa_id, id])
   @@map("compra")
 }
 
 model CompraItem {
   id                   String  @id @default(uuid(7)) @db.Uuid
+  tenant_id            String  @db.Uuid
+  empresa_id           String  @db.Uuid
   compra_id            String  @db.Uuid
   item_id              String  @db.Uuid
   quantidade           Decimal @db.Decimal(14, 3)
   custo_unitario       Decimal @db.Decimal(14, 2) /// preço pago
-  custo_unitario_final Decimal @db.Decimal(14, 2) /// + rateio frete/despesas
+  custo_unitario_final Decimal @default(0) @db.Decimal(14, 4) /// + rateio (preenchido no recebimento)
   total                Decimal @db.Decimal(14, 2)
 
-  compra     Compra             @relation(fields: [compra_id], references: [id], onDelete: Cascade)
-  item       Item               @relation(fields: [item_id], references: [id])
+  empresa    Empresa            @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
+  compra     Compra             @relation(fields: [empresa_id, compra_id], references: [empresa_id, id], onDelete: Cascade)
+  item       Item               @relation(fields: [empresa_id, item_id], references: [empresa_id, id])
   movimentos MovimentoEstoque[]
 
+  @@unique([empresa_id, id])
   @@map("compra_item")
 }
 
 enum TipoMovimento {
   ENTRADA_COMPRA
   SAIDA_OS
-  SAIDA_VENDA
-  DEVOLUCAO_CLIENTE
+  DEVOLUCAO_CLIENTE /// peça aplicada que voltou (OS cancelada/garantia)
   DEVOLUCAO_FORNECEDOR
   AJUSTE_ENTRADA /// contagem achou a mais
   AJUSTE_SAIDA /// contagem achou a menos
@@ -1795,119 +1619,40 @@ enum TipoMovimento {
   ESTORNO
 }
 
-/// Ledger imutável (ERPNext: Stock Ledger Entry). Saldo e custo médio do Item
-/// são derivados daqui. Correção = novo movimento de ESTORNO, nunca UPDATE.
+/// Ledger imutável (ERPNext: Stock Ledger Entry). `chave_operacao` torna cada
+/// efeito idempotente (ex.: "SAIDA_OS:<os_item_id>", "ENTRADA:<compra_item_id>").
 model MovimentoEstoque {
   id                     String        @id @default(uuid(7)) @db.Uuid
   tenant_id              String        @db.Uuid
   empresa_id             String        @db.Uuid
   item_id                String        @db.Uuid
   tipo                   TipoMovimento
+  chave_operacao         String
   quantidade             Decimal       @db.Decimal(14, 3) /// + entrada / − saída
-  custo_unitario         Decimal       @db.Decimal(14, 2)
+  custo_unitario         Decimal       @db.Decimal(14, 4)
   valor_total            Decimal       @db.Decimal(14, 2)
   saldo_apos             Decimal       @db.Decimal(14, 3)
-  custo_medio_apos       Decimal       @db.Decimal(14, 2)
+  custo_medio_apos       Decimal       @db.Decimal(14, 4)
   compra_item_id         String?       @db.Uuid
   os_item_id             String?       @db.Uuid
-  venda_item_id          String?       @db.Uuid
-  movimento_estornado_id String?       @unique @db.Uuid
+  movimento_estornado_id String?       @db.Uuid
   motivo                 String?
   membro_id              String?       @db.Uuid
   ocorreu_em             DateTime      @default(now())
 
-  empresa     Empresa           @relation(fields: [empresa_id], references: [id])
-  item        Item              @relation(fields: [item_id], references: [id])
-  compra_item CompraItem?       @relation(fields: [compra_item_id], references: [id])
-  os_item     OrdemServicoItem? @relation(fields: [os_item_id], references: [id])
-  venda_item  VendaItem?        @relation(fields: [venda_item_id], references: [id])
-  estornado   MovimentoEstoque? @relation("Estorno", fields: [movimento_estornado_id], references: [id])
+  empresa     Empresa           @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
+  item        Item              @relation(fields: [empresa_id, item_id], references: [empresa_id, id])
+  compra_item CompraItem?       @relation(fields: [empresa_id, compra_item_id], references: [empresa_id, id], onDelete: Restrict)
+  os_item     OrdemServicoItem? @relation(fields: [empresa_id, os_item_id], references: [empresa_id, id], onDelete: Restrict)
+  estornado   MovimentoEstoque? @relation("Estorno", fields: [empresa_id, movimento_estornado_id], references: [empresa_id, id], onDelete: Restrict)
   estorno     MovimentoEstoque? @relation("Estorno")
 
+  @@unique([empresa_id, chave_operacao])
+  @@unique([empresa_id, id])
+  @@unique([empresa_id, movimento_estornado_id])
   @@index([item_id, ocorreu_em])
   @@index([empresa_id, tipo, ocorreu_em])
   @@map("movimento_estoque")
-}
-
-enum StatusReserva {
-  ATIVA
-  CONSUMIDA
-  LIBERADA
-}
-
-/// Peça separada para uma OS (não sai do saldo, sai do "disponível").
-model ReservaEstoque {
-  id         String        @id @default(uuid(7)) @db.Uuid
-  item_id    String        @db.Uuid
-  os_item_id String        @db.Uuid
-  quantidade Decimal       @db.Decimal(14, 3)
-  status     StatusReserva @default(ATIVA)
-  created_at DateTime      @default(now())
-  updated_at DateTime      @updatedAt
-
-  item    Item             @relation(fields: [item_id], references: [id])
-  os_item OrdemServicoItem @relation(fields: [os_item_id], references: [id], onDelete: Cascade)
-
-  @@map("reserva_estoque")
-}
-
-enum OrigemVenda {
-  ORDEM_SERVICO
-  BALCAO
-}
-
-enum StatusVenda {
-  ABERTA
-  FATURADA /// receita reconhecida
-  CANCELADA
-}
-
-/// Reconhecimento de receita (ERPNext: Sales Invoice). Gerada na ENTREGA da OS
-/// ou numa venda de balcão (ex.: carregador avulso).
-model Venda {
-  id          String      @id @default(uuid(7)) @db.Uuid
-  tenant_id   String      @db.Uuid
-  empresa_id  String      @db.Uuid
-  numero      String
-  origem      OrigemVenda
-  os_id       String?     @db.Uuid
-  contato_id  String?     @db.Uuid
-  status      StatusVenda @default(ABERTA)
-  subtotal    Decimal     @db.Decimal(14, 2)
-  desconto    Decimal     @default(0) @db.Decimal(14, 2)
-  total       Decimal     @db.Decimal(14, 2)
-  custo_total Decimal     @default(0) @db.Decimal(14, 2) /// CMV + custo de peças
-  faturada_em DateTime?
-  criado_por  String?     @db.Uuid
-  created_at  DateTime    @default(now())
-
-  empresa Empresa            @relation(fields: [empresa_id], references: [id])
-  os      OrdemServico?      @relation(fields: [os_id], references: [id])
-  contato Contato?           @relation(fields: [contato_id], references: [id])
-  itens   VendaItem[]
-  titulos TituloFinanceiro[]
-
-  @@unique([empresa_id, numero])
-  @@map("venda")
-}
-
-model VendaItem {
-  id             String   @id @default(uuid(7)) @db.Uuid
-  venda_id       String   @db.Uuid
-  item_id        String?  @db.Uuid
-  tipo           TipoItem
-  descricao      String
-  quantidade     Decimal  @db.Decimal(14, 3)
-  preco_unitario Decimal  @db.Decimal(14, 2)
-  desconto       Decimal  @default(0) @db.Decimal(14, 2)
-  total          Decimal  @db.Decimal(14, 2)
-  custo_unitario Decimal  @default(0) @db.Decimal(14, 2)
-
-  venda      Venda              @relation(fields: [venda_id], references: [id], onDelete: Cascade)
-  item       Item?              @relation(fields: [item_id], references: [id])
-  movimentos MovimentoEstoque[]
-
-  @@map("venda_item")
 }
 
 enum TipoTitulo {
@@ -1930,7 +1675,9 @@ enum CategoriaFinanceira {
   OUTRA
 }
 
-/// Contas a pagar/receber (ERPNext: GL via Purchase/Sales Invoice + Payment Entry).
+/// Contas a pagar/receber (gerencial). RECEBER: um título por OS (índice parcial),
+/// criado na abertura/aprovação; sinal e parcelas são pagamentos nesse título.
+/// PAGAR: um ou mais títulos por compra (parcelas do fornecedor).
 model TituloFinanceiro {
   id            String              @id @default(uuid(7)) @db.Uuid
   tenant_id     String              @db.Uuid
@@ -1941,23 +1688,22 @@ model TituloFinanceiro {
   contato_id    String?             @db.Uuid
   fornecedor_id String?             @db.Uuid
   compra_id     String?             @db.Uuid
-  venda_id      String?             @db.Uuid
-  os_id         String?             @db.Uuid /// sinal/adiantamento antes da venda
+  os_id         String?             @db.Uuid
   valor         Decimal             @db.Decimal(14, 2)
-  valor_pago    Decimal             @default(0) @db.Decimal(14, 2)
+  valor_pago    Decimal             @default(0) @db.Decimal(14, 2) /// soma líquida dos pagamentos
   vencimento    DateTime            @db.Date
   status        StatusTitulo        @default(ABERTO)
   created_at    DateTime            @default(now())
   updated_at    DateTime            @updatedAt
 
-  empresa    Empresa       @relation(fields: [empresa_id], references: [id])
-  contato    Contato?      @relation(fields: [contato_id], references: [id])
-  fornecedor Fornecedor?   @relation(fields: [fornecedor_id], references: [id])
-  compra     Compra?       @relation(fields: [compra_id], references: [id])
-  venda      Venda?        @relation(fields: [venda_id], references: [id])
-  os         OrdemServico? @relation(fields: [os_id], references: [id])
+  empresa    Empresa       @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
+  contato    Contato?      @relation(fields: [empresa_id, contato_id], references: [empresa_id, id], onDelete: Restrict)
+  fornecedor Fornecedor?   @relation(fields: [empresa_id, fornecedor_id], references: [empresa_id, id], onDelete: Restrict)
+  compra     Compra?       @relation(fields: [empresa_id, compra_id], references: [empresa_id, id], onDelete: Restrict)
+  os         OrdemServico? @relation(fields: [empresa_id, os_id], references: [empresa_id, id], onDelete: Restrict)
   pagamentos Pagamento[]
 
+  @@unique([empresa_id, id])
   @@index([empresa_id, tipo, status, vencimento])
   @@map("titulo_financeiro")
 }
@@ -1972,44 +1718,36 @@ enum FormaPagamento {
   OUTRO
 }
 
+enum TipoLancamentoPagamento {
+  PAGAMENTO
+  ESTORNO /// valor negativo, aponta o pagamento estornado
+}
+
+/// Append-only. Estorno = nova linha (valor negativo) ligada ao pagamento original.
 model Pagamento {
-  id                 String         @id @default(uuid(7)) @db.Uuid
-  titulo_id          String         @db.Uuid
-  valor              Decimal        @db.Decimal(14, 2)
-  forma              FormaPagamento
-  parcelas           Int            @default(1)
-  taxa               Decimal        @default(0) @db.Decimal(14, 2) /// taxa de maquininha
-  referencia_externa String?
-  membro_id          String?        @db.Uuid
-  pago_em            DateTime       @default(now())
-  estornado_em       DateTime?
+  id                     String                  @id @default(uuid(7)) @db.Uuid
+  tenant_id              String                  @db.Uuid
+  empresa_id             String                  @db.Uuid
+  titulo_id              String                  @db.Uuid
+  tipo                   TipoLancamentoPagamento @default(PAGAMENTO)
+  valor                  Decimal                 @db.Decimal(14, 2)
+  forma                  FormaPagamento
+  parcelas               Int                     @default(1)
+  taxa                   Decimal                 @default(0) @db.Decimal(14, 2) /// taxa de maquininha
+  referencia_externa     String?
+  pagamento_estornado_id String?                 @db.Uuid
+  membro_id              String?                 @db.Uuid
+  pago_em                DateTime                @default(now())
 
-  titulo TituloFinanceiro @relation(fields: [titulo_id], references: [id])
+  empresa   Empresa          @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
+  titulo    TituloFinanceiro @relation(fields: [empresa_id, titulo_id], references: [empresa_id, id])
+  estornado Pagamento?       @relation("EstornoPagamento", fields: [empresa_id, pagamento_estornado_id], references: [empresa_id, id], onDelete: Restrict)
+  estorno   Pagamento?       @relation("EstornoPagamento")
 
+  @@unique([empresa_id, id])
+  @@unique([empresa_id, pagamento_estornado_id])
   @@index([titulo_id])
   @@map("pagamento")
-}
-
-enum SistemaExterno {
-  ERPNEXT
-}
-
-/// Ponte para sincronização futura com ERPNext (ou outro ERP/fiscal).
-model IntegracaoRef {
-  id              String         @id @default(uuid(7)) @db.Uuid
-  tenant_id       String         @db.Uuid
-  empresa_id      String         @db.Uuid
-  sistema         SistemaExterno
-  entidade_tipo   String /// item | fornecedor | contato | compra | venda | movimento
-  entidade_id     String         @db.Uuid
-  id_externo      String /// ex.: Item.item_code, Customer.name
-  sincronizado_em DateTime?
-  status          String         @default("pendente")
-  erro            String?
-
-  @@unique([sistema, entidade_tipo, entidade_id])
-  @@unique([empresa_id, sistema, entidade_tipo, id_externo])
-  @@map("integracao_ref")
 }
 
 // =============================================================================
@@ -2032,8 +1770,8 @@ enum EventoNotificacao {
   PESQUISA_SATISFACAO
 }
 
-/// Conteúdo por evento × canal. Para WhatsApp fora da janela de 24h a Meta
-/// exige template pré-aprovado (whatsapp_template / idioma).
+/// Conteúdo por evento × canal. `ativo` liga/desliga o evento naquele canal.
+/// WhatsApp fora da janela de 24h exige template aprovado pela Meta.
 model ModeloMensagem {
   id                String            @id @default(uuid(7)) @db.Uuid
   tenant_id         String            @db.Uuid
@@ -2044,29 +1782,15 @@ model ModeloMensagem {
   corpo             String /// Handlebars: {{contato.nome}}, {{os.numero}}, {{link}}
   whatsapp_template String?
   whatsapp_idioma   String?           @default("pt_BR")
+  status_os         StatusOS[] /// OS_STATUS_ALTERADO: quais status disparam
   ativo             Boolean           @default(true)
 
-  empresa      Empresa       @relation(fields: [empresa_id], references: [id])
+  empresa      Empresa       @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
   notificacoes Notificacao[]
 
   @@unique([empresa_id, evento, canal])
+  @@unique([empresa_id, id])
   @@map("modelo_mensagem")
-}
-
-/// Liga/desliga cada evento por empresa (ex.: avisar só PRONTA e ENTREGUE).
-model ConfigNotificacaoEvento {
-  id         String            @id @default(uuid(7)) @db.Uuid
-  empresa_id String            @db.Uuid
-  evento     EventoNotificacao
-  ativo      Boolean           @default(true)
-  atraso_min Int               @default(0)
-  /// para OS_STATUS_ALTERADO: quais status disparam
-  status_os  StatusOS[]
-
-  empresa Empresa @relation(fields: [empresa_id], references: [id])
-
-  @@unique([empresa_id, evento])
-  @@map("config_notificacao_evento")
 }
 
 enum StatusNotificacao {
@@ -2079,24 +1803,26 @@ enum StatusNotificacao {
   CANCELADA
 }
 
-/// Outbox: criada na MESMA transação da mudança de status; um worker envia,
-/// faz retry/fallback de canal e atualiza via webhooks do provedor.
+/// Outbox: criada na MESMA transação da mudança de status. Worker envia com
+/// retry e fallback de canal; webhooks do provedor atualizam o status.
 model Notificacao {
   id              String            @id @default(uuid(7)) @db.Uuid
   tenant_id       String            @db.Uuid
   empresa_id      String            @db.Uuid
   contato_id      String            @db.Uuid
+  orcamento_id    String?           @db.Uuid
+  os_id           String?           @db.Uuid
+  negocio_id      String?           @db.Uuid
   evento          EventoNotificacao
   canal           CanalComunicacao
+  chave_dedupe    String /// ex.: "OS_STATUS_ALTERADO:<os_status_historico.id>:WHATSAPP"
   destino         String /// e164 ou e-mail resolvido no envio
   modelo_id       String?           @db.Uuid
-  entidade_tipo   String
-  entidade_id     String            @db.Uuid
   variaveis       Json
-  conteudo        String? /// renderizado
+  conteudo        String?
   status          StatusNotificacao @default(PENDENTE)
   tentativas      Int               @default(0)
-  provedor        String? /// meta_cloud, zenvia, twilio, ses, resend…
+  provedor        String?
   provedor_msg_id String?
   erro            String?
   agendada_para   DateTime          @default(now())
@@ -2105,13 +1831,18 @@ model Notificacao {
   lida_em         DateTime?
   created_at      DateTime          @default(now())
 
-  empresa Empresa         @relation(fields: [empresa_id], references: [id])
-  contato Contato         @relation(fields: [contato_id], references: [id])
-  modelo  ModeloMensagem? @relation(fields: [modelo_id], references: [id])
+  empresa   Empresa         @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
+  contato   Contato         @relation(fields: [empresa_id, contato_id], references: [empresa_id, id])
+  orcamento Orcamento?      @relation(fields: [empresa_id, orcamento_id], references: [empresa_id, id], onDelete: Restrict)
+  os        OrdemServico?   @relation(fields: [empresa_id, os_id], references: [empresa_id, id], onDelete: Restrict)
+  negocio   Negocio?        @relation(fields: [empresa_id, negocio_id], references: [empresa_id, id], onDelete: Restrict)
+  modelo    ModeloMensagem? @relation(fields: [empresa_id, modelo_id], references: [empresa_id, id], onDelete: Restrict)
 
+  @@unique([empresa_id, chave_dedupe])
+  @@unique([provedor, provedor_msg_id])
   @@index([status, agendada_para])
-  @@index([entidade_tipo, entidade_id])
-  @@index([provedor, provedor_msg_id])
+  @@index([os_id])
+  @@index([orcamento_id])
   @@map("notificacao")
 }
 
@@ -2135,7 +1866,8 @@ enum StatusJob {
   FALHOU
 }
 
-/// Lotes grandes (> 500 linhas ou CSV) rodam assíncronos; a API devolve 202 + job_id.
+/// Lotes > 500 linhas ou CSV: API devolve 202 + job_id. Cada linha é processada
+/// em sua própria transação (política: sucesso parcial, erros por linha).
 model JobLote {
   id              String      @id @default(uuid(7)) @db.Uuid
   tenant_id       String      @db.Uuid
@@ -2154,7 +1886,7 @@ model JobLote {
   created_at      DateTime    @default(now())
   finalizado_em   DateTime?
 
-  empresa Empresa @relation(fields: [empresa_id], references: [id])
+  empresa Empresa @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
 
   @@unique([empresa_id, idempotency_key])
   @@map("job_lote")
