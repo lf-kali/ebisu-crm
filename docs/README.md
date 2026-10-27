@@ -3,7 +3,7 @@
 > CRM/prospecção + bancada de OS + estoque simplificado para assistências técnicas
 > de celulares, notebooks e PCs. Multi-tenant, multi-empresa, RBAC.
 > **Atualização:** este documento descreve a v0.1 (68 tabelas, em [`historico/schema-v0.1.prisma`](./historico/schema-v0.1.prisma)).
-> O modelo vigente é o **v0.2-MVP** em [`schema.prisma`](./schema.prisma) — mudanças e motivos em
+> O modelo vigente é o **v0.2-MVP** em [`schema.prisma`](../packages/db/prisma/schema.prisma) — mudanças e motivos em
 > [`consolidacao-revisoes.md`](./consolidacao-revisoes.md); regras em [`invariantes.md`](./invariantes.md).
 > O [Ogun](https://github.com/lf-kali/ogun) é usado apenas como **referência** de modelagem.
 
@@ -305,7 +305,7 @@ Convenções: `/v1`, JSON, paginação por cursor (`?cursor=&limit=`), filtros `
 
 ## 11. Modelo de dados — mapa
 
-O schema v0.1 (68 tabelas, 63 enums) está em [`historico/schema-v0.1.prisma`](./historico/schema-v0.1.prisma); o vigente (v0.2-MVP) em [`schema.prisma`](./schema.prisma).
+O schema v0.1 (68 tabelas, 63 enums) está em [`historico/schema-v0.1.prisma`](./historico/schema-v0.1.prisma); o vigente (v0.2-MVP) em [`schema.prisma`](../packages/db/prisma/schema.prisma).
 
 ```mermaid
 erDiagram

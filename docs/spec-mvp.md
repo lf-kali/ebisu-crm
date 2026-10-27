@@ -10,8 +10,8 @@
 
 | Assunto | Arquivo | Regra de precedência |
 |---|---|---|
-| Modelo de dados | [`schema.prisma`](./schema.prisma) | Fonte única de tabelas, colunas e relações |
-| Constraints, RLS, triggers | [`sql/complemento-v0.2.sql`](./sql/complemento-v0.2.sql) | Aplicado na mesma migração inicial |
+| Modelo de dados | [`schema.prisma`](../packages/db/prisma/schema.prisma) | Fonte única de tabelas, colunas e relações |
+| Constraints, RLS, triggers, papéis de banco | [migração inicial](../packages/db/prisma/migrations/20261027000000_inicial/migration.sql) (seções 1–5, depois do SQL gerado pelo Prisma) | Toda constraint nova entra em migração nova (§5.8) |
 | Regras de negócio, estados, comandos | [`invariantes.md`](./invariantes.md) | IDs (`EST-6`, `OS-3`…) são citados em tarefas, testes e PRs |
 | Testes das regras do banco | [`sql/testes-invariantes.sh`](./sql/testes-invariantes.sh) | Devem passar no CI |
 | Escopo e motivos | [`consolidacao-revisoes.md`](./consolidacao-revisoes.md) | Histórico das decisões |

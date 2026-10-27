@@ -1,0 +1,173 @@
+import { randomUUID } from 'node:crypto';
+import type pg from 'pg';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import {
+  type BancoDeTeste,
+  codigoDoErro,
+  criarBancoDeTeste,
+  rodarNoPacote,
+} from './banco-de-teste.js';
+
+const SEM_PERMISSAO = '42501';
+const TABELAS_GLOBAIS = ['permissao', 'refresh_token', 'usuario'];
+
+describe('migração inicial e papéis de banco', () => {
+  let banco: BancoDeTeste;
+  let admin: pg.Client;
+  let app: pg.Client;
+  let auth: pg.Client;
+  const tenants = [randomUUID(), randomUUID()];
+
+  beforeAll(async () => {
+    banco = await criarBancoDeTeste();
+    admin = await banco.conectar(banco.urlAdmin);
+    app = await banco.conectar(banco.urlDoPapel('ebisu_app'));
+    auth = await banco.conectar(banco.urlDoPapel('ebisu_auth'));
+
+    // Dados de dois tenants, gravados pelo superusuário do container (superusuário ignora RLS).
+    for (const [i, tenantId] of tenants.entries()) {
+      const usuarioId = randomUUID();
+      await admin.query('BEGIN');
+      await admin.query(`SELECT set_config('app.tenant_id', $1, true)`, [tenantId]);
+      await admin.query(
+        `INSERT INTO usuario (id, email, nome, updated_at) VALUES ($1, $2, 'Pessoa', now())`,
+        [usuarioId, `pessoa${i}@teste.local`],
+      );
+      await admin.query(
+        `INSERT INTO tenant (id, nome, slug, updated_at) VALUES ($1, 'T', $2, now())`,
+        [tenantId, `tenant-${i}`],
+      );
+      await admin.query(
+        `INSERT INTO empresa (id, tenant_id, razao_social, nome_fantasia, updated_at)
+         VALUES ($1, $2, 'Empresa', 'E', now())`,
+        [randomUUID(), tenantId],
+      );
+      await admin.query(
+        `INSERT INTO membro (id, tenant_id, usuario_id, updated_at) VALUES ($1, $2, $3, now())`,
+        [randomUUID(), tenantId, usuarioId],
+      );
+      await admin.query('COMMIT');
+    }
+  });
+
+  afterAll(async () => {
+    await Promise.all([admin?.end(), app?.end(), auth?.end()]);
+    await banco?.container.stop();
+  });
+
+  it('não há drift entre schema.prisma e as migrações', async () => {
+    await admin.query('CREATE DATABASE sombra');
+    const sombra = new URL(banco.urlAdmin);
+    sombra.pathname = '/sombra';
+    const saida = rodarNoPacote(
+      'pnpm',
+      [
+        'exec',
+        'prisma',
+        'migrate',
+        'diff',
+        '--from-migrations',
+        'prisma/migrations',
+        '--to-schema-datamodel',
+        'prisma/schema.prisma',
+        '--shadow-database-url',
+        sombra.toString(),
+        '--exit-code',
+      ],
+      {},
+    );
+    expect(saida).toContain('No difference detected');
+  });
+
+  it('SEG-1: toda tabela tem RLS forçado, exceto as globais de autenticação', async () => {
+    const { rows } = await admin.query<{ relname: string }>(
+      `SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname <> '_prisma_migrations'
+          AND NOT (c.relrowsecurity AND c.relforcerowsecurity)
+        ORDER BY 1`,
+    );
+    expect(rows.map((r) => r.relname)).toEqual(TABELAS_GLOBAIS);
+  });
+
+  it('SEG-6: ebisu_app e ebisu_auth não são superusuários, não ignoram RLS e não são donos de nada', async () => {
+    const { rows } = await admin.query(
+      `SELECT r.rolname, r.rolsuper, r.rolbypassrls, r.rolcanlogin,
+              (SELECT count(*)::int FROM pg_class c WHERE c.relowner = r.oid) AS objetos
+         FROM pg_roles r WHERE r.rolname IN ('ebisu_app', 'ebisu_auth') ORDER BY 1`,
+    );
+    expect(rows).toEqual([
+      { rolname: 'ebisu_app', rolsuper: false, rolbypassrls: false, rolcanlogin: true, objetos: 0 },
+      {
+        rolname: 'ebisu_auth',
+        rolsuper: false,
+        rolbypassrls: false,
+        rolcanlogin: true,
+        objetos: 0,
+      },
+    ]);
+  });
+
+  it('SEG-1: ebisu_app sem app.tenant_id não enxerga nenhuma linha', async () => {
+    const { rows } = await app.query('SELECT count(*)::int AS n FROM tenant');
+    expect(rows[0].n).toBe(0);
+  });
+
+  it('SEG-1: ebisu_app com app.tenant_id enxerga só o próprio tenant', async () => {
+    await app.query('BEGIN');
+    await app.query(`SELECT set_config('app.tenant_id', $1, true)`, [tenants[0]]);
+    const { rows } = await app.query('SELECT id FROM tenant');
+    await app.query('COMMIT');
+    expect(rows).toEqual([{ id: tenants[0] }]);
+  });
+
+  it.each(TABELAS_GLOBAIS)('ebisu_app não acessa a tabela global %s', async (tabela) => {
+    expect(await codigoDoErro(app, `SELECT 1 FROM ${tabela} LIMIT 1`)).toBe(SEM_PERMISSAO);
+  });
+
+  it('ebisu_auth lê membro, tenant e empresa de todos os tenants sem contexto', async () => {
+    for (const tabela of ['membro', 'tenant', 'empresa']) {
+      const { rows } = await auth.query(`SELECT count(*)::int AS n FROM ${tabela}`);
+      expect(rows[0].n, tabela).toBe(2);
+    }
+  });
+
+  it('ebisu_auth não grava em membro, tenant nem empresa', async () => {
+    expect(await codigoDoErro(auth, `UPDATE tenant SET nome = 'x'`)).toBe(SEM_PERMISSAO);
+    expect(await codigoDoErro(auth, `DELETE FROM membro`)).toBe(SEM_PERMISSAO);
+    expect(await codigoDoErro(auth, `UPDATE empresa SET nome_fantasia = 'x'`)).toBe(SEM_PERMISSAO);
+  });
+
+  it('ebisu_auth não acessa dados de negócio', async () => {
+    expect(await codigoDoErro(auth, 'SELECT 1 FROM contato LIMIT 1')).toBe(SEM_PERMISSAO);
+    expect(await codigoDoErro(auth, 'SELECT 1 FROM ordem_servico LIMIT 1')).toBe(SEM_PERMISSAO);
+  });
+
+  it('ebisu_auth grava usuario e lê o catálogo de permissões', async () => {
+    const id = randomUUID();
+    await auth.query(
+      `INSERT INTO usuario (id, email, nome, updated_at) VALUES ($1, 'novo@teste.local', 'Novo', now())`,
+      [id],
+    );
+    await auth.query('SELECT count(*) FROM permissao');
+    expect(
+      await codigoDoErro(
+        auth,
+        `INSERT INTO permissao (chave, recurso, acao, descricao) VALUES ('x.y', 'x', 'y', 'teste')`,
+      ),
+    ).toBe(SEM_PERMISSAO);
+  });
+
+  it('configurar-papeis é idempotente e recusa rodar sem senha definida', () => {
+    const env = {
+      DATABASE_URL: banco.urlAdmin,
+      DB_APP_PASSWORD: 'senha-app-teste',
+      DB_AUTH_PASSWORD: 'senha-auth-teste',
+    };
+    expect(rodarNoPacote('node', ['scripts/configurar-papeis.mjs'], env)).toContain(
+      'Papel ebisu_auth: LOGIN e senha definidos',
+    );
+    expect(() =>
+      rodarNoPacote('node', ['scripts/configurar-papeis.mjs'], { ...env, DB_APP_PASSWORD: '' }),
+    ).toThrow(/DB_APP_PASSWORD não definido/);
+  });
+});

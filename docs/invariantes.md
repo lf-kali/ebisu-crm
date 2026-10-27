@@ -1,9 +1,9 @@
 # ebisuCRM — Regras invariantes, estados e comandos de domínio (v0.2-MVP)
 
-> Complementa [`schema.prisma`](./schema.prisma) e [`consolidacao-revisoes.md`](./consolidacao-revisoes.md).
+> Complementa [`schema.prisma`](../packages/db/prisma/schema.prisma) e [`consolidacao-revisoes.md`](./consolidacao-revisoes.md).
 > Cada regra tem um identificador (ex.: `EST-2`) e diz **quem garante**:
 >
-> - **Banco** — constraint, índice, trigger ou RLS em [`sql/complemento-v0.2.sql`](./sql/complemento-v0.2.sql),
+> - **Banco** — constraint, índice, trigger ou RLS na [migração inicial](../packages/db/prisma/migrations/20261027000000_inicial/migration.sql),
 >   coberta por [`sql/testes-invariantes.sh`](./sql/testes-invariantes.sh).
 > - **Domínio** — comando transacional no backend (NestJS), coberto por testes de integração.
 >
