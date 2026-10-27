@@ -27,6 +27,7 @@ try {
       throw new Error(`Papel ${nome} não existe; rode as migrações antes (prisma migrate deploy)`);
     }
     // ALTER ROLE não aceita parâmetros: nome é constante e a senha vai como literal escapado.
+    // A senha trafega no statement: não rode com log_statement = 'ddl'/'all' no servidor.
     await cliente.query(`ALTER ROLE ${nome} WITH LOGIN PASSWORD ${cliente.escapeLiteral(senha)}`);
     console.log(`Papel ${nome}: LOGIN e senha definidos`);
   }

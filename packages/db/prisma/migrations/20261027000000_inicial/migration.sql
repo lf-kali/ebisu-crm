@@ -2039,16 +2039,29 @@ CREATE POLICY tenant_isolamento ON papel_permissao
 -- ebisu_auth → módulo de auth. Lê e grava usuario/refresh_token, lê o catálogo
 --              de permissões e LÊ (só leitura) membro/tenant/empresa de qualquer
 --              tenant, para resolver os vínculos do usuário no login.
+--
+-- Migrações futuras: toda tabela nova recebe GRANT explícito (não há default
+-- privileges) e só ebisu_app/ebisu_auth acessam tabelas com RLS forçado,
+-- exceto as globais de auth — o teste de integração do pacote verifica.
+--
+-- Limitação conhecida: a FK membro.usuario_id é checada com os privilégios do
+-- dono, então ebisu_app distingue um usuario.id existente de um inexistente ao
+-- gravar membro. A criação de membros fica restrita a fluxos controlados (F3).
 -- =============================================================================
 
+-- Papéis são globais do cluster: se já existirem (outro banco do mesmo cluster),
+-- são reaproveitados, mas a migração aborta se algum puder ignorar o RLS.
 DO $$
+DECLARE papel text;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ebisu_app') THEN
-    CREATE ROLE ebisu_app NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ebisu_auth') THEN
-    CREATE ROLE ebisu_auth NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
-  END IF;
+  FOREACH papel IN ARRAY ARRAY['ebisu_app', 'ebisu_auth'] LOOP
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = papel) THEN
+      EXECUTE format('CREATE ROLE %I NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS', papel);
+    ELSIF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = papel
+                   AND (rolsuper OR rolbypassrls OR rolcreaterole OR rolcreatedb)) THEN
+      RAISE EXCEPTION 'Papel % já existe com SUPERUSER/BYPASSRLS/CREATEROLE/CREATEDB; corrija antes de migrar', papel;
+    END IF;
+  END LOOP;
 END $$;
 
 GRANT USAGE ON SCHEMA public TO ebisu_app, ebisu_auth;
@@ -2056,6 +2069,14 @@ GRANT USAGE ON SCHEMA public TO ebisu_app, ebisu_auth;
 -- ebisu_app: todas as tabelas de negócio (todas têm RLS), exceto as globais de auth.
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ebisu_app;
 REVOKE ALL ON usuario, refresh_token, permissao FROM ebisu_app;
+-- Histórico de migrações do Prisma (sem RLS): nenhum papel da aplicação o acessa.
+-- Ausente no shadow database do `prisma migrate dev`, daí a guarda.
+DO $$
+BEGIN
+  IF to_regclass('_prisma_migrations') IS NOT NULL THEN
+    REVOKE ALL ON _prisma_migrations FROM ebisu_app, ebisu_auth;
+  END IF;
+END $$;
 GRANT EXECUTE ON FUNCTION app_tenant_id() TO ebisu_app, ebisu_auth;
 
 -- ebisu_auth: tabelas globais de autenticação
