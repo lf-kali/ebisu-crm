@@ -119,34 +119,49 @@ describe('migração inicial e papéis de banco', () => {
     expect(saida).toContain('All migrations have been successfully applied');
   });
 
-  // Cada caso deixa o papel existente inseguro, tenta migrar um banco novo e desfaz.
-  const PAPEIS_INSEGUROS = [
+  // Cada caso deixa um papel existente inseguro, tenta migrar um banco novo e desfaz.
+  const PAPEIS_INSEGUROS: Array<{
+    motivo: string;
+    papel: string;
+    estragar: (banco: string) => string[];
+    desfazer: (banco: string) => string[];
+  }> = [
+    ...(['SUPERUSER', 'BYPASSRLS', 'CREATEROLE', 'CREATEDB', 'REPLICATION'] as const).map(
+      (atributo) => ({
+        motivo: atributo,
+        papel: 'ebisu_auth',
+        estragar: (b: string) => [`CREATE DATABASE ${b}`, `ALTER ROLE ebisu_auth ${atributo}`],
+        desfazer: () => [`ALTER ROLE ebisu_auth NO${atributo}`],
+      }),
+    ),
     {
-      caso: 'BYPASSRLS',
+      motivo: 'membro de outro papel',
       papel: 'ebisu_app',
-      estragar: 'ALTER ROLE ebisu_app BYPASSRLS',
-      desfazer: 'ALTER ROLE ebisu_app NOBYPASSRLS',
+      estragar: (b) => [`CREATE DATABASE ${b}`, 'GRANT pg_read_all_data TO ebisu_app'],
+      desfazer: () => ['REVOKE pg_read_all_data FROM ebisu_app'],
     },
     {
-      caso: 'REPLICATION',
-      papel: 'ebisu_auth',
-      estragar: 'ALTER ROLE ebisu_auth REPLICATION',
-      desfazer: 'ALTER ROLE ebisu_auth NOREPLICATION',
+      motivo: 'dono do banco',
+      papel: 'ebisu_app',
+      estragar: (b) => [`CREATE DATABASE ${b} OWNER ebisu_app`],
+      desfazer: (b) => [`DROP DATABASE ${b}`],
     },
     {
-      caso: 'membro de pg_read_all_data',
+      motivo: 'configuração própria (ALTER ROLE ... SET)',
       papel: 'ebisu_app',
-      estragar: 'GRANT pg_read_all_data TO ebisu_app',
-      desfazer: 'REVOKE pg_read_all_data FROM ebisu_app',
+      estragar: (b) => [
+        `CREATE DATABASE ${b}`,
+        `ALTER ROLE ebisu_app SET app.tenant_id = '${randomUUID()}'`,
+      ],
+      desfazer: () => ['ALTER ROLE ebisu_app RESET ALL'],
     },
   ];
 
   it.each(PAPEIS_INSEGUROS)(
-    'SEG-6: aborta a migração se um papel existente tiver $caso',
-    async ({ papel, estragar, desfazer }) => {
+    'SEG-6: aborta a migração se um papel existente for inseguro ($motivo)',
+    async ({ motivo, papel, estragar, desfazer }) => {
       const nomeBanco = `banco_${randomUUID().replaceAll('-', '')}`;
-      await admin.query(`CREATE DATABASE ${nomeBanco}`);
-      await admin.query(estragar);
+      for (const sql of estragar(nomeBanco)) await admin.query(sql);
       try {
         const url = new URL(banco.urlAdmin);
         url.pathname = `/${nomeBanco}`;
@@ -159,9 +174,9 @@ describe('migração inicial e papéis de banco', () => {
           const { stdout = '', stderr = '' } = erro as { stdout?: string; stderr?: string };
           saida = stdout + stderr;
         }
-        expect(saida).toContain(`Papel ${papel} existe com SUPERUSER/BYPASSRLS`);
+        expect(saida).toContain(`Papel ${papel} inseguro (${motivo})`);
       } finally {
-        await admin.query(desfazer);
+        for (const sql of desfazer(nomeBanco)) await admin.query(sql);
       }
     },
   );
@@ -175,9 +190,27 @@ describe('migração inicial e papéis de banco', () => {
           DB_APP_PASSWORD: 'senha-app-teste',
           DB_AUTH_PASSWORD: 'senha-auth-teste',
         }),
-      ).toThrow(/Papel ebisu_app tem SUPERUSER\/BYPASSRLS/);
+      ).toThrow(/Papel ebisu_app inseguro \(membro de outro papel\)/);
     } finally {
       await admin.query('REVOKE pg_write_all_data FROM ebisu_app');
+    }
+  });
+
+  it('SEG-1: configurar-papeis descarta tenant padrão configurado no papel', async () => {
+    await admin.query(`ALTER ROLE ebisu_app SET app.tenant_id = '${tenants[0]}'`);
+    rodarNoPacote('node', ['scripts/configurar-papeis.mjs'], {
+      DATABASE_URL: banco.urlAdmin,
+      DB_APP_PASSWORD: 'senha-app-teste',
+      DB_AUTH_PASSWORD: 'senha-auth-teste',
+    });
+    const novaConexao = await banco.conectar(banco.urlDoPapel('ebisu_app'));
+    try {
+      const { rows } = await novaConexao.query(
+        'SELECT app_tenant_id() AS t, count(*)::int AS n FROM tenant',
+      );
+      expect(rows[0]).toEqual({ t: null, n: 0 });
+    } finally {
+      await novaConexao.end();
     }
   });
 

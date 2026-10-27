@@ -631,6 +631,7 @@ curta do módulo (`apps/api/src/modules/<dominio>/README.md`: comandos, eventos,
 | Custo de transação por request (set_config + queries) | Transação em lote do Prisma; medir no teste de carga (§6.3) |
 | Conflitos entre agentes em arquivos compartilhados | Tabela de donos (§3.3); contratos por domínio em pastas separadas |
 | WhatsApp: template não aprovado a tempo | Adapter falso no MVP + fallback para e-mail/SMS; templates submetidos cedo (F10, onda 3) |
+| Papel de banco pré-existente com poder demais (BYPASSRLS, membro de `pg_read_all_data`, dono do banco, `ALTER ROLE … SET`) fura o RLS ou os GRANTs | Premissa: `ebisu_app`/`ebisu_auth` são criados pela migração e só alterados por `pnpm db:papeis`; o banco pertence ao papel migrador. A função `motivo_papel_inseguro` aborta a migração e o `db:papeis` nos casos conhecidos; vetores novos dessa classe viram limitação documentada |
 | Escopo cresce durante a execução | Itens "fora do MVP" (§1) exigem decisão do dono do produto |
 
 ---

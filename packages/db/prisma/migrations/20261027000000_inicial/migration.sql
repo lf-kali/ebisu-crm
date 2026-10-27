@@ -2049,24 +2049,58 @@ CREATE POLICY tenant_isolamento ON papel_permissao
 -- gravar membro. A criação de membros fica restrita a fluxos controlados (F3).
 -- =============================================================================
 
--- Papéis são globais do cluster: se já existirem (outro banco do mesmo cluster),
--- são reaproveitados, mas a migração aborta se algum tiver atributo que fure o
--- RLS ou os GRANTs, ou for membro de outro papel (ex.: pg_read_all_data e
--- pg_write_all_data ignoram GRANTs de tabela). `pnpm db:papeis` repete a checagem.
+-- Premissa de implantação: ebisu_app e ebisu_auth são criados por esta migração e
+-- só alterados por `pnpm db:papeis`; o banco e o schema public pertencem ao papel
+-- que roda as migrações. Papéis já existentes (outro banco do mesmo cluster) são
+-- reaproveitados, mas a migração aborta se algum tiver poder além do necessário.
+-- A mesma regra é reaplicada por `pnpm db:papeis` a cada deploy.
+
+-- Motivo pelo qual o papel é inseguro para a aplicação, ou NULL se estiver ok.
+CREATE FUNCTION motivo_papel_inseguro(papel name) RETURNS text
+LANGUAGE sql STABLE AS $$
+  SELECT CASE
+    WHEN r.rolsuper       THEN 'SUPERUSER'
+    WHEN r.rolbypassrls   THEN 'BYPASSRLS'
+    WHEN r.rolcreaterole  THEN 'CREATEROLE'
+    WHEN r.rolcreatedb    THEN 'CREATEDB'
+    WHEN r.rolreplication THEN 'REPLICATION'
+    -- ex.: pg_read_all_data / pg_write_all_data ignoram os GRANTs de tabela
+    WHEN EXISTS (SELECT 1 FROM pg_auth_members m WHERE m.member = r.oid)
+      THEN 'membro de outro papel'
+    -- dono do banco é dono efetivo do schema public (pg_database_owner): pode dar DROP
+    WHEN EXISTS (SELECT 1 FROM pg_database d WHERE d.datname = current_database() AND d.datdba = r.oid)
+      THEN 'dono do banco'
+    WHEN EXISTS (SELECT 1 FROM pg_namespace n WHERE n.nspowner = r.oid)
+      THEN 'dono de schema'
+    WHEN EXISTS (SELECT 1 FROM pg_class c WHERE c.relowner = r.oid)
+      OR EXISTS (SELECT 1 FROM pg_proc p WHERE p.proowner = r.oid)
+      OR EXISTS (SELECT 1 FROM pg_type t WHERE t.typowner = r.oid)
+      THEN 'dono de objeto'
+    -- ex.: ALTER ROLE ... SET app.tenant_id criaria um tenant padrão sem set_config
+    WHEN EXISTS (SELECT 1 FROM pg_db_role_setting s
+                  WHERE s.setrole = r.oid
+                    AND s.setdatabase IN (0, (SELECT oid FROM pg_database WHERE datname = current_database())))
+      THEN 'configuração própria (ALTER ROLE ... SET)'
+  END
+  FROM pg_roles r
+  WHERE r.rolname = papel
+$$;
+REVOKE ALL ON FUNCTION motivo_papel_inseguro(name) FROM PUBLIC;
+
 DO $$
-DECLARE papel text;
+DECLARE
+  papel  text;
+  motivo text;
 BEGIN
   FOREACH papel IN ARRAY ARRAY['ebisu_app', 'ebisu_auth'] LOOP
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = papel) THEN
       EXECUTE format(
         'CREATE ROLE %I NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS', papel);
-    ELSIF EXISTS (
-      SELECT 1 FROM pg_roles r
-       WHERE r.rolname = papel
-         AND (r.rolsuper OR r.rolbypassrls OR r.rolcreaterole OR r.rolcreatedb OR r.rolreplication
-              OR EXISTS (SELECT 1 FROM pg_auth_members m WHERE m.member = r.oid))
-    ) THEN
-      RAISE EXCEPTION 'Papel % existe com SUPERUSER/BYPASSRLS/CREATEROLE/CREATEDB/REPLICATION ou é membro de outro papel; corrija antes de migrar', papel;
+    ELSE
+      motivo := motivo_papel_inseguro(papel);
+      IF motivo IS NOT NULL THEN
+        RAISE EXCEPTION 'Papel % inseguro (%): corrija antes de migrar', papel, motivo;
+      END IF;
     END IF;
   END LOOP;
 END $$;
