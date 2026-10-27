@@ -46,15 +46,29 @@ export async function comTenant<T>(
   }, opcoes);
 }
 
+export class TransacaoNoClienteDoTenantError extends Error {
+  constructor() {
+    super('clienteDoTenant não abre transações; para várias operações atômicas use comTenant');
+    this.name = 'TransacaoNoClienteDoTenantError';
+  }
+}
+
 /**
  * Cliente para leituras/escritas avulsas de um tenant: cada operação de model roda numa
  * transação em lote `[set_config, operação]`. Não use dentro de `comTenant` (lá, use o `tx`)
  * e não cobre `$queryRaw`/`$executeRaw`, que rodam sem contexto e portanto não veem linhas.
+ * `$transaction` é bloqueado: cada operação já abre a própria transação em outra conexão,
+ * o que quebraria a atomicidade (ou travaria com pool de 1 conexão).
  */
 export function clienteDoTenant(cliente: PrismaClient, tenantId: string) {
   const id = validarTenantId(tenantId);
   return cliente.$extends({
     name: 'tenancy',
+    client: {
+      $transaction(): never {
+        throw new TransacaoNoClienteDoTenantError();
+      },
+    },
     query: {
       $allModels: {
         async $allOperations({ args, query }) {

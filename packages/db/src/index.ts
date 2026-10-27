@@ -3,6 +3,7 @@ export {
   clienteDoTenant,
   comTenant,
   TenantInvalidoError,
+  TransacaoNoClienteDoTenantError,
   type ClienteDoTenant,
   type OpcoesTransacao,
 } from './tenancy.js';
