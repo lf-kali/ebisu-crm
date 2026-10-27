@@ -13,7 +13,9 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "db:invariantes": "./scripts/db-invariantes.sh"
+    "db:invariantes": "./scripts/db-invariantes.sh",
+    "db:migrate": "pnpm --filter @ebisu/db migrate:deploy",
+    "db:papeis": "pnpm --filter @ebisu/db papeis"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",

@@ -1,6 +1,6 @@
 # ebisuCRM — Consolidação das revisões do modelo v0.1 e proposta de MVP
 
-> Data: 2026-10-27 · Base: [`schema.prisma`](./schema.prisma) v0.1 e [`README.md`](./README.md)
+> Data: 2026-10-27 · Base: [`schema.prisma`](./historico/schema-v0.1.prisma) v0.1 e [`README.md`](./README.md)
 >
 > Três agentes revisaram o modelo v0.1 a partir do prompt de validação. Este documento confere
 > cada afirmação contra o schema real, compara os pareceres e consolida a proposta final do MVP.
@@ -300,7 +300,7 @@ RETURNING estoque_atual, custo_medio;
 ## 5. Situação
 
 - Decisões da §4.4 aprovadas.
-- Schema v0.2-MVP em [`schema.prisma`](./schema.prisma) (v0.1 em [`historico/`](./historico/schema-v0.1.prisma)).
+- Schema v0.2-MVP em [`schema.prisma`](../packages/db/prisma/schema.prisma) (v0.1 em [`historico/`](./historico/schema-v0.1.prisma)).
 - Regras, estados e comandos em [`invariantes.md`](./invariantes.md); constraints e RLS em
-  [`sql/complemento-v0.2.sql`](./sql/complemento-v0.2.sql), testadas por
+  [migração inicial](../packages/db/prisma/migrations/20261027000000_inicial/migration.sql), testadas por
   [`sql/testes-invariantes.sh`](./sql/testes-invariantes.sh).

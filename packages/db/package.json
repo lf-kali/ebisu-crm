@@ -2,7 +2,7 @@
   "name": "@ebisu/db",
   "version": "0.0.0",
   "private": true,
-  "description": "schema.prisma, migrações, seeds e cliente com tenancy (F1)",
+  "description": "Schema Prisma, migrações, papéis de banco, seeds e cliente com tenancy (F1)",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -13,9 +13,22 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "dev": "prisma generate && tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "typecheck": "prisma generate && tsc -p tsconfig.json",
+    "test": "vitest run",
+    "migrate:deploy": "prisma migrate deploy",
+    "migrate:status": "prisma migrate status",
+    "papeis": "node scripts/configurar-papeis.mjs"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@testcontainers/postgresql": "^12.2.1",
+    "@types/pg": "^8.23.1",
+    "prisma": "6.19.3",
+    "testcontainers": "^12.2.1"
   }
 }

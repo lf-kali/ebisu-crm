@@ -10,8 +10,8 @@
 
 | Assunto | Arquivo | Regra de precedência |
 |---|---|---|
-| Modelo de dados | [`schema.prisma`](./schema.prisma) | Fonte única de tabelas, colunas e relações |
-| Constraints, RLS, triggers | [`sql/complemento-v0.2.sql`](./sql/complemento-v0.2.sql) | Aplicado na mesma migração inicial |
+| Modelo de dados | [`schema.prisma`](../packages/db/prisma/schema.prisma) | Fonte única de tabelas, colunas e relações |
+| Constraints, RLS, triggers, papéis de banco | [migração inicial](../packages/db/prisma/migrations/20261027000000_inicial/migration.sql) (seções 1–5, depois do SQL gerado pelo Prisma) | Toda constraint nova entra em migração nova (§5.8) |
 | Regras de negócio, estados, comandos | [`invariantes.md`](./invariantes.md) | IDs (`EST-6`, `OS-3`…) são citados em tarefas, testes e PRs |
 | Testes das regras do banco | [`sql/testes-invariantes.sh`](./sql/testes-invariantes.sh) | Devem passar no CI |
 | Escopo e motivos | [`consolidacao-revisoes.md`](./consolidacao-revisoes.md) | Histórico das decisões |
@@ -631,6 +631,7 @@ curta do módulo (`apps/api/src/modules/<dominio>/README.md`: comandos, eventos,
 | Custo de transação por request (set_config + queries) | Transação em lote do Prisma; medir no teste de carga (§6.3) |
 | Conflitos entre agentes em arquivos compartilhados | Tabela de donos (§3.3); contratos por domínio em pastas separadas |
 | WhatsApp: template não aprovado a tempo | Adapter falso no MVP + fallback para e-mail/SMS; templates submetidos cedo (F10, onda 3) |
+| Papel de banco pré-existente com poder demais (BYPASSRLS, membro de `pg_read_all_data`, dono do banco, `ALTER ROLE … SET`) fura o RLS ou os GRANTs | Premissa: `ebisu_app`/`ebisu_auth` são criados pela migração e só alterados por `pnpm db:papeis`; o banco pertence ao papel migrador. A função `motivo_papel_inseguro` aborta a migração e o `db:papeis` nos casos conhecidos; vetores novos dessa classe viram limitação documentada |
 | Escopo cresce durante a execução | Itens "fora do MVP" (§1) exigem decisão do dono do produto |
 
 ---

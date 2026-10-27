@@ -11,6 +11,8 @@ Requisitos: Node.js 24 (`.nvmrc`), pnpm 10 e Docker com Compose.
 cp .env.example .env     # portas e credenciais de dev
 docker compose up -d     # Postgres, Redis, SeaweedFS (S3) e Mailpit
 pnpm install
+pnpm db:migrate          # aplica as migrações (packages/db)
+pnpm db:papeis           # define LOGIN/senha de ebisu_app e ebisu_auth
 pnpm dev                 # api, worker e web
 ```
 
@@ -31,10 +33,11 @@ Postgres só valem na criação do volume: para trocá-los, rode `down -v` antes
 
 ## Comandos
 
-| Comando                             | O que faz                        |
-| ----------------------------------- | -------------------------------- |
-| `pnpm build`                        | Build de todos os pacotes e apps |
-| `pnpm typecheck`                    | Checagem de tipos                |
-| `pnpm test`                         | Testes (Vitest)                  |
-| `pnpm lint`                         | ESLint                           |
-| `pnpm format` / `pnpm format:check` | Prettier                         |
+| Comando                             | O que faz                                                                         |
+| ----------------------------------- | --------------------------------------------------------------------------------- |
+| `pnpm build`                        | Build de todos os pacotes e apps                                                  |
+| `pnpm typecheck`                    | Checagem de tipos                                                                 |
+| `pnpm test`                         | Testes (Vitest)                                                                   |
+| `pnpm lint`                         | ESLint                                                                            |
+| `pnpm format` / `pnpm format:check` | Prettier                                                                          |
+| `pnpm db:invariantes`               | Recria `ebisu_test`, aplica as migrações e roda os testes de invariantes do banco |

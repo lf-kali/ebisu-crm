@@ -2,13 +2,12 @@
 # =============================================================================
 # Testes das invariantes garantidas pelo BANCO (docs/invariantes.md).
 #
-# Pré-requisito: banco vazio com a migração do Prisma + complemento-v0.2.sql.
-#   npx prisma migrate diff --from-empty --to-schema-datamodel docs/schema.prisma --script > /tmp/m.sql
-#   psql -d ebisu_test -f /tmp/m.sql && psql -d ebisu_test -f docs/sql/complemento-v0.2.sql
+# Pré-requisito: banco vazio com as migrações de packages/db aplicadas
+# (`./scripts/db-invariantes.sh` recria o banco, aplica e roda este arquivo).
 #
 # Uso:  PSQL="psql -d ebisu_test" ./docs/sql/testes-invariantes.sh
-# PSQL deve conectar como superusuário (o script cria o papel ebisu_app e roda
-# os testes com SET ROLE ebisu_app, sem BYPASSRLS, como a aplicação rodará).
+# PSQL deve conectar como superusuário (o script roda os testes com SET ROLE ebisu_app,
+# sem BYPASSRLS e com as permissões da migração, como a aplicação rodará).
 # =============================================================================
 set -u
 PSQL=${PSQL:-psql -d ebisu_test}
@@ -48,15 +47,10 @@ igual() {   # igual "descrição" "esperado" tenant "sql que retorna 1 valor"
 }
 
 echo "== Preparação"
-$PSQL -X -q <<SQL >/dev/null
-DO \$\$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ebisu_app') THEN
-    CREATE ROLE ebisu_app NOLOGIN NOSUPERUSER NOBYPASSRLS;
-  END IF;
-END \$\$;
-GRANT USAGE ON SCHEMA public TO ebisu_app;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ebisu_app;
-SQL
+# O papel ebisu_app e suas permissões vêm da migração; os testes rodam com elas, sem GRANT extra.
+if [ "$($PSQL -X -At -c "SELECT count(*) FROM pg_roles WHERE rolname = 'ebisu_app' AND NOT rolbypassrls")" != 1 ]; then
+  echo "  ✘ papel ebisu_app (sem BYPASSRLS) não existe — aplique as migrações antes"; exit 1
+fi
 
 for T in $T1 $T2; do
   roda "$T" "INSERT INTO tenant (id, nome, slug, updated_at) VALUES ('$T', 'Tenant', 'tenant-$T', now());"
