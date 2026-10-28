@@ -29,6 +29,9 @@ const Modo = z.object({
       'nest_500',
       'nest_502',
       'nest_409',
+      'zod_interno',
+      'dominio_5xx',
+      'objeto_cru',
     ])
     .default('ok'),
 });
@@ -61,6 +64,16 @@ export class ExemploController {
         throw new HttpException('gateway', 502);
       case 'nest_409':
         throw new ConflictException('conflito sem ErroDominio');
+      case 'zod_interno':
+        return z.object({ senha_interna: z.string() }).parse({ x: 'valor-secreto' });
+      case 'dominio_5xx':
+        throw new ErroDominio(
+          'erro_interno',
+          { detail: 'SEGREDO sql', extras: { tabela: 'usuario' } },
+          'X-1',
+        );
+      case 'objeto_cru':
+        throw { status: 400, expose: true, type: 'entity.parse.failed' };
       default:
         return { id: ID_EXEMPLO, ...corpo };
     }

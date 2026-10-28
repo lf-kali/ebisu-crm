@@ -6,9 +6,8 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import { type CodigoErro, camposDoZod, criarProblema, type Problema } from '@ebisu/contracts';
+import { CATALOGO_ERROS, type CodigoErro, criarProblema, type Problema } from '@ebisu/contracts';
 import type { Request, Response } from 'express';
-import { ZodError } from 'zod';
 import { requestIdDa } from '../requisicao/request-id.js';
 import { ErroDominio } from './erro-dominio.js';
 
@@ -45,11 +44,7 @@ function statusDeErroDoCliente(excecao: unknown): number | undefined {
   let status: unknown;
   if (excecao instanceof HttpException) {
     status = excecao.getStatus();
-  } else if (
-    typeof excecao === 'object' &&
-    excecao !== null &&
-    (excecao as { expose?: unknown }).expose === true
-  ) {
+  } else if (excecao instanceof Error && (excecao as { expose?: unknown }).expose === true) {
     status = (excecao as { status?: unknown }).status;
   }
   return typeof status === 'number' && status >= 400 && status < 500 ? status : undefined;
@@ -74,11 +69,12 @@ export class FiltroProblema implements ExceptionFilter {
 
   private converter(excecao: unknown): Problema {
     if (excecao instanceof ErroDominio) {
+      // Em falha do servidor só o catálogo vai ao cliente: detail/extras/invariante ficam no log.
+      if (CATALOGO_ERROS[excecao.code].status >= 500) return criarProblema(excecao.code);
       return criarProblema(excecao.code, { ...excecao.detalhes, invariante: excecao.invariante });
     }
-    if (excecao instanceof ZodError) {
-      return criarProblema('validacao', { campos: camposDoZod(excecao) });
-    }
+    // ZodError solto (fora da validação de entrada do contrato) não é tratado aqui: cai em
+    // erro_interno, porque é erro de programação.
     // Só status com código no catálogo são reconhecidos. Qualquer outro (5xx, ou um 409
     // lançado sem ErroDominio) vira erro_interno e é logado: nunca mascarar falha como
     // erro de entrada. Conflitos de regra de negócio saem por ErroDominio com o código certo.

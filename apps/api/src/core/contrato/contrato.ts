@@ -5,8 +5,10 @@ import {
   HttpCode,
   SetMetadata,
 } from '@nestjs/common';
+import { camposDoZod } from '@ebisu/contracts';
 import type { Request } from 'express';
 import type { z } from 'zod';
+import { ErroDominio } from '../erros/erro-dominio.js';
 
 // Um contrato por endpoint (D-A02, D-A10): os mesmos schemas validam a requisição e a resposta
 // e geram o OpenAPI. Endpoint sem contrato é recusado pelo teste de cobertura do OpenAPI.
@@ -50,8 +52,12 @@ function validar(parte: Parte, contexto: ExecutionContext): unknown {
       `@Contrato sem schema "${parte}" em ${contexto.getClass().name}.${contexto.getHandler().name}`,
     );
   }
-  // ZodError vira 422 `validacao` no filtro global.
-  return schema.parse(ORIGEM[parte](contexto.switchToHttp().getRequest<Request>()));
+  // Só a entrada vira 422: um ZodError lançado em outro lugar (service, regra) é bug e o
+  // filtro o trata como 500 logado, sem expor o schema interno.
+  const resultado = schema.safeParse(ORIGEM[parte](contexto.switchToHttp().getRequest<Request>()));
+  if (!resultado.success)
+    throw new ErroDominio('validacao', { campos: camposDoZod(resultado.error) });
+  return resultado.data;
 }
 
 /** Corpo validado pelo `corpo` do contrato. */
