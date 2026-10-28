@@ -17,7 +17,7 @@ const rotaApp = getRouteApi('/_app');
 
 /** Empresa atual no cabeçalho; com mais de uma, troca por um menu (X-Empresa-Id). */
 export function SeletorEmpresa() {
-  const { empresa: empresaAtual, queryClient } = rotaApp.useRouteContext();
+  const { empresa: empresaAtual } = rotaApp.useRouteContext();
   const { eu, empresa, empresas } = useAcesso();
   if (!eu || !empresa) return null;
 
@@ -36,9 +36,8 @@ export function SeletorEmpresa() {
 
   function escolher(id: string) {
     if (!eu || id === empresa?.id) return;
+    // O layout reage à troca: refaz os dados de domínio (que são por empresa).
     empresaAtual.escolher(donoDaPreferencia(eu), id);
-    // Dados de domínio são por empresa: refaz tudo, menos o /v1/eu (que é da conta).
-    void queryClient.resetQueries({ predicate: (consulta) => consulta.queryKey[0] !== 'eu' });
   }
 
   return (

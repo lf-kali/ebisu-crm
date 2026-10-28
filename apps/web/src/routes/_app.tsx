@@ -73,6 +73,16 @@ function LayoutApp() {
     [sessao, router, queryClient, empresa],
   );
 
+  // Dados de domínio são por empresa: qualquer troca da empresa atual (seletor ou perda de acesso
+  // no /v1/eu) refaz tudo, menos o /v1/eu, que é da conta.
+  useEffect(
+    () =>
+      empresa.assinar(() => {
+        void queryClient.resetQueries({ predicate: (consulta) => consulta.queryKey[0] !== 'eu' });
+      }),
+    [empresa, queryClient],
+  );
+
   const { eu, empresas, pode } = useAcesso();
   // O /v1/eu mudou (ex.: perdeu acesso à empresa atual): escolhe de novo entre as que restam.
   useEffect(() => {

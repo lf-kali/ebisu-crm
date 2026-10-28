@@ -173,9 +173,12 @@ describe('empresa atual (X-Empresa-Id)', () => {
   it('perder acesso à empresa atual escolhe outra das que restam', async () => {
     const { queryClient } = renderizarApp('/');
     await botaoEmpresa(centro!.nome_fantasia);
+    queryClient.setQueryData(['contatos'], ['da empresa que saiu']);
     const eu = queryClient.getQueryData<RespostaEu>(['eu'])!;
     queryClient.setQueryData(['eu'], { ...eu, empresas: [shopping] });
     expect(await screen.findByText(shopping!.nome_fantasia, { selector: 'span' })).toBeTruthy();
+    // Dados da empresa que saiu não ficam no cache (mesmo caminho da troca pelo seletor).
+    await waitFor(() => expect(queryClient.getQueryData(['contatos'])).toBeUndefined());
   });
 
   it('com uma empresa só, mostra o nome sem menu de troca', async () => {
