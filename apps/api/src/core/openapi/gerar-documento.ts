@@ -111,6 +111,13 @@ const CabecalhoEmpresa = z.object({
   'X-Empresa-Id': Uuid.meta({ description: 'Empresa em que a operação acontece' }),
 });
 
+/** POST de domínio: idempotente (§5.1; plano f3-3a). */
+const CabecalhosIdempotente = CabecalhoEmpresa.extend({
+  'Idempotency-Key': Uuid.meta({
+    description: 'Repetir com a mesma chave devolve a mesma resposta (validade de 24 h)',
+  }),
+});
+
 /** Respostas de erro que a marca de acesso acrescenta, além do `default`. */
 const ERROS_DO_ACESSO: Record<Acesso['tipo'], string[]> = {
   publica: [],
@@ -136,6 +143,8 @@ export function gerarDocumento(app: INestApplication) {
     const status = contrato.status ?? 200;
     const permissao = acesso.tipo === 'permissao' ? `Permissão: \`${acesso.chave}\`.` : undefined;
     const descricao = [contrato.descricao, permissao].filter(Boolean).join('\n\n');
+    const idempotente = acesso.tipo === 'permissao' && metodo === 'post';
+    const erros = [...ERROS_DO_ACESSO[acesso.tipo], ...(idempotente ? ['409'] : [])];
     registro.registerPath({
       method: metodo,
       path: caminho,
@@ -144,7 +153,9 @@ export function gerarDocumento(app: INestApplication) {
       ...(contrato.tags ? { tags: contrato.tags } : {}),
       ...(acesso.tipo === 'publica' ? {} : { security: [{ [bearer.name]: [] }] }),
       request: {
-        ...(acesso.tipo === 'permissao' ? { headers: CabecalhoEmpresa } : {}),
+        ...(acesso.tipo === 'permissao'
+          ? { headers: idempotente ? CabecalhosIdempotente : CabecalhoEmpresa }
+          : {}),
         ...(contrato.params ? { params: contrato.params } : {}),
         ...(contrato.query ? { query: contrato.query } : {}),
         ...(contrato.corpo
@@ -158,7 +169,7 @@ export function gerarDocumento(app: INestApplication) {
               content: { 'application/json': { schema: contrato.resposta } },
             }
           : { description: 'Sucesso, sem conteúdo' },
-        ...Object.fromEntries(ERROS_DO_ACESSO[acesso.tipo].map((s) => [s, respostaDeErro])),
+        ...Object.fromEntries(erros.map((s) => [s, respostaDeErro])),
         default: respostaDeErro,
       },
     });

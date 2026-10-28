@@ -508,6 +508,12 @@ executarComando(contextoHttpOuJob, comando, entrada, { idempotencyKey? })
 Regras: um comando nunca chama outro módulo por repositório, só pelo serviço público (que recebe o
 mesmo `TxContext`); erros de regra são lançados como `ErroDominio(code, detalhes, invariante)`.
 
+Idempotência (plano `docs/planos/f3-3a-idempotencia.md`): em todo POST de domínio o guard põe a
+`Idempotency-Key` e o hash do pedido (rota, parâmetros, empresa, autor e corpo) no contexto. O
+`executarComando` trava a chave na própria transação (409 se outra requisição a usa), devolve a
+resposta salva (422 se o pedido for outro) ou roda o comando e grava a resposta junto com os
+efeitos. Só sucesso é memorizado; `EM_PROCESSAMENTO` não é usado (efeito e resposta são atômicos).
+
 `permissoes` guarda o escopo de cada chave para o repositório aplicar o PROPRIO
 (`filtroDeEscopo`). `emitir` fica fora do contexto até existir o despachante de eventos: um
 `emitir` que só descartasse eventos os perderia em silêncio (plano `docs/planos/f3-2-contexto-rbac.md`).

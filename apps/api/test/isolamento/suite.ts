@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { expect, it } from 'vitest';
 import { type CenarioIsolamento, IDS, type Quem } from './cenario.js';
@@ -25,11 +26,15 @@ export function pedir(cenario: () => CenarioIsolamento) {
     caminho: string,
     empresa: string | null,
     corpo?: object,
+    /** Idempotency-Key do POST; sem ela, uma nova a cada chamada (como o cliente web). `null` omite. */
+    chave?: string | null,
   ) => {
     const req = request(cenario().app.getHttpServer())
       [metodo](caminho)
       .set('Authorization', `Bearer ${await cenario().token(quem)}`);
     if (empresa) req.set('X-Empresa-Id', empresa);
+    const idempotencia = chave === undefined && metodo === 'post' ? randomUUID() : chave;
+    if (idempotencia) req.set('Idempotency-Key', idempotencia);
     return corpo ? req.send(corpo) : req;
   };
 }

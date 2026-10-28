@@ -17,6 +17,7 @@ import {
 } from '../../modules/auth/tokens.js';
 import { PRISMA_APP, PRISMA_AUTH } from '../banco/banco.module.js';
 import { ErroDominio } from '../erros/erro-dominio.js';
+import { idempotenciaDa } from '../idempotencia/idempotencia.js';
 import { requestIdDa } from '../requisicao/request-id.js';
 import type { ContextoDaRequisicao } from '../tx/contexto.js';
 import { type Acesso, marcasDe } from './marcas.js';
@@ -77,8 +78,13 @@ export class GuardaContexto implements CanActivate {
     const [tipo, token] = (req.headers.authorization ?? '').split(' ');
     const identidade = tipo === 'Bearer' && token ? await this.tokens.verificar(token) : null;
     if (!identidade) throw naoAutenticado();
-    // O formato do cabeçalho é conferido antes de ir ao banco.
+    // O formato dos cabeçalhos é conferido antes de ir ao banco.
     const empresaId = acesso.tipo === 'permissao' ? empresaDoCabecalho(req) : null;
+    // Todo POST de domínio é idempotente (plano f3-3a, decisão 1).
+    const idempotencia =
+      empresaId && req.method === 'POST'
+        ? idempotenciaDa(req, empresaId, identidade.membroId)
+        : undefined;
 
     // O usuário é global: só o ebisu_auth lê. O resto fica sob o RLS da conta do token.
     const usuario = await this.auth.usuario.findUnique({
@@ -102,6 +108,7 @@ export class GuardaContexto implements CanActivate {
       apiKeyId: null,
       permissoes,
       requestId: requestIdDa(contexto.switchToHttp().getResponse<Response>()) ?? randomUUID(),
+      ...(idempotencia ? { idempotencia } : {}),
     };
     return true;
   }

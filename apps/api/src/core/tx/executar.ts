@@ -2,10 +2,11 @@ import { Global, Inject, Injectable, Module } from '@nestjs/common';
 import { comTenant, Prisma, type PrismaClient } from '@ebisu/db';
 import { PRISMA_APP } from '../banco/banco.module.js';
 import { ErroDominio } from '../erros/erro-dominio.js';
+import { comoJson, gravarResposta, travarERecuperar } from '../idempotencia/idempotencia.js';
 import type { Comando, ContextoDaRequisicao } from './contexto.js';
 
-// Único ponto que abre transação para dados de domínio (spec §3.2, §5.4). Idempotência, audit
-// log e eventos entram aqui no PR 3.
+// Único ponto que abre transação para dados de domínio (spec §3.2, §5.4): aplica a
+// Idempotency-Key (PR 3a); audit log e eventos entram aqui depois.
 
 /**
  * Envolve uma escrita que grava referências (FKs, compostas por empresa: SEG-2). Se uma delas não
@@ -32,7 +33,16 @@ export class ExecutorDeComandos {
     comando: Comando<Entrada, Saida>,
     entrada: Entrada,
   ): Promise<Saida> {
-    return comTenant(this.app, contexto.tenantId, (tx) => comando({ ...contexto, tx }, entrada));
+    const { idempotencia, ...resto } = contexto;
+    return comTenant(this.app, contexto.tenantId, async (tx) => {
+      if (!idempotencia) return comando({ ...resto, tx }, entrada);
+      // A chave fica travada até o fim desta transação; a resposta é gravada nela (plano f3-3a).
+      const salva = await travarERecuperar(tx, contexto.tenantId, idempotencia);
+      if (salva) return salva.resposta as Saida;
+      const resposta = comoJson(await comando({ ...resto, tx }, entrada));
+      await gravarResposta(tx, contexto.tenantId, idempotencia, resposta);
+      return resposta as Saida;
+    });
   }
 }
 

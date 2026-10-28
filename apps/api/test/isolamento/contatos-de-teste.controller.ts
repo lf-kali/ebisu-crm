@@ -101,6 +101,44 @@ export class ContatosDeTesteController {
     );
   }
 
+  @Post(':id/duplicar')
+  @Permissao('contato.create')
+  @Contrato({
+    resumo: 'Duplica (teste): outra rota POST, com parâmetro',
+    params: PorId,
+    corpo: Editar,
+    resposta: ContatoDeTeste,
+    status: 201,
+  })
+  duplicar(
+    @Contexto() contexto: ContextoDaRequisicao,
+    @Parametros() { id }: z.infer<typeof PorId>,
+    @Corpo() entrada: z.infer<typeof Editar>,
+  ) {
+    return this.executor.executarComando(
+      contexto,
+      async (ctx, dados) => {
+        const origem = await ctx.tx.contato.findFirst({
+          where: { id, ...daEmpresa(ctx, 'contato.read') },
+          select: { email: true },
+        });
+        if (!origem) throw new ErroDominio('nao_encontrado');
+        return ctx.tx.contato.create({
+          data: {
+            tenant_id: ctx.tenantId,
+            empresa_id: ctx.empresaId,
+            nome: dados.nome,
+            email: origem.email,
+            responsavel_id: ctx.membroId,
+            campos_faltantes: [],
+          },
+          select: CAMPOS,
+        });
+      },
+      entrada,
+    );
+  }
+
   @Patch(':id')
   @Permissao('contato.update')
   @Contrato({ resumo: 'Edita (teste)', params: PorId, corpo: Editar, resposta: ContatoDeTeste })

@@ -1,5 +1,6 @@
 import type { EscopoPermissao } from '@ebisu/contracts';
 import type { Prisma } from '@ebisu/db';
+import type { Idempotencia } from '../idempotencia/idempotencia.js';
 
 // Contrato interno dos comandos de domínio (spec §5.4).
 
@@ -14,9 +15,11 @@ export interface ContextoDaRequisicao {
   /** Permissões efetivas na empresa, com o escopo de cada uma (SEG-4). */
   permissoes: ReadonlyMap<string, EscopoPermissao>;
   requestId: string;
+  /** POST de domínio: a Idempotency-Key e o hash do pedido (o executarComando a aplica). */
+  idempotencia?: Idempotencia;
 }
 
-export interface TxContext extends ContextoDaRequisicao {
+export interface TxContext extends Omit<ContextoDaRequisicao, 'idempotencia'> {
   /** Transação com `app.tenant_id` já definido (RLS, SEG-1). */
   tx: Prisma.TransactionClient;
 }
