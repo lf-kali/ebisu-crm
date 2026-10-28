@@ -1,3 +1,4 @@
+import { RespostaSaude } from '@ebisu/contracts';
 import { useEffect, useState } from 'react';
 
 type StatusApi = 'verificando' | 'ok' | 'indisponivel';
@@ -13,8 +14,12 @@ export function App() {
 
   useEffect(() => {
     let ativo = true;
+    // O mesmo schema que a API usa no contrato (packages/contracts).
     fetch('/v1/saude')
-      .then((resposta) => (ativo ? setStatus(resposta.ok ? 'ok' : 'indisponivel') : undefined))
+      .then(
+        async (resposta) => resposta.ok && RespostaSaude.safeParse(await resposta.json()).success,
+      )
+      .then((disponivel) => (ativo ? setStatus(disponivel ? 'ok' : 'indisponivel') : undefined))
       .catch(() => (ativo ? setStatus('indisponivel') : undefined));
     return () => {
       ativo = false;
