@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { EmConstrucao } from '../../componentes/em-construcao';
+import { EmConstrucao } from '../../../componentes/em-construcao';
 
-export const Route = createFileRoute('/orcamentos/')({
+export const Route = createFileRoute('/_app/orcamentos/')({
   component: () => <EmConstrucao titulo="Orçamentos" frente="F13-ORC" />,
 });

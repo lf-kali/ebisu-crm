@@ -10,8 +10,8 @@ import {
 } from '@ebisu/ui/components/ui/card';
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { api } from '../api/cliente';
-import { ErroDaApi } from '../componentes/erro-da-api';
+import { api } from '../../api/cliente';
+import { ErroDaApi } from '../../componentes/erro-da-api';
 
 export const consultaSaude = {
   queryKey: ['saude'],
@@ -41,4 +41,4 @@ function Painel() {
   );
 }
 
-export const Route = createFileRoute('/')({ component: Painel });
+export const Route = createFileRoute('/_app/')({ component: Painel });

@@ -1,6 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import { tanstackRouter } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react';
+import { msw } from 'msw/vite';
 import { loadEnv } from 'vite';
 import { defineConfig } from 'vitest/config';
 
@@ -13,12 +14,18 @@ const hostsPermitidos = (valor: string | undefined) =>
 // O .env fica na raiz do monorepo, compartilhado com o docker compose e a API.
 const RAIZ = new URL('../..', import.meta.url).pathname;
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ command, mode }) => {
   const env = { ...loadEnv(mode, RAIZ, ''), ...process.env };
 
   return {
     // O plugin do roteador precisa vir antes do React (gera src/routeTree.gen.ts e divide o código por rota).
-    plugins: [tanstackRouter({ target: 'react', autoCodeSplitting: true }), react(), tailwindcss()],
+    plugins: [
+      tanstackRouter({ target: 'react', autoCodeSplitting: true }),
+      react(),
+      tailwindcss(),
+      // Serve o worker da API simulada só no servidor de desenvolvimento (nunca no build).
+      ...(command === 'serve' ? [msw({ mode: 'worker-only' })] : []),
+    ],
     envDir: RAIZ,
     server: {
       port: Number(env.WEB_PORT ?? 5173),

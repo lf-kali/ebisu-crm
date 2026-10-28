@@ -47,6 +47,7 @@ do `globals.css` e falha o CI se algum cair abaixo do mínimo.
 | `primary` como texto / fundo                               | 6,2   | 7,7    |
 | `muted-foreground` / fundo                                 | 6,0   | 8,0    |
 | `destructive` / fundo                                      | 5,4   | 6,8    |
+| `destructive` / `card` (erro de campo no login)            | 5,4   | 6,2    |
 | `accent-foreground` / `accent`                             | 12,5  | 10,8   |
 | `sucesso` / fundo                                          | 5,2   | 8,4    |
 | `sucesso-foreground` / `sucesso`                           | 5,0   | 8,4    |
@@ -92,6 +93,10 @@ shadcn, barradas pelo teste:
 - Menu na ordem dos módulos (spec §4 F13): Painel, Contatos, Negócios, Dispositivos, Orçamentos,
   Bancada, Estoque, Financeiro, Configurações. Item atual com `aria-current="page"`. Itens sem
   permissão ficam ocultos (não desabilitados).
+- **Menu do usuário** (`apps/web/src/layout/menu-usuario.tsx`), à direita do cabeçalho: nome e
+  conta atual; "Trocar de conta" (só com mais de uma) e "Sair".
+- **Telas de entrada** (`TelaDeEntrada`: login, escolha de conta): fora do AppShell, cartão de até
+  384 px centralizado sobre `bg-muted`, com `h1` e descrição curta.
 
 ## Componentes
 
@@ -99,6 +104,11 @@ Base shadcn/ui (estilo `new-york`) em `packages/ui/src/components/ui/`: `alert`,
 `badge`, `button`, `card`, `dropdown-menu`, `input`, `label`, `separator`, `sheet`, `skeleton`,
 `table`, `tooltip`. Componentes novos entram pela CLI do shadcn no `packages/ui` e corrigindo o import do
 `cn` para `@ebisu/ui/lib/utils`.
+
+Formulários (`apps/web/src/formularios/`): React Hook Form com o schema Zod do contrato. Cada
+campo usa `Campo` (rótulo visível, `aria-invalid` e a mensagem ligada por `aria-describedby`);
+mensagens do Zod em pt-BR, com "Campo obrigatório." para campo vazio. Erros por campo de um 422
+vão para o campo (`aplicarErrosDaApi`); o resto aparece no topo do formulário.
 
 Estados padrão (`packages/ui/src/components/estados.tsx`), obrigatórios em toda tela com dados:
 

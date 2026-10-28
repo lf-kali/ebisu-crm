@@ -18,6 +18,8 @@ export interface OpcoesRequisicao<S extends z.ZodType> {
    */
   chaveIdempotencia?: string;
   sinal?: AbortSignal;
+  /** Cabeçalhos só desta requisição (somados aos do cliente). */
+  cabecalhos?: Record<string, string>;
 }
 
 export interface ConfigCliente {
@@ -25,6 +27,12 @@ export interface ConfigCliente {
   baseUrl?: string;
   /** Cabeçalhos por requisição: Authorization e X-Empresa-Id (entram com a autenticação). */
   cabecalhos?: () => Record<string, string>;
+  /**
+   * Chamado num 401 com os cabeçalhos que a requisição usou: tenta renovar a sessão (refresh). Se
+   * devolver true, a requisição é repetida uma vez, com os cabeçalhos novos e a mesma
+   * Idempotency-Key.
+   */
+  aoNaoAutenticado?: (cabecalhosUsados: Record<string, string>) => Promise<boolean>;
   fetch?: typeof fetch;
 }
 
@@ -44,14 +52,17 @@ export function criarClienteApi(config: ConfigCliente = {}) {
     metodo: Metodo,
     caminho: string,
     opcoes: OpcoesRequisicao<S>,
+    repeticao = false,
   ): Promise<S extends z.ZodType ? z.infer<S> : undefined> {
+    // A chave é fixada na primeira tentativa: a repetição depois do refresh é a mesma operação.
+    const chave = metodo === 'POST' ? (opcoes.chaveIdempotencia ?? crypto.randomUUID()) : undefined;
     const cabecalhos: Record<string, string> = {
       Accept: 'application/json',
       ...config.cabecalhos?.(),
+      ...opcoes.cabecalhos,
     };
     if (opcoes.corpo !== undefined) cabecalhos['Content-Type'] = 'application/json';
-    if (metodo === 'POST')
-      cabecalhos['Idempotency-Key'] = opcoes.chaveIdempotencia ?? crypto.randomUUID();
+    if (chave) cabecalhos['Idempotency-Key'] = chave;
 
     const url = montarUrl(config.baseUrl ?? window.location.origin, caminho, opcoes.query);
     let resposta: Response;
@@ -74,6 +85,11 @@ export function criarClienteApi(config: ConfigCliente = {}) {
       corpo = texto ? JSON.parse(texto) : undefined;
     } catch {
       corpo = undefined;
+    }
+    if (resposta.status === 401 && !repeticao && config.aoNaoAutenticado) {
+      if (await config.aoNaoAutenticado(cabecalhos)) {
+        return requisitar(metodo, caminho, { ...opcoes, chaveIdempotencia: chave }, true);
+      }
     }
     if (!resposta.ok) throw ErroApi.deResposta(resposta.status, corpo);
     if (opcoes.resposta === null) return undefined as never;
