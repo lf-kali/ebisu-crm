@@ -21,12 +21,20 @@ export function renderizarApp(
     ...queryClient.getDefaultOptions(),
     queries: { ...queryClient.getDefaultOptions().queries, retryDelay: 0 },
   });
-  const { sessao, cliente } = criarSessaoECliente();
+  const { sessao, cliente, empresa } = criarSessaoECliente();
   const router = criarRouter({
     queryClient,
     sessao,
     cliente,
+    empresa,
     history: createMemoryHistory({ initialEntries: [caminho] }),
   });
-  return { router, queryClient, sessao, ...render(<RouterProvider router={router} />) };
+  return {
+    router,
+    queryClient,
+    sessao,
+    empresa,
+    cliente,
+    ...render(<RouterProvider router={router} />),
+  };
 }

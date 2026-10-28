@@ -8,10 +8,14 @@ import {
 } from '@tanstack/react-router';
 import { useEffect, useSyncExternalStore } from 'react';
 import { ErroApi } from '../api/erro-api';
+import { useAcesso } from '../auth/acesso';
 import { consultaEu } from '../auth/consultas';
+import { donoDaPreferencia } from '../auth/empresa';
 import { ErroDaApi } from '../componentes/erro-da-api';
-import { AppShell } from '../layout/app-shell';
+import { AppShell, estaAtivo } from '../layout/app-shell';
 import { MenuUsuario } from '../layout/menu-usuario';
+import { NAVEGACAO } from '../layout/navegacao';
+import { SeletorEmpresa } from '../layout/seletor-empresa';
 
 // Layout das páginas protegidas: sem sessão, vai para o login e volta para cá depois.
 export const Route = createFileRoute('/_app')({
@@ -21,10 +25,14 @@ export const Route = createFileRoute('/_app')({
   },
   loader: async ({ context, location }) => {
     try {
-      return await context.queryClient.ensureQueryData(consultaEu(context.cliente));
+      const eu = await context.queryClient.ensureQueryData(consultaEu(context.cliente));
+      // Antes das páginas: os dados de domínio já saem com o X-Empresa-Id certo.
+      context.empresa.resolver(donoDaPreferencia(eu), eu.empresas);
+      return eu;
     } catch (erro) {
       // A sessão caiu entre o beforeLoad e o loader (401 e refresh recusado): login, não erro.
-      if (erro instanceof ErroApi && erro.status === 401)
+      // Se o refresh falhou por rede, a sessão continua e o erro aparece como "sem conexão".
+      if (erro instanceof ErroApi && erro.status === 401 && !context.sessao.obter())
         throw redirect({ to: '/login', search: { redirect: location.href } });
       throw erro;
     }
@@ -41,7 +49,7 @@ export const Route = createFileRoute('/_app')({
 });
 
 function LayoutApp() {
-  const { sessao, queryClient } = Route.useRouteContext();
+  const { sessao, queryClient, empresa } = Route.useRouteContext();
   const router = useRouter();
   const atual = useSyncExternalStore(sessao.assinar, sessao.obter);
   const caminhoAtual = useRouterState({ select: (estado) => estado.location.pathname });
@@ -56,16 +64,64 @@ function LayoutApp() {
         const { href } = router.state.location;
         void router
           .navigate({ to: '/login', search: { redirect: href }, replace: true })
-          // Dados da sessão encerrada não podem sobrar para o próximo login.
-          .then(() => queryClient.clear());
+          // Dados e empresa da sessão encerrada não podem sobrar para o próximo login.
+          .then(() => {
+            queryClient.clear();
+            empresa.limpar();
+          });
       }),
-    [sessao, router, queryClient],
+    [sessao, router, queryClient, empresa],
   );
 
+  // Dados de domínio são por empresa: qualquer troca da empresa atual (seletor ou perda de acesso
+  // no /v1/eu) refaz tudo, menos o /v1/eu, que é da conta.
+  useEffect(
+    () =>
+      empresa.assinar(() => {
+        void queryClient.resetQueries({ predicate: (consulta) => consulta.queryKey[0] !== 'eu' });
+      }),
+    [empresa, queryClient],
+  );
+
+  const { eu, empresas, pode } = useAcesso();
+  // O /v1/eu mudou (ex.: perdeu acesso à empresa atual): escolhe de novo entre as que restam.
+  useEffect(() => {
+    if (eu) empresa.resolver(donoDaPreferencia(eu), eu.empresas);
+  }, [eu, empresa]);
+
   if (!atual) return null;
-  return (
-    <AppShell caminhoAtual={caminhoAtual} cabecalho={<MenuUsuario />}>
+  // Menu e páginas por permissão da empresa atual. A URL direta de um módulo oculto mostra
+  // "sem acesso" (a API negaria os dados de qualquer jeito).
+  const itens = NAVEGACAO.filter((item) => !item.permissao || pode(item.permissao));
+  const modulo = NAVEGACAO.find(
+    (item) => item.caminho !== '/' && estaAtivo(item.caminho, caminhoAtual),
+  );
+  const conteudo =
+    empresas.length === 0 ? (
+      <EstadoVazio
+        titulo="Nenhuma empresa disponível"
+        descricao="Seu acesso ainda não inclui nenhuma empresa desta conta. Fale com um administrador."
+      />
+    ) : modulo?.permissao && !pode(modulo.permissao) ? (
+      <EstadoVazio
+        titulo="Sem acesso a este módulo"
+        descricao="Seu papel nesta empresa não inclui este módulo. Fale com um administrador ou troque de empresa."
+      />
+    ) : (
       <Outlet />
+    );
+  return (
+    <AppShell
+      caminhoAtual={caminhoAtual}
+      itens={itens}
+      cabecalho={
+        <>
+          <SeletorEmpresa />
+          <MenuUsuario />
+        </>
+      }
+    >
+      {conteudo}
     </AppShell>
   );
 }

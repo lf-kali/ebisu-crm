@@ -27,14 +27,15 @@ const abrirMenuUsuario = async (u: ReturnType<typeof usuario>, nome: string) => 
 
 describe('login e proteção das páginas (F12)', () => {
   it('sem sessão, a página protegida leva ao login e volta para ela depois', async () => {
-    const { router } = renderizarApp('/contatos', { logado: null });
+    // Bruno é técnico: a Bancada está entre os módulos dele.
+    const { router } = renderizarApp('/bancada', { logado: null });
     expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeTruthy();
     expect(router.state.location.pathname).toBe('/login');
-    expect(router.state.location.search).toEqual({ redirect: '/contatos' });
+    expect(router.state.location.search).toEqual({ redirect: '/bancada' });
 
     await entrar('bruno@demo.test');
-    expect(await screen.findByRole('heading', { level: 1, name: 'Contatos' })).toBeTruthy();
-    expect(router.state.location.pathname).toBe('/contatos');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Bancada' })).toBeTruthy();
+    expect(router.state.location.pathname).toBe('/bancada');
     expect(screen.getByRole('button', { name: /Bruno Lima/ })).toBeTruthy();
   });
 
@@ -105,9 +106,11 @@ describe('login e proteção das páginas (F12)', () => {
   });
 
   it('quem já tem sessão e abre o login segue direto', async () => {
-    const { router } = renderizarApp('/login?redirect=%2Festoque', { logado: 'bruno@demo.test' });
-    expect(await screen.findByRole('heading', { level: 1, name: 'Estoque' })).toBeTruthy();
-    expect(router.state.location.pathname).toBe('/estoque');
+    const { router } = renderizarApp('/login?redirect=%2Fdispositivos', {
+      logado: 'bruno@demo.test',
+    });
+    expect(await screen.findByRole('heading', { level: 1, name: 'Dispositivos' })).toBeTruthy();
+    expect(router.state.location.pathname).toBe('/dispositivos');
   });
 });
 
@@ -123,7 +126,10 @@ describe('várias contas (decisão do usuário: escolher após o login)', () => 
     expect(await screen.findByRole('heading', { level: 1, name: 'Bancada' })).toBeTruthy();
     expect(router.state.location.pathname).toBe('/bancada');
     expect(sessao.obter()?.conta).toEqual(CONTAS.oficina);
-    expect(await screen.findByText('Oficina do Bairro', { selector: 'span' })).toBeTruthy();
+    // A conta aparece no menu do usuário (o nome da empresa, igual aqui, fica no seletor).
+    expect(
+      await screen.findByRole('button', { name: /Ana Souza\s*Oficina do Bairro/ }),
+    ).toBeTruthy();
   });
 
   it('o menu do usuário troca de conta e volta para a mesma página', async () => {
@@ -193,11 +199,15 @@ describe('sessão: refresh e saída', () => {
         return HttpResponse.json(criarProblema('nao_autenticado'), { status: 401 });
       }),
     );
-    const a = cliente.get(ROTAS_AUTH.eu, { resposta: RespostaEu });
-    const b = cliente.get(ROTAS_AUTH.eu, { resposta: RespostaEu });
-    await a;
+    // Qual das duas chega primeiro não é garantido: libera a segunda depois do refresh da primeira.
+    const pedidos = Promise.all([
+      cliente.get(ROTAS_AUTH.eu, { resposta: RespostaEu }),
+      cliente.get(ROTAS_AUTH.eu, { resposta: RespostaEu }),
+    ]);
+    await waitFor(() => expect(simulada.contagem.refresh).toBe(1));
     liberar();
-    expect((await b).usuario.nome).toBe('Ana Souza');
+    const [a, b] = await pedidos;
+    expect([a.usuario.nome, b.usuario.nome]).toEqual(['Ana Souza', 'Ana Souza']);
     expect(simulada.contagem.refresh).toBe(1);
   });
 
@@ -272,6 +282,81 @@ describe('sessão: refresh e saída', () => {
     const { router } = renderizarApp('/contatos', { logado: null });
     expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeTruthy();
     expect(router.state.location.search).toEqual({ redirect: '/contatos' });
+  });
+
+  it('refresh que termina depois do "Sair" não reinstala a sessão', async () => {
+    simulada.jaLogado('ana@demo.test');
+    const { sessao } = criarSessaoECliente();
+    await sessao.garantir();
+    let liberar = () => {};
+    const gate = new Promise<void>((resolver) => (liberar = resolver));
+    servidor.use(
+      http.post(
+        `*${ROTAS_AUTH.refresh}`,
+        async () => {
+          await gate;
+          // Resposta de sucesso atrasada: sem a guarda de geração, reinstalaria a sessão.
+          return HttpResponse.json({
+            access_token: 'sim-atrasado',
+            token_type: 'Bearer',
+            expira_em: 900,
+            conta: CONTAS.ebisu,
+            contas: [CONTAS.ebisu],
+          });
+        },
+        { once: true },
+      ),
+    );
+    const renovacao = sessao.renovar();
+    await sessao.sair();
+    liberar();
+    await renovacao;
+    expect(sessao.obter()).toBeNull();
+  });
+
+  it('o aviso de falha ao sair some enquanto a nova tentativa acontece', async () => {
+    let liberar = () => {};
+    const gate = new Promise<void>((resolver) => (liberar = resolver));
+    let tentativas = 0;
+    servidor.use(
+      http.post(`*${ROTAS_AUTH.logout}`, async () => {
+        tentativas += 1;
+        if (tentativas === 2) await gate;
+        return HttpResponse.json(criarProblema('erro_interno'), { status: 500 });
+      }),
+    );
+    renderizarApp('/contatos');
+    const u = usuario();
+    await u.click(
+      within(await abrirMenuUsuario(u, 'Ana Souza')).getByRole('menuitem', { name: 'Sair' }),
+    );
+    expect(await screen.findByText('Não foi possível sair. Tente de novo.')).toBeTruthy();
+    await u.click(
+      within(await abrirMenuUsuario(u, 'Ana Souza')).getByRole('menuitem', { name: 'Sair' }),
+    );
+    expect(screen.queryByText('Não foi possível sair. Tente de novo.')).toBeNull();
+    liberar();
+    expect(await screen.findByText('Não foi possível sair. Tente de novo.')).toBeTruthy();
+  });
+
+  it('401 no loader com refresh sem rede mostra "sem conexão" (a sessão pode estar válida)', async () => {
+    simulada.jaLogado('ana@demo.test');
+    let refreshs = 0;
+    servidor.use(
+      http.get(`*${ROTAS_AUTH.eu}`, () =>
+        HttpResponse.json(criarProblema('nao_autenticado'), { status: 401 }),
+      ),
+      http.post(`*${ROTAS_AUTH.refresh}`, () => {
+        refreshs += 1;
+        return refreshs === 1 ? undefined : HttpResponse.error();
+      }),
+    );
+    const { router } = renderizarApp('/contatos', { logado: null });
+    expect((await screen.findByRole('alert')).textContent).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Entrar' })).toBeNull();
+    // Sem ir e voltar pelo login: só o refresh do beforeLoad e o do 401.
+    expect(refreshs).toBe(2);
+    expect(router.state.location.pathname).toBe('/contatos');
   });
 
   it('access token vencido: renova uma vez só e repete as requisições', async () => {

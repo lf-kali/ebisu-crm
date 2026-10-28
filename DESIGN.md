@@ -93,8 +93,17 @@ shadcn, barradas pelo teste:
 - Menu na ordem dos módulos (spec §4 F13): Painel, Contatos, Negócios, Dispositivos, Orçamentos,
   Bancada, Estoque, Financeiro, Configurações. Item atual com `aria-current="page"`. Itens sem
   permissão ficam ocultos (não desabilitados).
+- **Seletor de empresa** (`apps/web/src/layout/seletor-empresa.tsx`), à esquerda do menu do
+  usuário: ícone + nome fantasia (com "Empresa:" para leitor de tela). Com mais de uma empresa é
+  um botão `outline` que abre um menu de opção única (`menuitemradio`); com uma só, é texto
+  `muted-foreground`. No celular o nome encolhe com reticências (sem rolagem horizontal até 320 px).
 - **Menu do usuário** (`apps/web/src/layout/menu-usuario.tsx`), à direita do cabeçalho: nome e
-  conta atual; "Trocar de conta" (só com mais de uma) e "Sair".
+  conta atual (no celular, só o ícone; o nome fica no nome acessível); "Trocar de conta" (só com
+  mais de uma) e "Sair".
+- **Permissões**: o menu lateral mostra só os módulos com permissão na empresa atual; a URL direta
+  de um módulo oculto mostra o estado vazio "Sem acesso a este módulo" dentro do layout. Ações
+  usam `SePermitido` (escondidas, não desabilitadas). Membro sem empresa vê "Nenhuma empresa
+  disponível".
 - **Telas de entrada** (`TelaDeEntrada`: login, escolha de conta): fora do AppShell, cartão de até
   384 px centralizado sobre `bg-muted`, com `h1` e descrição curta.
 
@@ -125,7 +134,9 @@ anunciada (`aria-live`). Enquanto a próxima página carrega, a anterior continu
 
 ## Acessibilidade
 
-- Meta: Lighthouse acessibilidade ≥ 90 nas páginas base (spec §4 F12).
+- Meta: Lighthouse acessibilidade ≥ 90 nas páginas base (spec §4 F12). Medido em 2026-10-28
+  (Lighthouse 13.5.0, celular e desktop): login, escolha de conta, Painel, Contatos, Bancada e
+  Estoque com 100.
 - Testes de componente rodam o axe-core (`apps/web/src/teste/axe.ts`); contraste não é avaliável
   no jsdom, por isso a tabela acima.
 - Foco sempre visível (`ring` do `primary`). Ícones decorativos com `aria-hidden`; botão só com

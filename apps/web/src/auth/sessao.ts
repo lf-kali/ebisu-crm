@@ -33,6 +33,12 @@ const travaPadrao = <T>(fn: () => Promise<T>): Promise<T> =>
 export function criarSessao({ cliente, agora = Date.now, travar = travaPadrao }: OpcoesSessao) {
   let atual: Sessao | null = null;
   let renovando: Promise<Sessao | null> | null = null;
+  /**
+   * Muda a cada troca de identidade (entrar, trocar de conta, sair). Um refresh que começou numa
+   * geração anterior tem a resposta descartada: senão um refresh atrasado reinstalaria a sessão
+   * depois do "Sair", ou a conta antiga depois de uma troca.
+   */
+  let geracao = 0;
   const ouvintes = new Set<() => void>();
 
   const definir = (proxima: Sessao | null) => {
@@ -54,12 +60,13 @@ export function criarSessao({ cliente, agora = Date.now, travar = travaPadrao }:
    */
   function renovar(): Promise<Sessao | null> {
     renovando ??= travar(async () => {
+      const inicio = geracao;
       try {
         const resposta = await cliente.post(ROTAS_AUTH.refresh, { resposta: RespostaSessao });
-        definir(daResposta(resposta));
+        if (inicio === geracao) definir(daResposta(resposta));
       } catch (erro) {
         if (!(erro instanceof ErroApi && erro.status === 401)) throw erro;
-        definir(null);
+        if (inicio === geracao) definir(null);
       }
       return atual;
     }).finally(() => {
@@ -81,6 +88,7 @@ export function criarSessao({ cliente, agora = Date.now, travar = travaPadrao }:
     },
     renovar,
     async entrar(credenciais: EntradaLogin): Promise<Sessao> {
+      geracao += 1;
       const resposta = await cliente.post(ROTAS_AUTH.login, {
         resposta: RespostaSessao,
         corpo: credenciais,
@@ -90,6 +98,7 @@ export function criarSessao({ cliente, agora = Date.now, travar = travaPadrao }:
       return sessao;
     },
     async trocarConta(tenantId: string): Promise<Sessao> {
+      geracao += 1;
       const resposta = await cliente.post(ROTAS_AUTH.trocarConta, {
         resposta: RespostaSessao,
         corpo: { tenant_id: tenantId },
@@ -105,6 +114,7 @@ export function criarSessao({ cliente, agora = Date.now, travar = travaPadrao }:
      * refresh a restauraria. 401 = já não havia sessão no servidor, o que conta como saída.
      */
     async sair(): Promise<void> {
+      geracao += 1;
       try {
         await cliente.post(ROTAS_AUTH.logout, { resposta: null });
       } catch (erro) {

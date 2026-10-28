@@ -19,7 +19,7 @@ export const Route = createFileRoute('/escolher-conta')({
 });
 
 function EscolherConta() {
-  const { sessao, queryClient } = Route.useRouteContext();
+  const { sessao, queryClient, empresa } = Route.useRouteContext();
   const { redirect: destino } = Route.useSearch();
   const navigate = useNavigate();
   const atual = useSyncExternalStore(sessao.assinar, sessao.obter);
@@ -27,9 +27,11 @@ function EscolherConta() {
   const escolher = useMutation({
     mutationFn: async (conta: ResumoConta) => {
       if (conta.tenant_id !== sessao.obter()?.conta.tenant_id) {
-        await sessao.trocarConta(conta.tenant_id);
-        // Outra conta = outros dados: nada do cache da conta anterior pode sobrar.
+        // Outra conta = outros dados: limpa antes de a sessão da conta nova existir.
+        // A empresa também é da conta: o X-Empresa-Id antigo não pode ir com o token novo.
         queryClient.clear();
+        empresa.limpar();
+        await sessao.trocarConta(conta.tenant_id);
       }
     },
     onSuccess: () => navigate({ href: destinoSeguro(destino) }),

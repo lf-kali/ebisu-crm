@@ -101,7 +101,7 @@ export function AppShell({ children, caminhoAtual, cabecalho, itens = NAVEGACAO 
           </SheetContent>
         </Sheet>
         <span className="text-base font-semibold tracking-tight">ebisuCRM</span>
-        <div className="ml-auto flex items-center gap-2">{cabecalho}</div>
+        <div className="ml-auto flex min-w-0 items-center gap-2">{cabecalho}</div>
       </header>
       <div className="flex flex-1">
         <aside className="hidden w-60 shrink-0 border-r bg-sidebar p-3 md:block">

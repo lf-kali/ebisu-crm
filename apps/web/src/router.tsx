@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRouter, type RouterHistory } from '@tanstack/react-router';
 import { type ClienteApi, criarClienteApi } from './api/cliente';
 import { ErroApi } from './api/erro-api';
+import { criarEmpresaAtual, type EmpresaAtual } from './auth/empresa';
 import { criarSessao, type GerenciadorSessao } from './auth/sessao';
 import { routeTree } from './routeTree.gen';
 
@@ -22,18 +23,40 @@ export function criarQueryClient() {
 export interface ContextoRoteador {
   queryClient: QueryClient;
   sessao: GerenciadorSessao;
-  /** Cliente autenticado: manda o Bearer da sessão e renova a sessão num 401. */
+  /** Empresa atual (X-Empresa-Id), resolvida no layout a partir do /v1/eu. */
+  empresa: EmpresaAtual;
+  /** Cliente autenticado: manda o Bearer da sessão e o X-Empresa-Id, e renova a sessão num 401. */
   cliente: ClienteApi;
 }
 
-/** Sessão + cliente autenticado. As rotas de auth usam um cliente sem Bearer (o refresh é por cookie). */
-export function criarSessaoECliente(opcoes: { fetch?: typeof fetch } = {}) {
+const armazenamentoLocal = () => {
+  try {
+    return window.localStorage;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Sessão, empresa atual e cliente autenticado. As rotas de auth usam um cliente sem Bearer (o
+ * refresh é por cookie).
+ */
+export function criarSessaoECliente(
+  opcoes: { fetch?: typeof fetch; armazenamento?: Storage } = {},
+) {
   const sessao = criarSessao({ cliente: criarClienteApi({ fetch: opcoes.fetch }) });
+  const empresa = criarEmpresaAtual({
+    armazenamento: opcoes.armazenamento ?? armazenamentoLocal(),
+  });
   const cliente = criarClienteApi({
     fetch: opcoes.fetch,
     cabecalhos: (): Record<string, string> => {
       const atual = sessao.obter();
-      return atual ? { Authorization: `Bearer ${atual.accessToken}` } : {};
+      const empresaId = empresa.obter();
+      return {
+        ...(atual ? { Authorization: `Bearer ${atual.accessToken}` } : {}),
+        ...(atual && empresaId ? { 'X-Empresa-Id': empresaId } : {}),
+      };
     },
     aoNaoAutenticado: async (usados) => {
       // O 401 chegou depois de outra requisição já ter renovado: só repete com o token novo.
@@ -42,15 +65,16 @@ export function criarSessaoECliente(opcoes: { fetch?: typeof fetch } = {}) {
       return (await sessao.renovar().catch(() => null)) !== null;
     },
   });
-  return { sessao, cliente };
+  return { sessao, empresa, cliente };
 }
 
 export function criarRouter(opcoes: Partial<ContextoRoteador> & { history?: RouterHistory } = {}) {
   const queryClient = opcoes.queryClient ?? criarQueryClient();
-  const padrao = opcoes.sessao && opcoes.cliente ? null : criarSessaoECliente();
+  const padrao = opcoes.sessao && opcoes.cliente && opcoes.empresa ? null : criarSessaoECliente();
   const contexto: ContextoRoteador = {
     queryClient,
     sessao: opcoes.sessao ?? padrao!.sessao,
+    empresa: opcoes.empresa ?? padrao!.empresa,
     cliente: opcoes.cliente ?? padrao!.cliente,
   };
   return createRouter({
