@@ -108,6 +108,7 @@ export class GuardaContexto implements CanActivate {
       apiKeyId: null,
       permissoes,
       requestId: requestIdDa(contexto.switchToHttp().getResponse<Response>()) ?? randomUUID(),
+      ip: req.ip ?? null,
       ...(idempotencia ? { idempotencia } : {}),
     };
     return true;

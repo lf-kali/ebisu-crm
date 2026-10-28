@@ -39,7 +39,7 @@
 | SEG-5 | Custos (`custo_*`, margem) só aparecem com `financeiro.ver_custos` | **Domínio:** removidos do DTO de resposta, não só ocultos no front |
 | SEG-6 | Aplicação conecta com papel sem ownership e sem `BYPASSRLS`; contexto via `set_config('app.tenant_id', $1, true)` no início de cada transação | **Infra** + teste de isolamento no CI |
 | SEG-7 | Toda operação crítica aceita `Idempotency-Key`; repetição devolve a mesma resposta | **Domínio** + tabela `idempotencia_requisicao` |
-| SEG-8 | `audit_log` não grava valores de dados pessoais (só nomes dos campos alterados) | **Domínio** — permite anonimizar sem tocar no log append-only |
+| SEG-8 | `audit_log` não grava valores de dados pessoais (só nomes dos campos alterados) | **Banco:** trigger `auditar()` nas tabelas de negócio grava só os nomes das colunas; autor e requisição vêm do contexto da transação (`comTenant`). Permite anonimizar sem tocar no log append-only |
 
 ---
 

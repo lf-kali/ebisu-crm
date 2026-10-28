@@ -23,10 +23,39 @@ function definirTenant(cliente: Pick<PrismaClient, '$executeRaw'>, tenantId: str
   return cliente.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
 }
 
+/**
+ * Quem age na transação, para o audit log automático (trigger `auditar()`, SEG-8). Também LOCAL
+ * à transação, como o tenant. Sem autor (seed, job, manutenção), a auditoria fica sem ator.
+ */
+export interface Ator {
+  membroId?: string | null;
+  apiKeyId?: string | null;
+  requestId?: string | null;
+  ip?: string | null;
+}
+
+/** UUID do autor ('' se não houver): um texto qualquer quebraria o cast no trigger. */
+function uuidDoAtor(valor: string | null | undefined): string {
+  if (!valor) return '';
+  if (!UUID.test(valor)) throw new Error(`ator com id inválido: ${JSON.stringify(valor)}`);
+  return valor;
+}
+
+function definirAtor(tx: Pick<PrismaClient, '$executeRaw'>, ator: Ator) {
+  const membro = uuidDoAtor(ator.membroId);
+  const apiKey = uuidDoAtor(ator.apiKeyId);
+  return tx.$executeRaw`SELECT set_config('app.membro_id', ${membro}, true),
+    set_config('app.api_key_id', ${apiKey}, true),
+    set_config('app.request_id', ${ator.requestId ?? ''}, true),
+    set_config('app.ip', ${ator.ip ?? ''}, true)`;
+}
+
 export interface OpcoesTransacao {
   isolationLevel?: Prisma.TransactionIsolationLevel;
   maxWait?: number;
   timeout?: number;
+  /** Autor da transação, gravado no audit log. */
+  ator?: Ator;
 }
 
 /**
@@ -40,10 +69,12 @@ export async function comTenant<T>(
   opcoes?: OpcoesTransacao,
 ): Promise<T> {
   const id = validarTenantId(tenantId);
+  const { ator, ...transacao } = opcoes ?? {};
   return cliente.$transaction(async (tx) => {
     await definirTenant(tx, id);
+    if (ator) await definirAtor(tx, ator);
     return fn(tx);
-  }, opcoes);
+  }, transacao);
 }
 
 export class TransacaoNoClienteDoTenantError extends Error {

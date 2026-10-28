@@ -500,13 +500,18 @@ export interface TxContext {
 export type Comando<Entrada, Saida> = (ctx: TxContext, entrada: Entrada) => Promise<Saida>;
 
 // Execução: core/tx abre a transação, define o tenant, roda o comando,
-// grava audit_log, despacha eventos "na transação", faz commit e então
+// grava audit_log (trigger do banco, com o autor do contexto), despacha eventos "na transação", faz commit e então
 // despacha eventos "após commit".
 executarComando(contextoHttpOuJob, comando, entrada, { idempotencyKey? })
 ```
 
 Regras: um comando nunca chama outro módulo por repositório, só pelo serviço público (que recebe o
 mesmo `TxContext`); erros de regra são lançados como `ErroDominio(code, detalhes, invariante)`.
+
+Audit log (plano `docs/planos/f3-3b-audit-log.md`): o próprio banco grava, pelo trigger
+`auditar()`, toda escrita nas tabelas de negócio, com o autor, o `request_id` e o IP que o
+`executarComando` passa ao `comTenant` e os nomes (nunca os valores) das colunas alteradas. O
+comando não faz nada para auditar.
 
 Idempotência (plano `docs/planos/f3-3a-idempotencia.md`): em todo POST de domínio o guard põe a
 `Idempotency-Key` e o hash do pedido (rota, parâmetros, empresa, autor e corpo) no contexto. O
