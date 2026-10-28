@@ -6,9 +6,11 @@ import {
   codigoDoErro,
   criarBancoDeTeste,
   rodarNoPacote,
-} from './banco-de-teste.js';
+} from '../src/teste/banco-de-teste.js';
 
 const SEM_PERMISSAO = '42501';
+const VIOLA_CHECK = '23514';
+const VIOLA_FK = '23503';
 const TABELAS_GLOBAIS = ['permissao', 'refresh_token', 'usuario'];
 const PRIVILEGIOS = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'];
 
@@ -309,6 +311,36 @@ describe('migração inicial e papéis de banco', () => {
         `INSERT INTO permissao (chave, recurso, acao, descricao) VALUES ('x.y', 'x', 'y', 'teste')`,
       ),
     ).toBe(SEM_PERMISSAO);
+  });
+
+  it('F3: e-mail só é gravado normalizado (minúsculas, sem espaço nas pontas)', async () => {
+    for (const email of ['Maiuscula@teste.local', ' espaco@teste.local', 'tab@teste.local\t']) {
+      expect(
+        await codigoDoErro(
+          auth,
+          `INSERT INTO usuario (id, email, nome, updated_at) VALUES ('${randomUUID()}', '${email}', 'X', now())`,
+        ),
+      ).toBe(VIOLA_CHECK);
+    }
+  });
+
+  it('F3: refresh token guarda a conta da sessão e some junto com o tenant', async () => {
+    const { rows } = await admin.query(
+      `SELECT id FROM usuario WHERE email = 'pessoa0@teste.local'`,
+    );
+    const familia = randomUUID();
+    await auth.query(
+      `INSERT INTO refresh_token (id, usuario_id, tenant_id, token_hash, familia, expira_em)
+       VALUES ($1, $2, $3, $4, $5, now() + interval '1 day')`,
+      [randomUUID(), rows[0].id, tenants[0], `hash-${familia}`, familia],
+    );
+    expect(
+      await codigoDoErro(
+        auth,
+        `INSERT INTO refresh_token (id, usuario_id, tenant_id, token_hash, familia, expira_em)
+         VALUES ('${randomUUID()}', '${rows[0].id}', '${randomUUID()}', 'h-${randomUUID()}', '${familia}', now())`,
+      ),
+    ).toBe(VIOLA_FK);
   });
 
   it('configurar-papeis é idempotente e recusa rodar sem senha definida', () => {

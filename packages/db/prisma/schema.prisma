@@ -54,6 +54,7 @@ model Tenant {
 
   empresas        Empresa[]
   membros         Membro[]
+  refresh_tokens  RefreshToken[]
   papeis          Papel[]
   tipos_acessorio TipoAcessorio[]
   checklists      ChecklistModelo[]
@@ -128,6 +129,7 @@ model Empresa {
 /// Identidade global (um e-mail pode participar de vários tenants).
 model Usuario {
   id           String    @id @default(uuid(7)) @db.Uuid
+  /// Normalizado (trim + minúsculas): CHECK usuario_email_normalizado na migração.
   email        String    @unique
   nome         String
   telefone     String?
@@ -147,6 +149,8 @@ model Usuario {
 model RefreshToken {
   id          String    @id @default(uuid(7)) @db.Uuid
   usuario_id  String    @db.Uuid
+  /// Conta da sessão (F3): o refresh mantém a conta; NULL só em linhas anteriores à F3.
+  tenant_id   String?   @db.Uuid
   token_hash  String    @unique
   familia     String    @db.Uuid /// rotação: reuso detectado invalida a família
   user_agent  String?
@@ -156,8 +160,11 @@ model RefreshToken {
   created_at  DateTime  @default(now())
 
   usuario Usuario @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+  tenant  Tenant? @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
 
   @@index([usuario_id])
+  @@index([usuario_id, created_at])
+  @@index([familia])
   @@map("refresh_token")
 }
 

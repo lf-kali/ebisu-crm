@@ -18,7 +18,8 @@
     "db:papeis": "pnpm --filter @ebisu/db papeis",
     "db:seed": "pnpm --filter @ebisu/db build && pnpm --filter @ebisu/db seed",
     "db:seed:demo": "pnpm --filter @ebisu/db build && pnpm --filter @ebisu/db seed:demo",
-    "dev:tailnet": "./scripts/dev-tailnet.sh"
+    "dev:tailnet": "./scripts/dev-tailnet.sh",
+    "auth:chaves": "node scripts/gerar-chave-jwt.mjs"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",

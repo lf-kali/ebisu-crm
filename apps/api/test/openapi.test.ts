@@ -16,7 +16,7 @@ describe('OpenAPI gerado dos contratos (D-A02, §4 F2)', () => {
 
   beforeAll(async () => {
     app = await criarAppDeTeste();
-    appComExemplo = await criarAppDeTeste([ExemploController]);
+    appComExemplo = await criarAppDeTeste({ controllers: [ExemploController] });
   });
   afterAll(async () => {
     await Promise.all([app?.close(), appComExemplo?.close()]);
@@ -60,7 +60,7 @@ describe('OpenAPI gerado dos contratos (D-A02, §4 F2)', () => {
     }
     @Controller('filho')
     class FilhoController extends Base {}
-    const comHeranca = await criarAppDeTeste([FilhoController]);
+    const comHeranca = await criarAppDeTeste({ controllers: [FilhoController] });
     try {
       expect(listarRotas(comHeranca).map((r) => r.caminho)).toContain('/v1/filho/com-contrato');
     } finally {
@@ -75,7 +75,7 @@ describe('OpenAPI gerado dos contratos (D-A02, §4 F2)', () => {
     }
     @Controller('filho2')
     class Filho2Controller extends BaseSemContrato {}
-    const semContrato = await criarAppDeTeste([Filho2Controller]);
+    const semContrato = await criarAppDeTeste({ controllers: [Filho2Controller] });
     try {
       expect(() => gerarDocumento(semContrato)).toThrow(
         /Rota sem @Contrato: GET \/v1\/filho2\/sem/,
@@ -93,7 +93,7 @@ describe('OpenAPI gerado dos contratos (D-A02, §4 F2)', () => {
         throw new Error('getter executado');
       }
     }
-    const comGetter = await criarAppDeTeste([ComGetterController]);
+    const comGetter = await criarAppDeTeste({ controllers: [ComGetterController] });
     try {
       expect(() => listarRotas(comGetter)).not.toThrow();
     } finally {
@@ -119,7 +119,7 @@ describe('OpenAPI gerado dos contratos (D-A02, §4 F2)', () => {
       tratar() {}
     }
     for (const controller of [ComHead, ComOptions, ComAll]) {
-      const especial = await criarAppDeTeste([controller]);
+      const especial = await criarAppDeTeste({ controllers: [controller] });
       try {
         expect(() => listarRotas(especial), controller.name).toThrow(
           /Método HTTP não suportado pelo contrato/,
@@ -139,7 +139,7 @@ describe('OpenAPI gerado dos contratos (D-A02, §4 F2)', () => {
         return {};
       }
     }
-    const semContrato = await criarAppDeTeste([SemContratoController]);
+    const semContrato = await criarAppDeTeste({ controllers: [SemContratoController] });
     try {
       expect(() => gerarDocumento(semContrato)).toThrow(
         /Rota sem @Contrato: GET \/v1\/sem-contrato/,

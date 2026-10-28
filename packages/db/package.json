@@ -10,6 +10,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./teste": {
+      "types": "./dist/teste/banco-de-teste.d.ts",
+      "default": "./dist/teste/banco-de-teste.js"
     }
   },
   "scripts": {

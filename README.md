@@ -16,6 +16,7 @@ pnpm db:migrate          # aplica as migrações (packages/db)
 pnpm db:papeis           # define LOGIN/senha de ebisu_app e ebisu_auth
 pnpm db:seed             # catálogo global de permissões
 pnpm db:seed:demo        # opcional: tenant de demonstração (usuários *@demo.ebisu.local)
+pnpm auth:chaves         # gera a chave do access token: cole a saída no .env
 pnpm dev                 # api, worker e web
 ```
 
