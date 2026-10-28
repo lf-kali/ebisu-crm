@@ -28,6 +28,19 @@ pnpm dev                 # api, worker e web
 | S3 (SeaweedFS) | http://localhost:8333, bucket `ebisu-anexos`           |
 | Mailpit        | SMTP `localhost:1025`, interface http://localhost:8025 |
 
+### Acesso pela tailnet
+
+`pnpm dev:tailnet` expõe o web na sua tailnet com `sudo tailscale serve --https=8447 5173` e sobe o
+`pnpm dev`. Antes, defina no `.env` o nome da máquina em `WEB_ALLOWED_HOSTS` (o Vite recusa hosts
+desconhecidos) e, se quiser, outra porta em `TAILNET_HTTPS_PORT`.
+
+- Só a sua tailnet enxerga (`serve`, nunca `funnel`). O `/v1` (API) vai junto, pelo proxy do Vite.
+- Falha fechado: se não conseguir ler o `tailscale serve status`, ou se a porta já tiver qualquer
+  serve (inclusive uma sobra deste script), aborta sem alterar nada e mostra como liberar a porta.
+- O `.env` é lido como `CHAVE=valor` simples (sem `export` nem comentário na mesma linha).
+- Ao sair (Ctrl+C, `kill` ou terminal fechado), desfaz só esse serve
+  (`tailscale serve --https=8447 off`). Se o processo morrer com `kill -9`, rode esse comando à mão.
+
 As portas de Postgres e Redis fogem das padrão para não conflitar com instalações nativas; ajuste
 no `.env` se quiser. O bucket é criado pelo serviço `seaweedfs-init` alguns segundos depois do `up`.
 
