@@ -118,6 +118,35 @@ describe('contrato: validação de entrada e saída, envelope de erro (§5.1, §
     },
   );
 
+  it('ZodError lançado dentro do código (não na entrada) → 500 logado, sem expor o schema', async () => {
+    const logErro = vi.spyOn(Logger.prototype, 'error');
+    const r = await http()
+      .post('/v1/exemplo?modo=zod_interno')
+      .send({ nome: 'Tela', valor: '1.00' });
+    expect(r.status).toBe(500);
+    expect(r.body.code).toBe('erro_interno');
+    expect(JSON.stringify(r.body)).not.toMatch(/senha_interna|valor-secreto|campos/);
+    expect(logErro).toHaveBeenCalledTimes(1);
+  });
+
+  it('ErroDominio 5xx não repassa detail, extras nem invariante ao cliente', async () => {
+    const r = await http()
+      .post('/v1/exemplo?modo=dominio_5xx')
+      .send({ nome: 'Tela', valor: '1.00' });
+    expect(r.status).toBe(500);
+    expect(r.body).not.toHaveProperty('detail');
+    expect(r.body).not.toHaveProperty('tabela');
+    expect(r.body).not.toHaveProperty('invariante');
+  });
+
+  it('objeto cru com status/expose (não é Error) → 500, não é tratado como erro do cliente', async () => {
+    const r = await http()
+      .post('/v1/exemplo?modo=objeto_cru')
+      .send({ nome: 'Tela', valor: '1.00' });
+    expect(r.status).toBe(500);
+    expect(r.body.code).toBe('erro_interno');
+  });
+
   it('ErroDominio → status e mensagem do catálogo, invariante e extras', async () => {
     const r = await http()
       .post('/v1/exemplo?modo=erro_dominio')
