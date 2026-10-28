@@ -18,9 +18,9 @@
   },
   "scripts": {
     "build": "prisma generate && tsc -p tsconfig.build.json",
-    "dev": "prisma generate && tsc -p tsconfig.build.json --watch --preserveWatchOutput",
-    "typecheck": "prisma generate && tsc -p tsconfig.json",
-    "test": "prisma generate && vitest run",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
     "migrate:deploy": "prisma migrate deploy",
     "migrate:status": "prisma migrate status",
     "papeis": "node scripts/configurar-papeis.mjs",

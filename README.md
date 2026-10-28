@@ -95,3 +95,7 @@ Postgres só valem na criação do volume: para trocá-los, rode `down -v` antes
 | `pnpm lint`                         | ESLint                                                                            |
 | `pnpm format` / `pnpm format:check` | Prettier                                                                          |
 | `pnpm db:invariantes`               | Recria `ebisu_test`, aplica as migrações e roda os testes de invariantes do banco |
+
+O client do Prisma só é gerado pelo `build` de `packages/db` (o Turborepo roda o `build` antes do
+`typecheck`, do `test` e do `dev` desse pacote). Para rodar um pacote só, use o Turborepo, por
+exemplo `pnpm turbo test --filter @ebisu/db`, ou rode `pnpm --filter @ebisu/db build` antes.
