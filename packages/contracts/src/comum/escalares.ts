@@ -6,9 +6,14 @@ export const Uuid = z.uuid().meta({ id: 'Uuid', description: 'Identificador UUID
 
 // Dinheiro: string decimal com 2 casas, como o Decimal(14,2) do banco (até 12 dígitos inteiros).
 // Pode ser negativo (ex.: estorno de pagamento, FIN-3); use DinheiroNaoNegativo onde não puder.
+// Forma canônica (sem zeros à esquerda, sem "-0.00"): um valor tem uma única representação,
+// o que importa para comparação de texto e para o hash da idempotência.
 export const Dinheiro = z
   .string()
-  .regex(/^-?\d{1,12}\.\d{2}$/, 'Valor em reais com 2 casas decimais, ex.: "123.40"')
+  .regex(
+    /^(?!-0\.00$)-?(0|[1-9]\d{0,11})\.\d{2}$/,
+    'Valor em reais com 2 casas decimais, ex.: "123.40"',
+  )
   .meta({ id: 'Dinheiro', description: 'Valor em BRL com 2 casas decimais', example: '123.40' });
 
 export const DinheiroNaoNegativo = Dinheiro.refine(
@@ -17,9 +22,13 @@ export const DinheiroNaoNegativo = Dinheiro.refine(
 );
 
 // Quantidade: até 3 casas, como o Decimal(14,3) do banco. Negativa só em movimentos (EST-3).
+// Forma canônica como no Dinheiro: sem zeros à esquerda e sem zero negativo.
 export const Quantidade = z
   .string()
-  .regex(/^-?\d{1,11}(\.\d{1,3})?$/, 'Quantidade com até 3 casas decimais, ex.: "1.5"')
+  .regex(
+    /^(?!-0(\.0{1,3})?$)-?(0|[1-9]\d{0,10})(\.\d{1,3})?$/,
+    'Quantidade com até 3 casas decimais, ex.: "1.5"',
+  )
   .meta({ id: 'Quantidade', description: 'Quantidade com até 3 casas decimais', example: '1' });
 
 export const DataHora = z.iso

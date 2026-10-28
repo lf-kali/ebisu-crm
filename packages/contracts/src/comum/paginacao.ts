@@ -5,11 +5,13 @@ import { z } from 'zod';
 
 export const LIMITE_PADRAO = 25;
 export const LIMITE_MAXIMO = 100;
+/** Cursor é só uma posição (poucos campos): limita o tamanho antes de decodificar. */
+export const TAMANHO_MAXIMO_CURSOR = 512;
 
 export const ParametrosPaginacao = z
   .object({
     limit: z.coerce.number().int().min(1).max(LIMITE_MAXIMO).default(LIMITE_PADRAO),
-    cursor: z.string().min(1).optional(),
+    cursor: z.string().min(1).max(TAMANHO_MAXIMO_CURSOR).optional(),
   })
   .meta({ id: 'ParametrosPaginacao' });
 export type ParametrosPaginacao = z.infer<typeof ParametrosPaginacao>;
@@ -48,6 +50,7 @@ export function codificarCursor(posicao: Record<string, unknown>): string {
 
 /** Decodifica e valida o cursor contra o formato esperado; qualquer desvio vira CursorInvalidoError. */
 export function decodificarCursor<T extends z.ZodType>(cursor: string, formato: T): z.infer<T> {
+  if (cursor.length > TAMANHO_MAXIMO_CURSOR) throw new CursorInvalidoError();
   let bruto: unknown;
   try {
     bruto = JSON.parse(deBase64Url(cursor));
