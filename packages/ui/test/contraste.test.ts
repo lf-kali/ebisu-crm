@@ -53,8 +53,10 @@ const contraste = (x: Rgb, y: Rgb) => {
   return (a + 0.05) / (b + 0.05);
 };
 
-// [frente, fundo, mínimo, alpha da frente, alpha do fundo] — fundo composto sobre `background`.
-const PARES: Array<[string, string, number, number?, number?]> = [
+// [frente, fundo, mínimo, alpha da frente, alpha do fundo, superfície onde o fundo é composto,
+//  modo]. Sem modo = vale nos dois; com modo = a combinação só existe nele (classe `dark:`).
+type Modo = ':root' | '.dark';
+const PARES: Array<[string, string, number, number?, number?, string?, Modo?]> = [
   ['foreground', 'background', 4.5],
   ['card-foreground', 'card', 4.5],
   ['primary-foreground', 'primary', 4.5],
@@ -75,29 +77,78 @@ const PARES: Array<[string, string, number, number?, number?]> = [
   ['alerta', 'background', 4.5],
   ['ring', 'background', 3], // anel de foco (opaco)
   ['input', 'background', 3], // borda de campo
+  ['input', 'muted', 3], // campo sobre superfície cinza
+  ['input', 'secondary', 3],
+  ['input', 'accent', 3],
+  ['input', 'card', 3],
+  // Botão outline e campo no escuro: dark:bg-input/30 e dark:hover:bg-input/50.
+  ['foreground', 'input', 4.5, 1, 0.3, undefined, '.dark'],
+  ['muted-foreground', 'input', 4.5, 1, 0.5, undefined, '.dark'],
+  ['accent-foreground', 'input', 4.5, 1, 0.5, undefined, '.dark'],
+  // Item destrutivo do dropdown em foco: focus:bg-destructive/10 e dark:focus:bg-destructive/20.
+  ['destructive', 'destructive', 4.5, 1, 0.1, 'popover', ':root'],
+  ['destructive', 'destructive', 4.5, 1, 0.2, 'popover', '.dark'],
+  ['ring', 'popover', 3], // foco dos itens do dropdown
+  ['sidebar-ring', 'sidebar', 3], // foco dos links do menu
+  ['sidebar-ring', 'sidebar-accent', 3],
+  ['sidebar-primary', 'sidebar-accent', 3], // barra do item ativo do menu
 ];
 
 describe.each([':root', '.dark'] as const)('contraste dos tokens (%s)', (seletor) => {
+  const pares = PARES.filter(([, , , , , , modo]) => !modo || modo === seletor);
   const t = tokens(seletor);
   const base = tokens(':root');
   const cor = (nome: string) => lerOklch(t[nome] ?? base[nome]!);
   const fundo = cor('background').rgb;
 
-  it.each(PARES)('%s sobre %s ≥ %s:1', (frente, atras, minimo, alphaFrente = 1, alphaFundo = 1) => {
-    const corFundo = sobre(cor(atras), fundo, alphaFundo);
-    const corFrente = sobre(cor(frente), corFundo, alphaFrente);
-    expect(contraste(corFrente, corFundo)).toBeGreaterThanOrEqual(minimo);
-  });
+  it.each(pares)(
+    '%s sobre %s ≥ %s:1',
+    (frente, atras, minimo, alphaFrente = 1, alphaFundo = 1, superficie) => {
+      const corFundo = sobre(cor(atras), superficie ? cor(superficie).rgb : fundo, alphaFundo);
+      const corFrente = sobre(cor(frente), corFundo, alphaFrente);
+      expect(contraste(corFrente, corFundo)).toBeGreaterThanOrEqual(minimo);
+    },
+  );
 });
 
-describe('componentes não usam combinações que fogem da tabela de contraste', () => {
-  const pasta = new URL('../src/components/ui/', import.meta.url);
-  const arquivos = readdirSync(pasta).filter((f) => f.endsWith('.tsx'));
+// Componentes do ui e telas do web (exceto testes).
+const arquivosTsx = (pasta: URL): URL[] =>
+  readdirSync(pasta, { withFileTypes: true }).flatMap((item) =>
+    item.isDirectory()
+      ? arquivosTsx(new URL(`${item.name}/`, pasta))
+      : item.name.endsWith('.tsx') && !item.name.endsWith('.test.tsx')
+        ? [new URL(item.name, pasta)]
+        : [],
+  );
 
-  it.each(arquivos)('%s', (arquivo) => {
-    const fonte = readFileSync(new URL(arquivo, pasta), 'utf8');
+describe('componentes e telas não usam combinações que fogem da tabela de contraste', () => {
+  const arquivos = [
+    ...arquivosTsx(new URL('../src/', import.meta.url)),
+    ...arquivosTsx(new URL('../../../apps/web/src/', import.meta.url)),
+  ].map((url) => [url.pathname.split('/').slice(-3).join('/'), url] as const);
+
+  it.each(arquivos)('%s', (_, url) => {
+    const fonte = readFileSync(url, 'utf8');
     // Anel de foco translúcido não chega a 3:1; texto branco sobre cor de status idem.
     expect(fonte).not.toMatch(/ring-ring\/\d+|outline-ring\/\d+/);
     expect(fonte).not.toMatch(/text-white/);
   });
+});
+
+describe('componentes do ui não escondem o foco sem um anel no lugar', () => {
+  const componentes = arquivosTsx(new URL('../src/components/', import.meta.url));
+
+  it.each(componentes.map((url) => [url.pathname.split('/').slice(-2).join('/'), url] as const))(
+    '%s',
+    (_, url) => {
+      // Cada grupo de classes que tira o outline precisa trazer um ring (foco visível, 1.4.11).
+      // Grupo = strings seguidas separadas só por vírgula (argumentos de um mesmo cn(...)).
+      const literal = String.raw`(?:'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|\x60(?:[^\x60\\]|\\.)*\x60)`;
+      const grupo = new RegExp(`${literal}(?:\\s*,\\s*${literal})*`, 'g');
+      const classes = [...readFileSync(url, 'utf8').matchAll(grupo)]
+        .map(([texto]) => texto)
+        .filter((texto) => /\boutline-(hidden|none)\b/.test(texto));
+      expect(classes.filter((texto) => !/\bring\b|ring-/.test(texto))).toEqual([]);
+    },
+  );
 });

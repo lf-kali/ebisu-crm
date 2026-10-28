@@ -26,7 +26,7 @@
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.922 0 0);
   /* Borda de campo: componente de interface, precisa de 3:1 (WCAG 1.4.11). */
-  --input: oklch(0.65 0 0);
+  --input: oklch(0.62 0 0);
   --ring: oklch(0.51 0.2 275);
   --sucesso: oklch(0.52 0.14 150);
   --sucesso-foreground: oklch(0.985 0 0);
@@ -59,7 +59,7 @@
   --destructive: oklch(0.7 0.19 22);
   --destructive-foreground: oklch(0.145 0 0);
   --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 35%);
+  --input: oklch(1 0 0 / 40%);
   --ring: oklch(0.72 0.15 275);
   --sucesso: oklch(0.72 0.14 150);
   --sucesso-foreground: oklch(0.145 0 0);
