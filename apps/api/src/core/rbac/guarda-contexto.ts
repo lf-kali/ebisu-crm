@@ -50,7 +50,8 @@ function acessoDa(contexto: ExecutionContext): Acesso {
 
 function empresaDoCabecalho(req: Request): string {
   const valor = req.get(CABECALHO_EMPRESA);
-  if (valor && Uuid.safeParse(valor).success) return valor;
+  // Minúsculas: o banco compara uuid sem caixa, mas as atribuições são comparadas como texto.
+  if (valor && Uuid.safeParse(valor).success) return valor.toLowerCase();
   throw new ErroDominio('validacao', {
     campos: [
       valor

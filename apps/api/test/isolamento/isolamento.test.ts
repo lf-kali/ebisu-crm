@@ -7,6 +7,7 @@ import { PRISMA_APP } from '../../src/core/banco/banco.module.js';
 import { Contrato } from '../../src/core/contrato/contrato.js';
 import { Permissao, Publica, SoAutenticado } from '../../src/core/rbac/marcas.js';
 import { gerarDocumento, listarRotas } from '../../src/core/openapi/gerar-documento.js';
+import { TOKENS_DE_ACESSO, type TokensDeAcesso } from '../../src/modules/auth/tokens.js';
 import { criarAppDeTeste } from '../app-de-teste.js';
 import { type CenarioIsolamento, criarCenarioIsolamento, IDS } from './cenario.js';
 import { pedir, testarIsolamento } from './suite.js';
@@ -115,6 +116,12 @@ describe('X-Empresa-Id e permissão (SEG-3)', () => {
     }
   });
 
+  it('UUID em maiúsculas vale o mesmo que em minúsculas (atribuição específica da empresa)', async () => {
+    const r = await http('m1', 'get', ROTA, a1.toUpperCase());
+    expect(r.status).toBe(200);
+    expect(r.body.dados.every((d: { empresa_id: string }) => d.empresa_id === a1)).toBe(true);
+  });
+
   it('empresa inativa, mesmo atribuída: 403', async () => {
     const r = await http('m1', 'get', ROTA, a3);
     expect(r.status).toBe(403);
@@ -173,6 +180,25 @@ describe('revalidação da sessão em toda requisição (token ainda válido)', 
     expect(await tentar('vol', a1)).toEqual([401, 401]);
     await restaurar.pop()!();
     expect(await tentar('vol', a1)).toEqual([200, 200]);
+  });
+
+  it('token cujo usuário não é o dono do membro: 401', async () => {
+    const tokens = cenario.app.get<TokensDeAcesso>(TOKENS_DE_ACESSO);
+    const trocado = await tokens.emitir({
+      usuarioId: IDS.usuarios.m1,
+      tenantId: IDS.contas.a,
+      membroId: IDS.membros.vol,
+    });
+    for (const [caminho, empresa] of [
+      [ROTA, a1],
+      ['/v1/eu', null],
+    ] as const) {
+      const req = request(cenario.app.getHttpServer())
+        .get(caminho)
+        .set('Authorization', `Bearer ${trocado}`);
+      if (empresa) req.set('X-Empresa-Id', empresa);
+      expect((await req).status, caminho).toBe(401);
+    }
   });
 
   it('membro suspenso ou removido: 401', async () => {

@@ -48,7 +48,8 @@ por `executarComando`, que abre a transação com o tenant definido.
     `filtroDeEscopo`.
 - `apps/api/src/core/tx/`:
   - `contexto.ts` com `TxContext` e `Comando`;
-  - `executar.ts` com `executarComando(contextoDaRequisicao, comando, entrada)`, sobre `comTenant`;
+  - `executar.ts` com `executarComando(contextoDaRequisicao, comando, entrada)`, sobre `comTenant`; e `comReferencias`, que
+    converte a FK violada de uma escrita de referência em 422 (ajuste da revisão);
   - um decorator de parâmetro `@Contexto()` para o controller.
 - `modules/auth` e `modules/eu`:
   - trocam o `GuardaBearer` próprio pelas marcas;

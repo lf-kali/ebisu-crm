@@ -7,7 +7,7 @@ import { Contexto } from '../../src/core/rbac/guarda-contexto.js';
 import { Permissao } from '../../src/core/rbac/marcas.js';
 import { filtroDeEscopo } from '../../src/core/rbac/permissoes.js';
 import type { ContextoDaRequisicao, TxContext } from '../../src/core/tx/contexto.js';
-import { ExecutorDeComandos } from '../../src/core/tx/executar.js';
+import { comReferencias, ExecutorDeComandos } from '../../src/core/tx/executar.js';
 
 // Rota de domínio SÓ para testes (F3-2): exercita o guard, o executarComando e o filtro de
 // escopo sobre a tabela `contato`, como uma frente de domínio faria no repositório.
@@ -82,19 +82,21 @@ export class ContatosDeTesteController {
     return this.executor.executarComando(
       contexto,
       (ctx, dados) =>
-        ctx.tx.contato.create({
-          data: {
-            tenant_id: ctx.tenantId,
-            empresa_id: ctx.empresaId,
-            nome: dados.nome,
-            // O banco exige um meio de contato (contato_meio_contato_ck).
-            email: 'contato@isolamento.local',
-            origem_id: dados.origem_id ?? null,
-            responsavel_id: dados.responsavel_id ?? ctx.membroId,
-            campos_faltantes: [],
-          },
-          select: CAMPOS,
-        }),
+        comReferencias(
+          ctx.tx.contato.create({
+            data: {
+              tenant_id: ctx.tenantId,
+              empresa_id: ctx.empresaId,
+              nome: dados.nome,
+              // O banco exige um meio de contato (contato_meio_contato_ck).
+              email: 'contato@isolamento.local',
+              origem_id: dados.origem_id ?? null,
+              responsavel_id: dados.responsavel_id ?? ctx.membroId,
+              campos_faltantes: [],
+            },
+            select: CAMPOS,
+          }),
+        ),
       entrada,
     );
   }

@@ -58,6 +58,13 @@ export default tseslint.config(
             message: 'Acesso a dados só via executarComando (core/tx) ou *.repositorio.ts.',
             allowTypeImports: true,
           })),
+          patterns: [
+            {
+              group: ['@ebisu/db/*', '@prisma/client/*'],
+              message: 'Acesso a dados só via executarComando (core/tx) ou *.repositorio.ts.',
+              allowTypeImports: true,
+            },
+          ],
         },
       ],
     },

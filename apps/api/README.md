@@ -46,8 +46,9 @@ No repositório, toda consulta filtra pela empresa e pelo escopo:
 where: { id, empresa_id: ctx.empresaId, ...filtroDeEscopo(ctx, 'contato.read', 'responsavel_id') }
 ```
 
-Uma FK violada (referência inexistente ou de outra empresa) vira 422 `validacao`, sem dizer qual
-dos dois casos aconteceu.
+Escritas que gravam referências passam por `comReferencias(...)`: uma FK violada (referência
+inexistente ou de outra empresa) vira 422 `validacao`, sem dizer qual dos dois casos aconteceu.
+Fora dele (ex.: FK `RESTRICT` barrando uma exclusão), o comando trata o caso como conflito.
 
 ## Testes de isolamento
 
