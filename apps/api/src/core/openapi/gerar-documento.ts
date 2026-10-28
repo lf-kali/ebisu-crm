@@ -42,9 +42,10 @@ function metodosDoController(prototipo: object): Array<[string, unknown]> {
   ) {
     for (const nome of Object.getOwnPropertyNames(atual)) {
       // A sobrescrita mais próxima da classe concreta vence, como no Nest.
-      if (nome !== 'constructor' && !vistos.has(nome)) {
-        vistos.set(nome, (atual as Record<string, unknown>)[nome]);
-      }
+      if (nome === 'constructor' || vistos.has(nome)) continue;
+      // Pelo descritor: ler `atual[nome]` executaria getters do controller.
+      const { value } = Object.getOwnPropertyDescriptor(atual, nome) ?? {};
+      vistos.set(nome, value);
     }
   }
   return [...vistos];

@@ -104,6 +104,18 @@ describe('contrato: validação de entrada e saída, envelope de erro (§5.1, §
     expect(JSON.stringify(r.body)).not.toMatch(/contrato|nao-e-uuid|Exemplo/);
   });
 
+  it.each(['nest_503', 'nest_500', 'nest_502', 'nest_409'])(
+    'HttpException sem código no catálogo (%s) → 500 erro_interno logado, nunca 422',
+    async (modo) => {
+      const logErro = vi.spyOn(Logger.prototype, 'error');
+      const r = await http().post(`/v1/exemplo?modo=${modo}`).send({ nome: 'Tela', valor: '1.00' });
+      expect(r.status).toBe(500);
+      expect(r.body.code).toBe('erro_interno');
+      expect(JSON.stringify(r.body)).not.toMatch(/10\.0\.0\.1|detalhe interno|gateway|conflito sem/);
+      expect(logErro).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it('ErroDominio → status e mensagem do catálogo, invariante e extras', async () => {
     const r = await http()
       .post('/v1/exemplo?modo=erro_dominio')

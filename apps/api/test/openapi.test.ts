@@ -85,6 +85,22 @@ describe('OpenAPI gerado dos contratos (D-A02, §4 F2)', () => {
     }
   });
 
+  it('listar rotas não executa getters do controller', async () => {
+    const { Controller } = await import('@nestjs/common');
+    @Controller('com-getter')
+    class ComGetterController {
+      get perigoso(): never {
+        throw new Error('getter executado');
+      }
+    }
+    const comGetter = await criarAppDeTeste([ComGetterController]);
+    try {
+      expect(() => listarRotas(comGetter)).not.toThrow();
+    } finally {
+      await comGetter.close();
+    }
+  });
+
   it('recusa @Head, @Options e @All (escapariam do contrato)', async () => {
     const { All, Controller, Head, Options } = await import('@nestjs/common');
     @Controller('head')

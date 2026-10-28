@@ -31,6 +31,10 @@ const DETALHE_DO_TIPO: Record<string, string> = {
   'entity.too.large': 'O corpo da requisição excede o tamanho máximo.',
   'encoding.unsupported': 'Codificação do corpo não suportada.',
   'charset.unsupported': 'Charset do corpo não suportado.',
+  'request.aborted': 'A requisição foi interrompida antes do fim.',
+  'request.size.invalid': 'O tamanho do corpo não confere com o cabeçalho.',
+  'stream.encoding.set': 'Codificação do corpo inválida.',
+  'parameters.too.many': 'O corpo tem parâmetros demais.',
 };
 
 /**
@@ -38,12 +42,17 @@ const DETALHE_DO_TIPO: Record<string, string> = {
  * http-errors (`status` + `expose`) antes de a requisição chegar ao Nest.
  */
 function statusDeErroDoCliente(excecao: unknown): number | undefined {
-  if (excecao instanceof HttpException) return excecao.getStatus();
-  if (typeof excecao !== 'object' || excecao === null) return undefined;
-  const { status, expose } = excecao as { status?: unknown; expose?: unknown };
-  return typeof status === 'number' && status >= 400 && status < 500 && expose === true
-    ? status
-    : undefined;
+  let status: unknown;
+  if (excecao instanceof HttpException) {
+    status = excecao.getStatus();
+  } else if (
+    typeof excecao === 'object' &&
+    excecao !== null &&
+    (excecao as { expose?: unknown }).expose === true
+  ) {
+    status = (excecao as { status?: unknown }).status;
+  }
+  return typeof status === 'number' && status >= 400 && status < 500 ? status : undefined;
 }
 
 @Catch()
@@ -70,12 +79,15 @@ export class FiltroProblema implements ExceptionFilter {
     if (excecao instanceof ZodError) {
       return criarProblema('validacao', { campos: camposDoZod(excecao) });
     }
+    // Só status com código no catálogo são reconhecidos. Qualquer outro (5xx, ou um 409
+    // lançado sem ErroDominio) vira erro_interno e é logado: nunca mascarar falha como
+    // erro de entrada. Conflitos de regra de negócio saem por ErroDominio com o código certo.
     const status = statusDeErroDoCliente(excecao);
-    if (status !== undefined) {
+    const code = status === undefined ? undefined : CODIGO_DO_STATUS[status];
+    if (code) {
       const tipo = (excecao as { type?: unknown }).type;
       const detail = typeof tipo === 'string' ? DETALHE_DO_TIPO[tipo] : undefined;
-      // 4xx sem código próprio no catálogo é tratado como entrada inválida.
-      return criarProblema(CODIGO_DO_STATUS[status] ?? 'validacao', { detail });
+      return criarProblema(code, { detail });
     }
     return criarProblema('erro_interno');
   }

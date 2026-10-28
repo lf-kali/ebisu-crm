@@ -1,4 +1,12 @@
-import { Controller, Get, Post } from '@nestjs/common';
+import {
+  ConflictException,
+  Controller,
+  Get,
+  HttpException,
+  InternalServerErrorException,
+  Post,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Dinheiro, DinheiroNaoNegativo, Uuid } from '@ebisu/contracts';
 import { z } from 'zod';
 import { Consulta, Contrato, Corpo, Parametros } from '../src/core/contrato/contrato.js';
@@ -11,7 +19,17 @@ const Entrada = z.object({ nome: z.string().min(1), valor: DinheiroNaoNegativo }
 const Saida = z.object({ id: Uuid, nome: z.string(), valor: Dinheiro });
 const Modo = z.object({
   modo: z
-    .enum(['ok', 'resposta_invalida', 'vaza_campo', 'erro_dominio', 'erro_inesperado'])
+    .enum([
+      'ok',
+      'resposta_invalida',
+      'vaza_campo',
+      'erro_dominio',
+      'erro_inesperado',
+      'nest_503',
+      'nest_500',
+      'nest_502',
+      'nest_409',
+    ])
     .default('ok'),
 });
 
@@ -35,6 +53,14 @@ export class ExemploController {
         throw new ErroDominio('estoque_insuficiente', { extras: { item_id: ID_EXEMPLO } }, 'EST-6');
       case 'erro_inesperado':
         throw new Error('falha no banco: senha=segredo123');
+      case 'nest_503':
+        throw new ServiceUnavailableException('banco fora do ar host=10.0.0.1');
+      case 'nest_500':
+        throw new InternalServerErrorException('detalhe interno');
+      case 'nest_502':
+        throw new HttpException('gateway', 502);
+      case 'nest_409':
+        throw new ConflictException('conflito sem ErroDominio');
       default:
         return { id: ID_EXEMPLO, ...corpo };
     }
