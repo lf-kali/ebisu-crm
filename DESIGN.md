@@ -97,7 +97,7 @@ shadcn, barradas pelo teste:
 
 Base shadcn/ui (estilo `new-york`) em `packages/ui/src/components/ui/`: `alert`, `avatar`,
 `badge`, `button`, `card`, `dropdown-menu`, `input`, `label`, `separator`, `sheet`, `skeleton`,
-`tooltip`. Componentes novos entram pela CLI do shadcn no `packages/ui` e corrigindo o import do
+`table`, `tooltip`. Componentes novos entram pela CLI do shadcn no `packages/ui` e corrigindo o import do
 `cn` para `@ebisu/ui/lib/utils`.
 
 Estados padrão (`packages/ui/src/components/estados.tsx`), obrigatórios em toda tela com dados:
@@ -107,6 +107,11 @@ Estados padrão (`packages/ui/src/components/estados.tsx`), obrigatórios em tod
 | Carregando | `Carregando`                                             | `role="status"`, `aria-live="polite"` |
 | Vazio      | `EstadoVazio` (título, descrição, ação)                  | Texto, sem só ícone                   |
 | Erro       | `EstadoErro`; no web, `ErroDaApi` lê o `Problema` da API | `role="alert"`, mostra `request_id`   |
+
+Listas usam `TabelaCursor` (`apps/web/src/componentes/tabela-cursor.tsx`): `<caption>` para leitor
+de tela, cabeçalhos com `scope="col"`, paginação "Anterior"/"Próxima" num `nav` com a página atual
+anunciada (`aria-live`). Enquanto a próxima página carrega, a anterior continua na tela
+(`aria-busy`) e "Próxima" fica desativada. Erro numa página seguinte oferece voltar à anterior.
 
 ## Acessibilidade
 

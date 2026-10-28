@@ -8,6 +8,7 @@ import {
   SheetTrigger,
 } from '@ebisu/ui/components/ui/sheet';
 import { cn } from '@ebisu/ui/lib/utils';
+import { Link } from '@tanstack/react-router';
 import { Menu } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { type ItemNavegacao, NAVEGACAO } from './navegacao';
@@ -19,6 +20,12 @@ interface PropsAppShell {
   /** Área à direita do cabeçalho (seletor de empresa e usuário, no PR 3). */
   cabecalho?: ReactNode;
   itens?: readonly ItemNavegacao[];
+}
+
+/** `/contatos` fica ativo também em `/contatos/123`; o Painel (`/`) só na própria página. */
+export function estaAtivo(caminho: string, atual?: string) {
+  if (!atual) return false;
+  return caminho === '/' ? atual === '/' : atual === caminho || atual.startsWith(`${caminho}/`);
 }
 
 function ListaNavegacao({
@@ -33,11 +40,11 @@ function ListaNavegacao({
   return (
     <ul className="flex flex-col gap-1">
       {itens.map(({ rotulo, caminho, icone: Icone }) => {
-        const ativo = caminho === caminhoAtual;
+        const ativo = estaAtivo(caminho, caminhoAtual);
         return (
           <li key={caminho}>
-            <a
-              href={caminho}
+            <Link
+              to={caminho}
               onClick={aoNavegar}
               aria-current={ativo ? 'page' : undefined}
               className={cn(
@@ -50,7 +57,7 @@ function ListaNavegacao({
             >
               <Icone aria-hidden className="size-4" />
               {rotulo}
-            </a>
+            </Link>
           </li>
         );
       })}

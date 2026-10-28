@@ -1,4 +1,5 @@
 import tailwindcss from '@tailwindcss/vite';
+import { tanstackRouter } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react';
 import { loadEnv } from 'vite';
 import { defineConfig } from 'vitest/config';
@@ -16,7 +17,8 @@ export default defineConfig(({ mode }) => {
   const env = { ...loadEnv(mode, RAIZ, ''), ...process.env };
 
   return {
-    plugins: [react(), tailwindcss()],
+    // O plugin do roteador precisa vir antes do React (gera src/routeTree.gen.ts e divide o código por rota).
+    plugins: [tanstackRouter({ target: 'react', autoCodeSplitting: true }), react(), tailwindcss()],
     envDir: RAIZ,
     server: {
       port: Number(env.WEB_PORT ?? 5173),
@@ -29,6 +31,7 @@ export default defineConfig(({ mode }) => {
     },
     test: {
       environment: 'jsdom',
+      setupFiles: ['./src/teste/setup.ts'],
     },
   };
 });

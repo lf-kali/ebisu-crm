@@ -11,10 +11,15 @@ import {
   Wrench,
 } from 'lucide-react';
 
+import type { LinkProps } from '@tanstack/react-router';
+
+/** Só caminhos que existem no roteador (tipado pelo routeTree gerado). */
+type CaminhoModulo = NonNullable<LinkProps['to']>;
+
 // Módulos do menu (spec §4 F13). `permissao` esconde o item sem acesso (filtro entra no PR 3).
 export interface ItemNavegacao {
   rotulo: string;
-  caminho: string;
+  caminho: CaminhoModulo;
   icone: LucideIcon;
   permissao?: string;
 }

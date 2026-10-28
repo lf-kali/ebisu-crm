@@ -4,3 +4,4 @@ coverage/
 docs/
 .vscode/
 apps/api/openapi.json
+apps/web/src/routeTree.gen.ts

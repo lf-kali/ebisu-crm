@@ -5,7 +5,9 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/coverage/**', '**/.turbo/**', 'docs/**'] },
+  {
+    ignores: ['**/dist/**', '**/coverage/**', '**/.turbo/**', 'docs/**', '**/routeTree.gen.ts'],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
