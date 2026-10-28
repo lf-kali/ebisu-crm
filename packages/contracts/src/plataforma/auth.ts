@@ -12,6 +12,19 @@ import { Uuid } from '../comum/escalares.js';
 // O login abre a sessão na conta usada por último (ou na mais antiga) e lista todas. Com mais de
 // uma, o web mostra a escolha logo após o login, e escolher outra é trocar de conta
 // (POST /v1/auth/trocar-conta), o que emite novos tokens.
+//
+// Requisitos para a F3 (revisão de segurança do contrato), que os schemas não conseguem impor:
+// - E-mail normalizado (trim + minúsculas) no login, no cadastro e no convite; usuario.email
+//   é @unique sensível a maiúsculas.
+// - Login: rate limit por IP e por e-mail; hash argon2id fictício quando o e-mail não existe;
+//   um único 401 nao_autenticado, com o mesmo tempo, para e-mail inexistente, senha errada ou
+//   usuário sem conta ativa.
+// - A sessão pertence a uma conta: o refresh devolve a conta em que o usuário estava, então o
+//   refresh token precisa guardar o tenant (hoje refresh_token só tem usuario_id → migração).
+// - Troca de conta: só para conta com membro ativo (senão 404 nao_encontrado, sem revelar se a
+//   conta existe); revoga a família de refresh anterior e grava um cookie de família nova.
+// - Refresh e logout (só cookie): exigir Content-Type application/json, validar Origin, cookie
+//   Secure com Path=/v1/auth, nunca por GET.
 
 export const EntradaLogin = z
   .object({
