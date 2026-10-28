@@ -103,6 +103,36 @@ describe('Idempotency-Key em POST de domínio', () => {
     expect(await contar('idem-dup')).toBe(1);
   });
 
+  it('só a rota muda (mesmo corpo, sem parâmetros): 422', async () => {
+    const chave = randomUUID();
+    expect((await http('m1', 'post', ROTA, a1, { nome: 'idem-rota' }, chave)).status).toBe(201);
+    const r = await http('m1', 'post', `${ROTA}/registrar`, a1, { nome: 'idem-rota' }, chave);
+    expect(r.status).toBe(422);
+    expect(r.body.code).toBe('idempotencia_divergente');
+    expect(await contar('idem-rota')).toBe(1);
+  });
+
+  it('POST 204 (sem corpo de resposta) também se repete sem novo efeito', async () => {
+    const chave = randomUUID();
+    const r1 = await http('m1', 'post', `${ROTA}/registrar`, a1, { nome: 'idem-204' }, chave);
+    const r2 = await http('m1', 'post', `${ROTA}/registrar`, a1, { nome: 'idem-204' }, chave);
+    expect([r1.status, r2.status]).toEqual([204, 204]);
+    expect(r2.text).toBe(r1.text);
+    expect(await contar('idem-204')).toBe(1);
+  });
+
+  it('mesma chave com outra query string: 422', async () => {
+    const chave = randomUUID();
+    const rota = `${ROTA}/registrar`;
+    expect(
+      (await http('m1', 'post', `${rota}?marca=a`, a1, { nome: 'idem-q' }, chave)).status,
+    ).toBe(204);
+    const r = await http('m1', 'post', `${rota}?marca=b`, a1, { nome: 'idem-q' }, chave);
+    expect(r.status).toBe(422);
+    expect(r.body.code).toBe('idempotencia_divergente');
+    expect(await contar('idem-q:b')).toBe(0);
+  });
+
   it('com a chave em uso por outra requisição: 409 na hora, sem efeito', async () => {
     const chave = randomUUID();
     const outra = await cenario.banco.conectar(cenario.banco.urlAdmin);

@@ -1,7 +1,7 @@
 import { Controller, Delete, Get, Patch, Post } from '@nestjs/common';
 import { Uuid } from '@ebisu/contracts';
 import { z } from 'zod';
-import { Contrato, Corpo, Parametros } from '../../src/core/contrato/contrato.js';
+import { Consulta, Contrato, Corpo, Parametros } from '../../src/core/contrato/contrato.js';
 import { ErroDominio } from '../../src/core/erros/erro-dominio.js';
 import { Contexto } from '../../src/core/rbac/guarda-contexto.js';
 import { Permissao } from '../../src/core/rbac/marcas.js';
@@ -27,6 +27,7 @@ const Criar = z.object({
   responsavel_id: Uuid.optional(),
 });
 const Editar = z.object({ nome: z.string().min(1) });
+const Marca = z.object({ marca: z.enum(['a', 'b']).optional() });
 
 const CAMPOS = { id: true, empresa_id: true, nome: true, responsavel_id: true, origem_id: true };
 
@@ -97,6 +98,38 @@ export class ContatosDeTesteController {
             select: CAMPOS,
           }),
         ),
+      entrada,
+    );
+  }
+
+  @Post('registrar')
+  @Permissao('contato.create')
+  @Contrato({
+    resumo: 'Registra sem devolver corpo (teste): POST 204, sem parâmetros, com query',
+    corpo: Editar,
+    query: Marca,
+    resposta: null,
+    status: 204,
+  })
+  async registrar(
+    @Contexto() contexto: ContextoDaRequisicao,
+    @Corpo() entrada: z.infer<typeof Editar>,
+    @Consulta() { marca }: z.infer<typeof Marca>,
+  ) {
+    await this.executor.executarComando(
+      contexto,
+      async (ctx, dados) => {
+        await ctx.tx.contato.create({
+          data: {
+            tenant_id: ctx.tenantId,
+            empresa_id: ctx.empresaId,
+            nome: marca ? `${dados.nome}:${marca}` : dados.nome,
+            email: 'contato@isolamento.local',
+            responsavel_id: ctx.membroId,
+            campos_faltantes: [],
+          },
+        });
+      },
       entrada,
     );
   }

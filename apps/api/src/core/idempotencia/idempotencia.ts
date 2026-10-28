@@ -32,7 +32,8 @@ function canonico(valor: unknown): unknown {
 }
 
 /**
- * Lê a `Idempotency-Key` e calcula o hash do pedido: rota, parâmetros, empresa, autor e corpo.
+ * Lê a `Idempotency-Key` e calcula o hash do pedido: rota, parâmetros, query, empresa, autor e
+ * corpo.
  * Mudar qualquer um com a mesma chave dá 422. O autor no hash impede que outra pessoa da conta,
  * com a mesma chave, receba a resposta de alguém.
  */
@@ -49,7 +50,14 @@ export function idempotenciaDa(req: Request, empresaId: string, autor: string): 
   const molde = (req.route as { path?: unknown } | undefined)?.path;
   if (typeof molde !== 'string') throw new Error('Idempotência fora de uma rota do Nest');
   const rota = `${req.method} ${molde}`;
-  const pedido = { rota, params: req.params, empresaId, autor, corpo: req.body ?? null };
+  const pedido = {
+    rota,
+    params: req.params,
+    query: req.query,
+    empresaId,
+    autor,
+    corpo: req.body ?? null,
+  };
   const hash = createHash('sha256')
     .update(JSON.stringify(canonico(pedido)))
     .digest('hex');

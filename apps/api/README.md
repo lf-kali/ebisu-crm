@@ -58,7 +58,9 @@ efeitos; a mesma chave com outro pedido (corpo, rota, parâmetros, empresa ou au
 `idempotencia_divergente`; com a chave em uso por outra requisição, 409 `idempotencia_em_andamento`.
 Só sucesso é memorizado (a resposta é gravada na mesma transação dos efeitos) e vale 24 h. Por
 isso a saída do comando precisa ser JSON puro (strings no lugar de `Date`/`Decimal`), o mesmo que
-o contrato já exige.
+o contrato já exige. Cada requisição chama o `executarComando` uma vez só: uma segunda chamada com o mesmo contexto
+devolveria a resposta da primeira. A trava, a leitura e a gravação da chave cabem na transação do
+comando (padrão do Prisma: 5 s); se ela estourar, tudo é desfeito e a repetição roda de novo.
 
 ## Testes de isolamento
 
