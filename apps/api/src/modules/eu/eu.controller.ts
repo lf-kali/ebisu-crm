@@ -1,7 +1,8 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Req } from '@nestjs/common';
 import { RespostaEu } from '@ebisu/contracts';
 import { Contrato } from '../../core/contrato/contrato.js';
-import { GuardaBearer, type RequisicaoAutenticada } from '../auth/guardas.js';
+import type { RequisicaoAutenticada } from '../../core/rbac/guarda-contexto.js';
+import { SoAutenticado } from '../../core/rbac/marcas.js';
 import { EuService } from './eu.service.js';
 
 @Controller('eu')
@@ -9,7 +10,7 @@ export class EuController {
   constructor(private readonly eu: EuService) {}
 
   @Get()
-  @UseGuards(GuardaBearer)
+  @SoAutenticado()
   @Contrato({
     resumo: 'Quem está logado, em qual conta e o que pode em cada empresa',
     tags: ['auth'],

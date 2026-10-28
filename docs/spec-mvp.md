@@ -491,9 +491,9 @@ export interface TxContext {
   empresaId: string;
   membroId: string | null;        // null quando a origem é API key ou job
   apiKeyId: string | null;
-  permissoes: ReadonlySet<string>;
+  permissoes: ReadonlyMap<string, EscopoPermissao>; // chave → escopo (SEG-4)
   requestId: string;
-  emitir(evento: EventoDominio): void; // ver 5.5
+  // emitir(evento: EventoDominio): void — entra com o despachante de eventos (§5.5)
 }
 
 // Forma de todo comando
@@ -507,6 +507,10 @@ executarComando(contextoHttpOuJob, comando, entrada, { idempotencyKey? })
 
 Regras: um comando nunca chama outro módulo por repositório, só pelo serviço público (que recebe o
 mesmo `TxContext`); erros de regra são lançados como `ErroDominio(code, detalhes, invariante)`.
+
+`permissoes` guarda o escopo de cada chave para o repositório aplicar o PROPRIO
+(`filtroDeEscopo`). `emitir` fica fora do contexto até existir o despachante de eventos: um
+`emitir` que só descartasse eventos os perderia em silêncio (plano `docs/planos/f3-2-contexto-rbac.md`).
 
 ### 5.5 Eventos de domínio
 

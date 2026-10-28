@@ -5,7 +5,9 @@ import { Contrato, Corpo } from '../../core/contrato/contrato.js';
 import { ErroDominio } from '../../core/erros/erro-dominio.js';
 import { LIMITADOR, type Limitador } from '../../core/limite/limitador.js';
 import { apagarRefresh, gravarRefresh, lerRefresh } from './cookie-refresh.js';
-import { GuardaBearer, GuardaOrigem, type RequisicaoAutenticada } from './guardas.js';
+import type { RequisicaoAutenticada } from '../../core/rbac/guarda-contexto.js';
+import { Publica, SoAutenticado } from '../../core/rbac/marcas.js';
+import { GuardaOrigem } from './guardas.js';
 import { normalizarEmail, type Origem, SessoesService } from './sessoes.service.js';
 
 // Rotas de auth (§5.3; contrato em packages/contracts/src/plataforma/auth.ts). Ignoram a
@@ -25,6 +27,7 @@ export class AuthController {
   ) {}
 
   @Post('login')
+  @Publica()
   @Contrato({
     resumo: 'Entra com e-mail e senha',
     descricao:
@@ -63,6 +66,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @Publica()
   @UseGuards(GuardaOrigem)
   @Contrato({
     resumo: 'Renova a sessão pelo cookie de refresh (rotativo)',
@@ -87,7 +91,8 @@ export class AuthController {
   }
 
   @Post('trocar-conta')
-  @UseGuards(GuardaOrigem, GuardaBearer)
+  @SoAutenticado()
+  @UseGuards(GuardaOrigem)
   @Contrato({
     resumo: 'Troca a sessão para outra conta do usuário',
     tags: ['auth'],
@@ -110,6 +115,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @Publica()
   @UseGuards(GuardaOrigem)
   @Contrato({
     resumo: 'Encerra a sessão (revoga o refresh)',

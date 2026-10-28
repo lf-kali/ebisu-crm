@@ -11,6 +11,13 @@
     }
   ],
   "components": {
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
     "schemas": {
       "RespostaSessao": {
         "type": "object",
@@ -436,6 +443,11 @@
         "tags": [
           "auth"
         ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -452,6 +464,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RespostaSessao"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
                 }
               }
             }
@@ -475,6 +497,11 @@
         "tags": [
           "auth"
         ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Sucesso",
@@ -482,6 +509,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RespostaEu"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
                 }
               }
             }

@@ -41,6 +41,35 @@ export default tseslint.config(
     },
   },
   {
+    // Spec §7: dados de domínio só via executarComando (core/tx) e repositórios. Fora deles, um
+    // módulo não abre transação nem usa o cliente Prisma; tipos continuam liberados.
+    files: ['apps/api/src/modules/**/*.ts'],
+    ignores: [
+      'apps/api/src/modules/auth/**',
+      'apps/api/src/modules/eu/**',
+      'apps/api/src/modules/**/*.repositorio.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: ['@ebisu/db', '@prisma/client'].map((name) => ({
+            name,
+            message: 'Acesso a dados só via executarComando (core/tx) ou *.repositorio.ts.',
+            allowTypeImports: true,
+          })),
+          patterns: [
+            {
+              group: ['@ebisu/db/*', '@prisma/client/*'],
+              message: 'Acesso a dados só via executarComando (core/tx) ou *.repositorio.ts.',
+              allowTypeImports: true,
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['apps/web/**/*.{ts,tsx}', 'packages/ui/**/*.{ts,tsx}'],
     languageOptions: { globals: { ...globals.browser } },
     plugins: { 'react-hooks': reactHooks },

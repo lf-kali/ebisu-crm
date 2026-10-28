@@ -1,10 +1,12 @@
 import { OpenAPIRegistry, OpenApiGeneratorV31 } from '@asteasolutions/zod-to-openapi';
-import { Problema, VERSAO_API } from '@ebisu/contracts';
+import { Problema, Uuid, VERSAO_API } from '@ebisu/contracts';
 import { resolve } from 'node:path';
 import { type INestApplication, RequestMethod } from '@nestjs/common';
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { ModulesContainer } from '@nestjs/core';
+import { z } from 'zod';
 import { CHAVE_CONTRATO, type DefinicaoContrato } from '../contrato/contrato.js';
+import { type Acesso, marcasDe } from '../rbac/marcas.js';
 
 // Gera o OpenAPI (D-A02) a partir das rotas registradas no Nest e dos seus @Contrato:
 // uma única fonte para validação e documentação.
@@ -23,6 +25,8 @@ export interface Rota {
   caminho: string;
   handler: string;
   contrato: DefinicaoContrato | undefined;
+  /** Marcas de acesso do handler (o guard exige exatamente uma). */
+  marcas: Acesso[];
 }
 
 const juntar = (...partes: Array<string | undefined>) =>
@@ -80,6 +84,7 @@ export function listarRotas(app: INestApplication): Rota[] {
               handler: `${metatype.name}.${nome}`,
               contrato: Reflect.getMetadata(CHAVE_CONTRATO, handler) as
                 DefinicaoContrato | undefined,
+              marcas: marcasDe(handler),
             });
           }
         }
@@ -101,19 +106,45 @@ const respostaDeErro = {
   content: { 'application/problem+json': { schema: Problema } },
 };
 
+/** Cabeçalho das rotas de domínio (§5.1, SEG-3). */
+const CabecalhoEmpresa = z.object({
+  'X-Empresa-Id': Uuid.meta({ description: 'Empresa em que a operação acontece' }),
+});
+
+/** Respostas de erro que a marca de acesso acrescenta, além do `default`. */
+const ERROS_DO_ACESSO: Record<Acesso['tipo'], string[]> = {
+  publica: [],
+  autenticado: ['401'],
+  permissao: ['401', '403', '422'],
+};
+
 export function gerarDocumento(app: INestApplication) {
   const registro = new OpenAPIRegistry();
-  for (const { metodo, caminho, handler, contrato } of listarRotas(app)) {
+  const bearer = registro.registerComponent('securitySchemes', 'bearer', {
+    type: 'http',
+    scheme: 'bearer',
+    bearerFormat: 'JWT',
+  });
+  for (const { metodo, caminho, handler, contrato, marcas } of listarRotas(app)) {
     if (!contrato)
       throw new Error(`Rota sem @Contrato: ${metodo.toUpperCase()} ${caminho} (${handler})`);
+    const [acesso] = marcas;
+    if (marcas.length !== 1 || !acesso)
+      throw new Error(
+        `Rota sem marca de acesso única: ${metodo.toUpperCase()} ${caminho} (${handler})`,
+      );
     const status = contrato.status ?? 200;
+    const permissao = acesso.tipo === 'permissao' ? `Permissão: \`${acesso.chave}\`.` : undefined;
+    const descricao = [contrato.descricao, permissao].filter(Boolean).join('\n\n');
     registro.registerPath({
       method: metodo,
       path: caminho,
       summary: contrato.resumo,
-      ...(contrato.descricao ? { description: contrato.descricao } : {}),
+      ...(descricao ? { description: descricao } : {}),
       ...(contrato.tags ? { tags: contrato.tags } : {}),
+      ...(acesso.tipo === 'publica' ? {} : { security: [{ [bearer.name]: [] }] }),
       request: {
+        ...(acesso.tipo === 'permissao' ? { headers: CabecalhoEmpresa } : {}),
         ...(contrato.params ? { params: contrato.params } : {}),
         ...(contrato.query ? { query: contrato.query } : {}),
         ...(contrato.corpo
@@ -127,6 +158,7 @@ export function gerarDocumento(app: INestApplication) {
               content: { 'application/json': { schema: contrato.resposta } },
             }
           : { description: 'Sucesso, sem conteúdo' },
+        ...Object.fromEntries(ERROS_DO_ACESSO[acesso.tipo].map((s) => [s, respostaDeErro])),
         default: respostaDeErro,
       },
     });

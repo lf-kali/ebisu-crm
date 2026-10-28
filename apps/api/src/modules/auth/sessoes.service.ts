@@ -48,7 +48,7 @@ interface LinhaRefresh {
 
 const naoAutenticado = () => new ErroDominio('nao_autenticado');
 /** Contas que aceitam login: em teste ou ativas (suspensa e cancelada ficam de fora). */
-const STATUS_CONTA_ATIVA = ['TRIAL', 'ATIVO'] as const;
+export const STATUS_CONTA_ATIVA = ['TRIAL', 'ATIVO'] as const;
 
 export const normalizarEmail = (email: string) => email.trim().toLowerCase();
 
