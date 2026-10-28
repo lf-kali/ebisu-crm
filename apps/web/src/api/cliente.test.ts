@@ -119,4 +119,47 @@ describe('cliente HTTP (F12)', () => {
     expect(erro).not.toBeInstanceOf(ErroApi);
     expect((erro as Error).name).toBe('AbortError');
   });
+
+  it('401: renova a sessão e repete uma vez, com a mesma Idempotency-Key', async () => {
+    let token = 'velho';
+    let renovacoes = 0;
+    const comRefresh = criarClienteApi({
+      cabecalhos: () => ({ Authorization: `Bearer ${token}` }),
+      aoNaoAutenticado: async () => {
+        renovacoes += 1;
+        token = 'novo';
+        return true;
+      },
+    });
+    const recebidas = capturar('post', () => HttpResponse.json({ id: '1', nome: 'A' }));
+    servidor.use(
+      http.post('*/v1/itens', ({ request }) => {
+        recebidas.push(request.clone());
+        return request.headers.get('authorization') === 'Bearer novo'
+          ? HttpResponse.json({ id: '1', nome: 'A' }, { status: 201 })
+          : HttpResponse.json(criarProblema('nao_autenticado'), { status: 401 });
+      }),
+    );
+    expect(await comRefresh.post('/v1/itens', { resposta: Item, corpo: {} })).toEqual({
+      id: '1',
+      nome: 'A',
+    });
+    expect(renovacoes).toBe(1);
+    const [primeira, repetida] = recebidas.map((r) => r.headers.get('idempotency-key'));
+    expect(primeira).toBeTruthy();
+    expect(repetida).toBe(primeira);
+  });
+
+  it('401 de novo depois de renovar não entra em laço: vira ErroApi', async () => {
+    let renovacoes = 0;
+    const comRefresh = criarClienteApi({
+      aoNaoAutenticado: async () => {
+        renovacoes += 1;
+        return true;
+      },
+    });
+    capturar('get', () => HttpResponse.json(criarProblema('nao_autenticado'), { status: 401 }));
+    const erro = await falhaCom(comRefresh.get('/v1/itens', { resposta: Item }));
+    expect([erro.status, renovacoes]).toEqual([401, 1]);
+  });
 });

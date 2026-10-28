@@ -1,22 +1,20 @@
 import { EstadoVazio } from '@ebisu/ui/components/estados';
-import type { QueryClient } from '@tanstack/react-query';
-import { createRootRouteWithContext, Outlet, useRouterState } from '@tanstack/react-router';
+import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
 import { ErroDaApi } from '../componentes/erro-da-api';
-import { AppShell } from '../layout/app-shell';
+import type { ContextoRoteador } from '../router';
 
-function Layout() {
-  const caminhoAtual = useRouterState({ select: (estado) => estado.location.pathname });
-  return (
-    <AppShell caminhoAtual={caminhoAtual}>
-      <Outlet />
-    </AppShell>
-  );
-}
-
-export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  component: Layout,
+// Raiz sem layout: as telas de entrada (login, escolha de conta) ficam fora do AppShell; as
+// páginas protegidas ficam sob o layout `_app`, que exige sessão.
+export const Route = createRootRouteWithContext<ContextoRoteador>()({
+  component: Outlet,
   notFoundComponent: () => (
-    <EstadoVazio titulo="Página não encontrada" descricao="Confira o endereço ou use o menu." />
+    <main className="p-6">
+      <EstadoVazio titulo="Página não encontrada" descricao="Confira o endereço." />
+    </main>
   ),
-  errorComponent: ({ error }) => <ErroDaApi erro={error} />,
+  errorComponent: ({ error }) => (
+    <main className="p-6">
+      <ErroDaApi erro={error} />
+    </main>
+  ),
 });

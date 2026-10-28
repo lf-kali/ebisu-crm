@@ -9,100 +9,136 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as BancadaIndexRouteImport } from './routes/bancada/index'
-import { Route as ConfiguracoesIndexRouteImport } from './routes/configuracoes/index'
-import { Route as ContatosIndexRouteImport } from './routes/contatos/index'
-import { Route as DispositivosIndexRouteImport } from './routes/dispositivos/index'
-import { Route as EstoqueIndexRouteImport } from './routes/estoque/index'
-import { Route as FinanceiroIndexRouteImport } from './routes/financeiro/index'
-import { Route as NegociosIndexRouteImport } from './routes/negocios/index'
-import { Route as OrcamentosIndexRouteImport } from './routes/orcamentos/index'
+import { Route as AppRouteImport } from './routes/_app'
+import { Route as EscolherContaRouteImport } from './routes/escolher-conta'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as AppSplatRouteImport } from './routes/_app/$'
+import { Route as AppBancadaIndexRouteImport } from './routes/_app/bancada/index'
+import { Route as AppConfiguracoesIndexRouteImport } from './routes/_app/configuracoes/index'
+import { Route as AppContatosIndexRouteImport } from './routes/_app/contatos/index'
+import { Route as AppDispositivosIndexRouteImport } from './routes/_app/dispositivos/index'
+import { Route as AppEstoqueIndexRouteImport } from './routes/_app/estoque/index'
+import { Route as AppFinanceiroIndexRouteImport } from './routes/_app/financeiro/index'
+import { Route as AppNegociosIndexRouteImport } from './routes/_app/negocios/index'
+import { Route as AppOrcamentosIndexRouteImport } from './routes/_app/orcamentos/index'
 
-const IndexRoute = IndexRouteImport.update({
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EscolherContaRoute = EscolherContaRouteImport.update({
+  id: '/escolher-conta',
+  path: '/escolher-conta',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AppRoute,
 } as any)
-const BancadaIndexRoute = BancadaIndexRouteImport.update({
+const AppSplatRoute = AppSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppBancadaIndexRoute = AppBancadaIndexRouteImport.update({
   id: '/bancada/',
   path: '/bancada/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AppRoute,
 } as any)
-const ConfiguracoesIndexRoute = ConfiguracoesIndexRouteImport.update({
+const AppConfiguracoesIndexRoute = AppConfiguracoesIndexRouteImport.update({
   id: '/configuracoes/',
   path: '/configuracoes/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AppRoute,
 } as any)
-const ContatosIndexRoute = ContatosIndexRouteImport.update({
+const AppContatosIndexRoute = AppContatosIndexRouteImport.update({
   id: '/contatos/',
   path: '/contatos/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AppRoute,
 } as any)
-const DispositivosIndexRoute = DispositivosIndexRouteImport.update({
+const AppDispositivosIndexRoute = AppDispositivosIndexRouteImport.update({
   id: '/dispositivos/',
   path: '/dispositivos/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AppRoute,
 } as any)
-const EstoqueIndexRoute = EstoqueIndexRouteImport.update({
+const AppEstoqueIndexRoute = AppEstoqueIndexRouteImport.update({
   id: '/estoque/',
   path: '/estoque/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AppRoute,
 } as any)
-const FinanceiroIndexRoute = FinanceiroIndexRouteImport.update({
+const AppFinanceiroIndexRoute = AppFinanceiroIndexRouteImport.update({
   id: '/financeiro/',
   path: '/financeiro/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AppRoute,
 } as any)
-const NegociosIndexRoute = NegociosIndexRouteImport.update({
+const AppNegociosIndexRoute = AppNegociosIndexRouteImport.update({
   id: '/negocios/',
   path: '/negocios/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AppRoute,
 } as any)
-const OrcamentosIndexRoute = OrcamentosIndexRouteImport.update({
+const AppOrcamentosIndexRoute = AppOrcamentosIndexRouteImport.update({
   id: '/orcamentos/',
   path: '/orcamentos/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AppRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/bancada/': typeof BancadaIndexRoute
-  '/configuracoes/': typeof ConfiguracoesIndexRoute
-  '/contatos/': typeof ContatosIndexRoute
-  '/dispositivos/': typeof DispositivosIndexRoute
-  '/estoque/': typeof EstoqueIndexRoute
-  '/financeiro/': typeof FinanceiroIndexRoute
-  '/negocios/': typeof NegociosIndexRoute
-  '/orcamentos/': typeof OrcamentosIndexRoute
+  '/': typeof AppIndexRoute
+  '/escolher-conta': typeof EscolherContaRoute
+  '/login': typeof LoginRoute
+  '/$': typeof AppSplatRoute
+  '/bancada/': typeof AppBancadaIndexRoute
+  '/configuracoes/': typeof AppConfiguracoesIndexRoute
+  '/contatos/': typeof AppContatosIndexRoute
+  '/dispositivos/': typeof AppDispositivosIndexRoute
+  '/estoque/': typeof AppEstoqueIndexRoute
+  '/financeiro/': typeof AppFinanceiroIndexRoute
+  '/negocios/': typeof AppNegociosIndexRoute
+  '/orcamentos/': typeof AppOrcamentosIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/bancada': typeof BancadaIndexRoute
-  '/configuracoes': typeof ConfiguracoesIndexRoute
-  '/contatos': typeof ContatosIndexRoute
-  '/dispositivos': typeof DispositivosIndexRoute
-  '/estoque': typeof EstoqueIndexRoute
-  '/financeiro': typeof FinanceiroIndexRoute
-  '/negocios': typeof NegociosIndexRoute
-  '/orcamentos': typeof OrcamentosIndexRoute
+  '/escolher-conta': typeof EscolherContaRoute
+  '/login': typeof LoginRoute
+  '/$': typeof AppSplatRoute
+  '/': typeof AppIndexRoute
+  '/bancada': typeof AppBancadaIndexRoute
+  '/configuracoes': typeof AppConfiguracoesIndexRoute
+  '/contatos': typeof AppContatosIndexRoute
+  '/dispositivos': typeof AppDispositivosIndexRoute
+  '/estoque': typeof AppEstoqueIndexRoute
+  '/financeiro': typeof AppFinanceiroIndexRoute
+  '/negocios': typeof AppNegociosIndexRoute
+  '/orcamentos': typeof AppOrcamentosIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/bancada/': typeof BancadaIndexRoute
-  '/configuracoes/': typeof ConfiguracoesIndexRoute
-  '/contatos/': typeof ContatosIndexRoute
-  '/dispositivos/': typeof DispositivosIndexRoute
-  '/estoque/': typeof EstoqueIndexRoute
-  '/financeiro/': typeof FinanceiroIndexRoute
-  '/negocios/': typeof NegociosIndexRoute
-  '/orcamentos/': typeof OrcamentosIndexRoute
+  '/_app': typeof AppRouteWithChildren
+  '/escolher-conta': typeof EscolherContaRoute
+  '/login': typeof LoginRoute
+  '/_app/$': typeof AppSplatRoute
+  '/_app/': typeof AppIndexRoute
+  '/_app/bancada/': typeof AppBancadaIndexRoute
+  '/_app/configuracoes/': typeof AppConfiguracoesIndexRoute
+  '/_app/contatos/': typeof AppContatosIndexRoute
+  '/_app/dispositivos/': typeof AppDispositivosIndexRoute
+  '/_app/estoque/': typeof AppEstoqueIndexRoute
+  '/_app/financeiro/': typeof AppFinanceiroIndexRoute
+  '/_app/negocios/': typeof AppNegociosIndexRoute
+  '/_app/orcamentos/': typeof AppOrcamentosIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/escolher-conta'
+    | '/login'
+    | '/$'
     | '/bancada/'
     | '/configuracoes/'
     | '/contatos/'
@@ -113,6 +149,9 @@ export interface FileRouteTypes {
     | '/orcamentos/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/escolher-conta'
+    | '/login'
+    | '/$'
     | '/'
     | '/bancada'
     | '/configuracoes'
@@ -124,107 +163,155 @@ export interface FileRouteTypes {
     | '/orcamentos'
   id:
     | '__root__'
-    | '/'
-    | '/bancada/'
-    | '/configuracoes/'
-    | '/contatos/'
-    | '/dispositivos/'
-    | '/estoque/'
-    | '/financeiro/'
-    | '/negocios/'
-    | '/orcamentos/'
+    | '/_app'
+    | '/escolher-conta'
+    | '/login'
+    | '/_app/$'
+    | '/_app/'
+    | '/_app/bancada/'
+    | '/_app/configuracoes/'
+    | '/_app/contatos/'
+    | '/_app/dispositivos/'
+    | '/_app/estoque/'
+    | '/_app/financeiro/'
+    | '/_app/negocios/'
+    | '/_app/orcamentos/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  BancadaIndexRoute: typeof BancadaIndexRoute
-  ConfiguracoesIndexRoute: typeof ConfiguracoesIndexRoute
-  ContatosIndexRoute: typeof ContatosIndexRoute
-  DispositivosIndexRoute: typeof DispositivosIndexRoute
-  EstoqueIndexRoute: typeof EstoqueIndexRoute
-  FinanceiroIndexRoute: typeof FinanceiroIndexRoute
-  NegociosIndexRoute: typeof NegociosIndexRoute
-  OrcamentosIndexRoute: typeof OrcamentosIndexRoute
+  AppRoute: typeof AppRouteWithChildren
+  EscolherContaRoute: typeof EscolherContaRoute
+  LoginRoute: typeof LoginRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/escolher-conta': {
+      id: '/escolher-conta'
+      path: '/escolher-conta'
+      fullPath: '/escolher-conta'
+      preLoaderRoute: typeof EscolherContaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app/': {
+      id: '/_app/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
     }
-    '/bancada/': {
-      id: '/bancada/'
+    '/_app/$': {
+      id: '/_app/$'
+      path: '/$'
+      fullPath: '/$'
+      preLoaderRoute: typeof AppSplatRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/bancada/': {
+      id: '/_app/bancada/'
       path: '/bancada'
       fullPath: '/bancada/'
-      preLoaderRoute: typeof BancadaIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AppBancadaIndexRouteImport
+      parentRoute: typeof AppRoute
     }
-    '/configuracoes/': {
-      id: '/configuracoes/'
+    '/_app/configuracoes/': {
+      id: '/_app/configuracoes/'
       path: '/configuracoes'
       fullPath: '/configuracoes/'
-      preLoaderRoute: typeof ConfiguracoesIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AppConfiguracoesIndexRouteImport
+      parentRoute: typeof AppRoute
     }
-    '/contatos/': {
-      id: '/contatos/'
+    '/_app/contatos/': {
+      id: '/_app/contatos/'
       path: '/contatos'
       fullPath: '/contatos/'
-      preLoaderRoute: typeof ContatosIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AppContatosIndexRouteImport
+      parentRoute: typeof AppRoute
     }
-    '/dispositivos/': {
-      id: '/dispositivos/'
+    '/_app/dispositivos/': {
+      id: '/_app/dispositivos/'
       path: '/dispositivos'
       fullPath: '/dispositivos/'
-      preLoaderRoute: typeof DispositivosIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AppDispositivosIndexRouteImport
+      parentRoute: typeof AppRoute
     }
-    '/estoque/': {
-      id: '/estoque/'
+    '/_app/estoque/': {
+      id: '/_app/estoque/'
       path: '/estoque'
       fullPath: '/estoque/'
-      preLoaderRoute: typeof EstoqueIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AppEstoqueIndexRouteImport
+      parentRoute: typeof AppRoute
     }
-    '/financeiro/': {
-      id: '/financeiro/'
+    '/_app/financeiro/': {
+      id: '/_app/financeiro/'
       path: '/financeiro'
       fullPath: '/financeiro/'
-      preLoaderRoute: typeof FinanceiroIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AppFinanceiroIndexRouteImport
+      parentRoute: typeof AppRoute
     }
-    '/negocios/': {
-      id: '/negocios/'
+    '/_app/negocios/': {
+      id: '/_app/negocios/'
       path: '/negocios'
       fullPath: '/negocios/'
-      preLoaderRoute: typeof NegociosIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AppNegociosIndexRouteImport
+      parentRoute: typeof AppRoute
     }
-    '/orcamentos/': {
-      id: '/orcamentos/'
+    '/_app/orcamentos/': {
+      id: '/_app/orcamentos/'
       path: '/orcamentos'
       fullPath: '/orcamentos/'
-      preLoaderRoute: typeof OrcamentosIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AppOrcamentosIndexRouteImport
+      parentRoute: typeof AppRoute
     }
   }
 }
 
+interface AppRouteChildren {
+  AppSplatRoute: typeof AppSplatRoute
+  AppIndexRoute: typeof AppIndexRoute
+  AppBancadaIndexRoute: typeof AppBancadaIndexRoute
+  AppConfiguracoesIndexRoute: typeof AppConfiguracoesIndexRoute
+  AppContatosIndexRoute: typeof AppContatosIndexRoute
+  AppDispositivosIndexRoute: typeof AppDispositivosIndexRoute
+  AppEstoqueIndexRoute: typeof AppEstoqueIndexRoute
+  AppFinanceiroIndexRoute: typeof AppFinanceiroIndexRoute
+  AppNegociosIndexRoute: typeof AppNegociosIndexRoute
+  AppOrcamentosIndexRoute: typeof AppOrcamentosIndexRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppSplatRoute: AppSplatRoute,
+  AppIndexRoute: AppIndexRoute,
+  AppBancadaIndexRoute: AppBancadaIndexRoute,
+  AppConfiguracoesIndexRoute: AppConfiguracoesIndexRoute,
+  AppContatosIndexRoute: AppContatosIndexRoute,
+  AppDispositivosIndexRoute: AppDispositivosIndexRoute,
+  AppEstoqueIndexRoute: AppEstoqueIndexRoute,
+  AppFinanceiroIndexRoute: AppFinanceiroIndexRoute,
+  AppNegociosIndexRoute: AppNegociosIndexRoute,
+  AppOrcamentosIndexRoute: AppOrcamentosIndexRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  BancadaIndexRoute: BancadaIndexRoute,
-  ConfiguracoesIndexRoute: ConfiguracoesIndexRoute,
-  ContatosIndexRoute: ContatosIndexRoute,
-  DispositivosIndexRoute: DispositivosIndexRoute,
-  EstoqueIndexRoute: EstoqueIndexRoute,
-  FinanceiroIndexRoute: FinanceiroIndexRoute,
-  NegociosIndexRoute: NegociosIndexRoute,
-  OrcamentosIndexRoute: OrcamentosIndexRoute,
+  AppRoute: AppRouteWithChildren,
+  EscolherContaRoute: EscolherContaRoute,
+  LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

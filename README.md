@@ -28,6 +28,21 @@ pnpm dev                 # api, worker e web
 | S3 (SeaweedFS) | http://localhost:8333, bucket `ebisu-anexos`           |
 | Mailpit        | SMTP `localhost:1025`, interface http://localhost:8025 |
 
+### Login no web (API simulada)
+
+Até a F3 entregar a autenticação na API, o web em `pnpm dev` usa uma API simulada no navegador
+(MSW) para login, troca de conta e `GET /v1/eu`, seguindo os contratos de
+`packages/contracts/src/plataforma`. Ela liga com `VITE_API_SIMULADA=1` no `.env` (já vem assim no
+`.env.example`); as demais rotas `/v1` seguem para a API real pelo proxy do Vite.
+
+| Usuário           | Senha      | Contas                                          |
+| ----------------- | ---------- | ----------------------------------------------- |
+| `ana@demo.test`   | `demo1234` | duas (escolhe depois do login), acesso completo |
+| `bruno@demo.test` | `demo1234` | uma, técnico com acesso só a bancada            |
+
+A sessão simulada sobrevive ao F5 (fica no `sessionStorage` da aba, no lugar do cookie httpOnly) e
+nada disso entra no build de produção.
+
 ### Acesso pela tailnet
 
 `pnpm dev:tailnet` expõe o web na sua tailnet com `sudo tailscale serve --https=8447 5173` e sobe o

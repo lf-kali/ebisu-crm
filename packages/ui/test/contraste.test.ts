@@ -70,6 +70,7 @@ const PARES: Array<[string, string, number, number?, number?, string?, Modo?]> =
   ['sidebar-foreground', 'sidebar', 4.5],
   ['destructive', 'background', 4.5],
   ['destructive', 'background', 4.5, 0.9], // text-destructive/90 do alert
+  ['destructive', 'card', 4.5], // erro do campo nos formulários em cartão (login)
   ['destructive-foreground', 'destructive', 4.5],
   ['destructive-foreground', 'destructive', 4.5, 1, 0.9], // hover do botão
   ['sucesso', 'background', 4.5],
