@@ -1,2 +1,4 @@
-// Contratos do domínio plataforma (F3). Esqueleto: a frente do domínio é dona desta pasta (spec §3.3).
-export {};
+// Contratos do domínio plataforma (F3): a frente do domínio é dona desta pasta (spec §3.3).
+// Auth e /v1/eu foram adiantados para o web (F12); a F3 implementa a API contra eles.
+export * from './auth.js';
+export * from './eu.js';
