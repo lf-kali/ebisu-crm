@@ -40,8 +40,9 @@ Até a F3 entregar a autenticação na API, o web em `pnpm dev` usa uma API simu
 | `ana@demo.test`   | `demo1234` | duas (escolhe depois do login), acesso completo |
 | `bruno@demo.test` | `demo1234` | uma, técnico com acesso só a bancada            |
 
-A sessão simulada sobrevive ao F5 (fica no `sessionStorage` da aba, no lugar do cookie httpOnly) e
-nada disso entra no build de produção.
+A sessão simulada sobrevive ao F5 e vale em todas as abas, como um cookie: o "cookie" de refresh
+fica no `localStorage` (no lugar do cookie httpOnly da API real). Nada disso entra no build de
+produção.
 
 ### Acesso pela tailnet
 

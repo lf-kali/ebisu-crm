@@ -9,7 +9,7 @@ import {
 } from '@ebisu/ui/components/ui/dropdown-menu';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, useNavigate, useRouterState } from '@tanstack/react-router';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, CircleUser } from 'lucide-react';
 import { useState, useSyncExternalStore } from 'react';
 import { consultaEu } from '../auth/consultas';
 
@@ -40,12 +40,14 @@ export function MenuUsuario() {
       ) : null}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="gap-2">
-            <span className="flex flex-col items-end leading-tight">
+          <Button variant="ghost" className="gap-2 px-2 sm:px-3">
+            {/* No celular, só o ícone: nome e conta continuam no nome acessível do botão. */}
+            <CircleUser aria-hidden className="size-5 sm:hidden" />
+            <span className="sr-only sm:not-sr-only sm:flex sm:flex-col sm:items-end sm:leading-tight">
               <span>{eu.data.usuario.nome}</span>
               <span className="text-xs font-normal text-muted-foreground">{atual.conta.nome}</span>
             </span>
-            <ChevronDown aria-hidden />
+            <ChevronDown aria-hidden className="hidden sm:block" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">

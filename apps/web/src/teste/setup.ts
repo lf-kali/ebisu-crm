@@ -4,7 +4,10 @@ import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest';
 import { reiniciarSimulacao, servidor } from './servidor';
 
 beforeAll(() => servidor.listen({ onUnhandledFrame: 'error' }));
-beforeEach(() => reiniciarSimulacao());
+beforeEach(() => {
+  reiniciarSimulacao();
+  window.localStorage.clear();
+});
 afterEach(() => cleanup());
 afterAll(() => servidor.close());
 

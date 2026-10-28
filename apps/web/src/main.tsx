@@ -19,7 +19,8 @@ async function iniciarSimulacao() {
     import('msw/browser'),
     import('./simulacao/api-simulada'),
   ]);
-  const simulada = criarApiSimulada({ persistir: window.sessionStorage });
+  // O "cookie" de refresh simulado fica no localStorage: como um cookie, vale em todas as abas.
+  const simulada = criarApiSimulada({ persistir: window.localStorage });
   await setupWorker(...simulada.handlers).start({ onUnhandledFrame: 'bypass' });
 }
 

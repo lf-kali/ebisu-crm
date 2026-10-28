@@ -27,9 +27,9 @@ function EscolherConta() {
   const escolher = useMutation({
     mutationFn: async (conta: ResumoConta) => {
       if (conta.tenant_id !== sessao.obter()?.conta.tenant_id) {
-        await sessao.trocarConta(conta.tenant_id);
-        // Outra conta = outros dados: nada do cache da conta anterior pode sobrar.
+        // Outra conta = outros dados: limpa antes de a sessão da conta nova existir.
         queryClient.clear();
+        await sessao.trocarConta(conta.tenant_id);
       }
     },
     onSuccess: () => navigate({ href: destinoSeguro(destino) }),

@@ -13,7 +13,8 @@ import { USUARIOS, SENHA_DEMO, type UsuarioDemo } from './dados';
 
 // API simulada (MSW) do contrato de auth e do /v1/eu (packages/contracts/plataforma), usada pelo
 // web até a F3 entregar a API real. O "cookie" do refresh é o estado `refresh` daqui (o MSW não
-// grava cookie httpOnly); no navegador ele persiste no sessionStorage para sobreviver ao F5.
+// grava cookie httpOnly); no navegador ele persiste no localStorage, que como um cookie vale em
+// todas as abas e sobrevive ao F5.
 
 interface Vinculo {
   usuarioId: string;

@@ -42,9 +42,10 @@ function Login() {
   async function enviar(dados: EntradaLogin) {
     setErro(null);
     try {
-      const nova = await sessao.entrar(dados);
-      // Dados de outra sessão não podem aparecer para quem entrou agora.
+      // Dados de outra sessão não podem aparecer para quem entra: limpa antes de a sessão nova
+      // existir, sem janela em que ela conviva com o cache anterior.
       queryClient.clear();
+      const nova = await sessao.entrar(dados);
       if (nova.contas.length > 1)
         await navigate({ to: '/escolher-conta', search: { redirect: destino } });
       else await navigate({ href: destinoSeguro(destino) });
