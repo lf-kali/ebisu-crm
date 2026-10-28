@@ -43,7 +43,9 @@ function ListaNavegacao({
               className={cn(
                 'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors',
                 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none',
-                ativo && 'bg-sidebar-accent text-sidebar-accent-foreground',
+                // Ativo não depende só do fundo: barra lateral (5,3:1) e peso da fonte.
+                ativo &&
+                  'bg-sidebar-accent font-semibold text-sidebar-accent-foreground shadow-[inset_3px_0_0_var(--sidebar-primary)]',
               )}
             >
               <Icone aria-hidden className="size-4" />
