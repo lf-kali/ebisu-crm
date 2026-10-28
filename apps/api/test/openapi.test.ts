@@ -47,6 +47,73 @@ describe('OpenAPI gerado dos contratos (D-A02, §4 F2)', () => {
     expect(JSON.stringify(post.responses)).toContain('application/problem+json');
   });
 
+  it('rotas herdadas de uma classe base entram no documento e exigem contrato', async () => {
+    const { Controller, Get } = await import('@nestjs/common');
+    const { z } = await import('zod');
+    const { Contrato } = await import('../src/core/contrato/contrato.js');
+    class Base {
+      @Get('com-contrato')
+      @Contrato({ resumo: 'Herdada', resposta: z.object({ ok: z.boolean() }) })
+      comContrato() {
+        return { ok: true };
+      }
+    }
+    @Controller('filho')
+    class FilhoController extends Base {}
+    const comHeranca = await criarAppDeTeste([FilhoController]);
+    try {
+      expect(listarRotas(comHeranca).map((r) => r.caminho)).toContain('/v1/filho/com-contrato');
+    } finally {
+      await comHeranca.close();
+    }
+
+    class BaseSemContrato {
+      @Get('sem')
+      sem() {
+        return {};
+      }
+    }
+    @Controller('filho2')
+    class Filho2Controller extends BaseSemContrato {}
+    const semContrato = await criarAppDeTeste([Filho2Controller]);
+    try {
+      expect(() => gerarDocumento(semContrato)).toThrow(
+        /Rota sem @Contrato: GET \/v1\/filho2\/sem/,
+      );
+    } finally {
+      await semContrato.close();
+    }
+  });
+
+  it('recusa @Head, @Options e @All (escapariam do contrato)', async () => {
+    const { All, Controller, Head, Options } = await import('@nestjs/common');
+    @Controller('head')
+    class ComHead {
+      @Head()
+      tratar() {}
+    }
+    @Controller('options')
+    class ComOptions {
+      @Options()
+      tratar() {}
+    }
+    @Controller('all')
+    class ComAll {
+      @All()
+      tratar() {}
+    }
+    for (const controller of [ComHead, ComOptions, ComAll]) {
+      const especial = await criarAppDeTeste([controller]);
+      try {
+        expect(() => listarRotas(especial), controller.name).toThrow(
+          /Método HTTP não suportado pelo contrato/,
+        );
+      } finally {
+        await especial.close();
+      }
+    }
+  });
+
   it('recusa gerar o documento se alguma rota não tiver @Contrato', async () => {
     const { Controller, Get } = await import('@nestjs/common');
     @Controller('sem-contrato')

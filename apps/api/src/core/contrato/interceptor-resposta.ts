@@ -36,7 +36,12 @@ export class InterceptorResposta implements NestInterceptor {
         if (resultado.success) return resultado.data;
         const requestId = requestIdDa(contexto.switchToHttp().getResponse<Response>());
         this.logger.error(
-          { request_id: requestId, handler, issues: resultado.error.issues },
+          {
+            request_id: requestId,
+            handler,
+            // Só caminho e código: nunca valores da resposta (SEG-8), nem via mensagem de refine.
+            issues: resultado.error.issues.map(({ path, code }) => ({ path, code })),
+          },
           'Resposta fora do contrato',
         );
         throw new RespostaForaDoContratoError(handler);

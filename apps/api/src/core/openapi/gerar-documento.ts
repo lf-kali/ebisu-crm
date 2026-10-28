@@ -32,6 +32,24 @@ const juntar = (...partes: Array<string | undefined>) =>
     .filter(Boolean)
     .join('/');
 
+/** Métodos do controller, incluindo os herdados (o Nest também registra rotas herdadas). */
+function metodosDoController(prototipo: object): Array<[string, unknown]> {
+  const vistos = new Map<string, unknown>();
+  for (
+    let atual = prototipo;
+    atual && atual !== Object.prototype;
+    atual = Object.getPrototypeOf(atual)
+  ) {
+    for (const nome of Object.getOwnPropertyNames(atual)) {
+      // A sobrescrita mais próxima da classe concreta vence, como no Nest.
+      if (nome !== 'constructor' && !vistos.has(nome)) {
+        vistos.set(nome, (atual as Record<string, unknown>)[nome]);
+      }
+    }
+  }
+  return [...vistos];
+}
+
 /** Lista as rotas HTTP do app, com o contrato de cada uma (ou `undefined` se faltar). */
 export function listarRotas(app: INestApplication): Rota[] {
   const rotas: Rota[] = [];
@@ -39,14 +57,19 @@ export function listarRotas(app: INestApplication): Rota[] {
     for (const { metatype } of modulo.controllers.values()) {
       if (!metatype) continue;
       const prefixos = [Reflect.getMetadata(PATH_METADATA, metatype) as string | string[]].flat();
-      const prototipo = metatype.prototype as Record<string, unknown>;
-      for (const nome of Object.getOwnPropertyNames(prototipo)) {
-        const handler = prototipo[nome];
-        if (nome === 'constructor' || typeof handler !== 'function') continue;
-        const metodo = METODOS[Reflect.getMetadata(METHOD_METADATA, handler) as RequestMethod];
+      for (const [nome, handler] of metodosDoController(metatype.prototype as object)) {
+        if (typeof handler !== 'function') continue;
         const caminhos = Reflect.getMetadata(PATH_METADATA, handler) as
           string | string[] | undefined;
-        if (!metodo || caminhos === undefined) continue;
+        if (caminhos === undefined) continue;
+        const metodoNest = Reflect.getMetadata(METHOD_METADATA, handler) as RequestMethod;
+        const metodo = METODOS[metodoNest];
+        if (!metodo) {
+          // @All/@Head/@Options etc. escapariam do OpenAPI e da exigência de @Contrato.
+          throw new Error(
+            `Método HTTP não suportado pelo contrato: ${RequestMethod[metodoNest]} em ${metatype.name}.${nome}`,
+          );
+        }
         for (const prefixo of prefixos) {
           for (const caminho of [caminhos].flat()) {
             rotas.push({
@@ -62,7 +85,9 @@ export function listarRotas(app: INestApplication): Rota[] {
       }
     }
   }
-  return rotas.sort((a, b) => `${a.caminho} ${a.metodo}`.localeCompare(`${b.caminho} ${b.metodo}`));
+  // Ordem por código (independe do locale): o openapi.json sai igual em qualquer máquina.
+  const chave = (r: Rota) => `${r.caminho} ${r.metodo}`;
+  return rotas.sort((a, b) => (chave(a) < chave(b) ? -1 : chave(a) > chave(b) ? 1 : 0));
 }
 
 /** apps/api/openapi.json (mesma profundidade em src/ e em dist/). */

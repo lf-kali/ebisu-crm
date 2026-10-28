@@ -1,6 +1,6 @@
-import type { INestApplication } from '@nestjs/common';
+import { type INestApplication, Logger } from '@nestjs/common';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { criarAppDeTeste } from './app-de-teste.js';
 import { ExemploController, ID_EXEMPLO } from './exemplo.controller.js';
 
@@ -15,6 +15,9 @@ describe('contrato: validação de entrada e saída, envelope de erro (§5.1, §
   });
   afterAll(async () => {
     await app?.close();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('entrada válida → status do contrato e corpo validado', async () => {
@@ -59,6 +62,30 @@ describe('contrato: validação de entrada e saída, envelope de erro (§5.1, §
       .send('{"nome":');
     expect(r.status).toBe(422);
     expect(r.body.code).toBe('validacao');
+  });
+
+  it('corpo grande demais (body-parser) → 422 validacao com detalhe, sem log de erro', async () => {
+    const logErro = vi.spyOn(Logger.prototype, 'error');
+    const r = await http()
+      .post('/v1/exemplo')
+      .set('content-type', 'application/json')
+      .send(JSON.stringify({ nome: 'x'.repeat(200_000), valor: '1.00' }));
+    expect(r.status).toBe(422);
+    expect(r.headers['content-type']).toMatch(PROBLEMA);
+    expect(r.body).toMatchObject({
+      code: 'validacao',
+      detail: 'O corpo da requisição excede o tamanho máximo.',
+    });
+    expect(logErro).not.toHaveBeenCalled();
+  });
+
+  it('erro do cliente (4xx) não gera log de erro; falha do servidor (5xx) gera', async () => {
+    const logErro = vi.spyOn(Logger.prototype, 'error');
+    await http().get('/v1/nao-existe');
+    await http().post('/v1/exemplo').send({ nome: '' });
+    expect(logErro).not.toHaveBeenCalled();
+    await http().post('/v1/exemplo?modo=erro_inesperado').send({ nome: 'Tela', valor: '1.00' });
+    expect(logErro).toHaveBeenCalledTimes(1);
   });
 
   it('parâmetro de rota inválido → 422; válido → 200', async () => {
