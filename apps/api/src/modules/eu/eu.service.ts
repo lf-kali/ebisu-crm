@@ -1,39 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { EmpresaDoMembro, EscopoPermissao, RespostaEu } from '@ebisu/contracts';
+import type { EmpresaDoMembro, RespostaEu } from '@ebisu/contracts';
 import { comTenant, type PrismaClient } from '@ebisu/db';
 import { PRISMA_APP, PRISMA_AUTH } from '../../core/banco/banco.module.js';
 import { ErroDominio } from '../../core/erros/erro-dominio.js';
+import { permissoesPorEmpresa } from '../../core/rbac/permissoes.js';
 import type { Identidade } from '../auth/tokens.js';
-
-const PESO: Record<EscopoPermissao, number> = { PROPRIO: 1, EMPRESA: 2, TENANT: 3 };
-
-/**
- * Permissões efetivas por empresa: união dos papéis atribuídos à empresa e dos atribuídos a
- * todas as empresas (empresa_id nulo), ficando com o maior escopo (TENANT > EMPRESA > PROPRIO).
- */
-export function permissoesPorEmpresa(
-  empresas: readonly string[],
-  atribuicoes: ReadonlyArray<{
-    empresaId: string | null;
-    permissoes: ReadonlyArray<{ chave: string; escopo: EscopoPermissao }>;
-  }>,
-): Map<string, Record<string, EscopoPermissao>> {
-  const resultado = new Map<string, Record<string, EscopoPermissao>>();
-  for (const atribuicao of atribuicoes) {
-    const alvos = atribuicao.empresaId
-      ? empresas.filter((id) => id === atribuicao.empresaId)
-      : empresas;
-    for (const empresaId of alvos) {
-      const atual = resultado.get(empresaId) ?? {};
-      for (const { chave, escopo } of atribuicao.permissoes) {
-        const anterior = atual[chave];
-        if (!anterior || PESO[escopo] > PESO[anterior]) atual[chave] = escopo;
-      }
-      resultado.set(empresaId, atual);
-    }
-  }
-  return resultado;
-}
 
 @Injectable()
 export class EuService {

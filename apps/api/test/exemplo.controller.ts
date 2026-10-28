@@ -11,6 +11,7 @@ import { Dinheiro, DinheiroNaoNegativo, Uuid } from '@ebisu/contracts';
 import { z } from 'zod';
 import { Consulta, Contrato, Corpo, Parametros } from '../src/core/contrato/contrato.js';
 import { ErroDominio } from '../src/core/erros/erro-dominio.js';
+import { Publica } from '../src/core/rbac/marcas.js';
 
 // Endpoint de exemplo SÓ para testes (decisão do dono): prova validação de entrada e de saída.
 
@@ -39,6 +40,7 @@ const Modo = z.object({
 @Controller('exemplo')
 export class ExemploController {
   @Post()
+  @Publica()
   @Contrato({
     resumo: 'Exemplo de comando',
     query: Modo,
@@ -80,12 +82,14 @@ export class ExemploController {
   }
 
   @Post('sem-schema')
+  @Publica()
   @Contrato({ resumo: 'Lê o corpo sem declarar schema (bug de programação)', resposta: null })
   semSchema(@Corpo() corpo: unknown) {
     return corpo;
   }
 
   @Get(':id')
+  @Publica()
   @Contrato({ resumo: 'Exemplo de leitura', params: z.object({ id: Uuid }), resposta: Saida })
   ler(@Parametros() { id }: { id: string }) {
     return { id, nome: 'Exemplo', valor: '1.00' };

@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ConfigInvalidaError, lerConfig } from '../../src/core/config/config.js';
 import { limitadorEmMemoria, limitadorRedis } from '../../src/core/limite/limitador.js';
 import { ChaveJwtInvalidaError, criarTokensDeAcesso } from '../../src/modules/auth/tokens.js';
-import { permissoesPorEmpresa } from '../../src/modules/eu/eu.service.js';
+import { permissoesPorEmpresa } from '../../src/core/rbac/permissoes.js';
 import { configDeTeste } from '../app-de-teste.js';
 
 describe('configuração (falha fechada)', () => {
