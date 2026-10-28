@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { verify } from '@node-rs/argon2';
 import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -15,6 +16,7 @@ import {
   semearPadroesEmpresa,
   semearDemo,
   semearPadroesTenant,
+  SENHA_DEMO,
   TENANT_DEMO_ID,
 } from '../src/seeds/index.js';
 import { comTenant } from '../src/tenancy.js';
@@ -192,6 +194,44 @@ describe('semeadura no banco', () => {
     const primeira = await semearDemo(admin);
     expect(primeira).toMatchObject({ criado: true, empresas: 2, contatos: 30 });
     expect(await semearDemo(admin)).toEqual({ criado: false, tenantId: TENANT_DEMO_ID });
+  });
+
+  it('usuários de demonstração ganham a senha de dev, também num banco já semeado', async () => {
+    const demo = { email: { endsWith: '@demo.ebisu.local' } };
+    const senhasOk = async () => {
+      const usuarios = await admin.usuario.findMany({ where: demo, select: { senha_hash: true } });
+      expect(usuarios).toHaveLength(PAPEIS_PADRAO.length);
+      for (const { senha_hash } of usuarios) {
+        expect(senha_hash).toMatch(/^\$argon2id\$v=19\$m=19456,t=2,p=1\$/);
+        expect(await verify(senha_hash!, SENHA_DEMO)).toBe(true);
+      }
+    };
+    await semearDemo(admin);
+    await senhasOk();
+    // Banco semeado antes do F3: usuários sem senha. Rodar o seed de novo grava a senha.
+    await admin.usuario.updateMany({ where: demo, data: { senha_hash: null } });
+    const fora = await admin.usuario.create({
+      data: { email: 'fora-da-demo@exemplo.local', nome: 'Fora' },
+    });
+    expect(await semearDemo(admin)).toEqual({ criado: false, tenantId: TENANT_DEMO_ID });
+    await senhasOk();
+    // Só os usuários de demonstração: nenhum outro recebe a senha conhecida.
+    const depois = await admin.usuario.findUniqueOrThrow({ where: { id: fora.id } });
+    expect(depois.senha_hash).toBeNull();
+  });
+
+  it('seed de demonstração recusa NODE_ENV=production sem tocar no banco', async () => {
+    const demo = { email: { endsWith: '@demo.ebisu.local' } };
+    await admin.usuario.updateMany({ where: demo, data: { senha_hash: null } });
+    const anterior = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      await expect(semearDemo(admin)).rejects.toThrow(/NODE_ENV=production/);
+    } finally {
+      process.env.NODE_ENV = anterior;
+    }
+    expect(await admin.usuario.count({ where: { ...demo, senha_hash: { not: null } } })).toBe(0);
+    await semearDemo(admin);
   });
 
   it('seed de demonstração é coerente com as regras (CRM-2, CRM-4, DSP-2)', async () => {

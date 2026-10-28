@@ -1,3 +1,4 @@
+import { type Algorithm, hash } from '@node-rs/argon2';
 import type { $Enums, Prisma, PrismaClient } from '@prisma/client';
 import { comTenant } from '../tenancy.js';
 import { PAPEIS_PADRAO } from './papeis-padrao.js';
@@ -11,6 +12,8 @@ export const SLUG_DEMO = 'assistencia-demo';
 /** ID fixo: permite checar a existência dentro do contexto do próprio tenant (sob RLS). */
 export const TENANT_DEMO_ID = '0190d7c0-0000-7000-8000-00000000de30';
 const DOMINIO_EMAIL = 'demo.ebisu.local';
+/** Senha de todos os usuários de demonstração. Só para desenvolvimento local (README). */
+export const SENHA_DEMO = 'demo-ebisu-2026';
 
 const EMPRESAS = [
   {
@@ -274,9 +277,40 @@ async function criarCarteira(
   return fases.length;
 }
 
-/** Cria o tenant de demonstração com padrões, equipe e carteira. Roda com o papel migrador. */
+/**
+ * Grava SENHA_DEMO nos usuários *@demo.ebisu.local, inclusive num banco já semeado (antes do F3
+ * eles não tinham senha). argon2id com os parâmetros da API (apps/api/src/modules/auth/senha.ts).
+ */
+async function definirSenhasDemo(cliente: PrismaClient): Promise<number> {
+  // `Algorithm` é um const enum ambiente: o valor vai literal (2 = Argon2id).
+  const senha_hash = await hash(SENHA_DEMO, {
+    algorithm: 2 as Algorithm,
+    memoryCost: 19_456,
+    timeCost: 2,
+    parallelism: 1,
+  });
+  const { count } = await cliente.usuario.updateMany({
+    where: { email: { endsWith: `@${DOMINIO_EMAIL}` } },
+    data: { senha_hash },
+  });
+  return count;
+}
+
+/**
+ * Cria o tenant de demonstração com padrões, equipe e carteira e grava SENHA_DEMO nos usuários
+ * demo. Roda com o papel migrador. Recusa NODE_ENV=production aqui (não só no CLI): quem importar
+ * a função também não grava a senha conhecida num ambiente de produção.
+ */
 export async function semearDemo(cliente: PrismaClient, agora = new Date()) {
+  if (process.env.NODE_ENV === 'production')
+    throw new Error('seed de demonstração recusado com NODE_ENV=production');
   await semearCatalogoPermissoes(cliente);
+  const resultado = await semearTenantDemo(cliente, agora);
+  await definirSenhasDemo(cliente);
+  return resultado;
+}
+
+async function semearTenantDemo(cliente: PrismaClient, agora: Date) {
   const tenantId = TENANT_DEMO_ID;
   return comTenant(
     cliente,

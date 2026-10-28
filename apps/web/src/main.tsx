@@ -10,7 +10,7 @@ const raiz = document.getElementById('root');
 if (!raiz) throw new Error('Elemento #root não encontrado');
 
 /**
- * API simulada (MSW) no navegador até a F3 entregar a API real. Só em `pnpm dev` com
+ * API simulada (MSW) no navegador, opcional para mexer só no front. Só em `pnpm dev` com
  * VITE_API_SIMULADA=1: o `import.meta.env.DEV` tira tudo isto do build de produção.
  */
 async function iniciarSimulacao() {
