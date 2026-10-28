@@ -126,8 +126,11 @@ export class SessoesService {
   }
 
   /**
-   * Troca de conta: só para conta em que o usuário é membro ativo (senão 404, sem revelar se a
-   * conta existe). Revoga a família da sessão anterior e abre uma família nova.
+   * Troca de conta. Exige a sessão inteira, não só o access token: o cookie de refresh precisa
+   * ser válido e da mesma pessoa e conta do token (senão um access token roubado, de 15 min,
+   * viraria uma sessão nova de 30 dias). Só para conta em que o usuário é membro ativo (senão
+   * 404, sem revelar se a conta existe). A família da sessão anterior é revogada; como na
+   * rotação, a linha do token fica travada para não correr contra um refresh simultâneo.
    */
   async trocarConta(
     identidade: Identidade,
@@ -135,18 +138,31 @@ export class SessoesService {
     tokenAtual: string | undefined,
     origem: Origem,
   ): Promise<SessaoEmitida> {
-    const vinculos = await this.vinculosAtivos(identidade.usuarioId);
-    const vinculo = vinculos.find((v) => v.conta.tenant_id === tenantId);
-    if (!vinculo) throw new ErroDominio('nao_encontrado');
+    if (!tokenAtual) throw naoAutenticado();
+    const resultado = await this.db.$transaction(async (tx) => {
+      const [atual] = await tx.$queryRaw<LinhaRefresh[]>`
+        SELECT id, usuario_id, tenant_id, familia, expira_em, revogado_em
+        FROM refresh_token WHERE token_hash = ${hashDoRefresh(tokenAtual)} FOR UPDATE`;
+      const sessaoValida =
+        atual &&
+        !atual.revogado_em &&
+        atual.expira_em > new Date() &&
+        atual.usuario_id === identidade.usuarioId &&
+        atual.tenant_id === identidade.tenantId;
+      if (!sessaoValida) return 'sem-sessao' as const;
+      // Usuário desativado com um access token ainda válido não ganha sessão nova.
+      const usuario = await tx.usuario.findUnique({ where: { id: identidade.usuarioId } });
+      if (!usuario?.ativo) return 'sem-sessao' as const;
 
-    if (tokenAtual) {
-      const atual = await this.db.refreshToken.findUnique({
-        where: { token_hash: hashDoRefresh(tokenAtual) },
-      });
-      if (atual?.usuario_id === identidade.usuarioId)
-        await this.revogarFamilia(this.db, atual.familia);
-    }
-    return this.emitir(this.db, identidade.usuarioId, vinculo, vinculos, randomUUID(), origem);
+      const vinculos = await this.vinculosAtivos(identidade.usuarioId, tx);
+      const vinculo = vinculos.find((v) => v.conta.tenant_id === tenantId);
+      if (!vinculo) return 'sem-conta' as const;
+      await this.revogarFamilia(tx, atual.familia);
+      return this.emitir(tx, identidade.usuarioId, vinculo, vinculos, randomUUID(), origem);
+    });
+    if (resultado === 'sem-sessao') throw naoAutenticado();
+    if (resultado === 'sem-conta') throw new ErroDominio('nao_encontrado');
+    return resultado;
   }
 
   /** Logout: revoga a família inteira da sessão. Sem sessão válida, 401. */
@@ -155,8 +171,11 @@ export class SessoesService {
     const atual = await this.db.refreshToken.findUnique({
       where: { token_hash: hashDoRefresh(token) },
     });
-    if (!atual || atual.revogado_em) throw naoAutenticado();
+    if (!atual) throw naoAutenticado();
     await this.revogarFamilia(this.db, atual.familia);
+    // Token já trocado ou revogado: é reuso (ou logout repetido). A família cai do mesmo jeito,
+    // mas a resposta é 401: não havia sessão válida neste token.
+    if (atual.revogado_em) throw naoAutenticado();
   }
 
   private async emitir(

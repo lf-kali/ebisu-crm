@@ -44,6 +44,15 @@ async function entrar(email = 'ana@teste.local') {
 
 const eu = (token: string) => http().get('/v1/eu').set('Authorization', `Bearer ${token}`);
 
+/** Troca de conta com o Bearer e o cookie de refresh da sessão (os dois são exigidos). */
+const trocarConta = (token: string, cookie: string | undefined, tenantId: string) =>
+  http()
+    .post('/v1/auth/trocar-conta')
+    .set('Origin', ORIGEM_WEB)
+    .set('Authorization', `Bearer ${token}`)
+    .set('Cookie', `${COOKIE}=${cookie}`)
+    .send({ tenant_id: tenantId });
+
 describe('POST /v1/auth/login', () => {
   it('entra, lista só contas ativas e devolve o refresh só no cookie seguro', async () => {
     const r = await login('ana@teste.local');
@@ -124,22 +133,13 @@ describe('POST /v1/auth/login', () => {
   });
 
   it('abre na conta usada por último', async () => {
-    const { sessao } = await entrar();
-    const troca = await http()
-      .post('/v1/auth/trocar-conta')
-      .set('Origin', ORIGEM_WEB)
-      .set('Authorization', `Bearer ${sessao.access_token}`)
-      .send({ tenant_id: IDS.contas.oficina });
+    const { sessao, cookie } = await entrar();
+    const troca = await trocarConta(sessao.access_token, cookie, IDS.contas.oficina);
     expect(troca.status).toBe(200);
     const depois = await entrar();
     expect(depois.sessao.conta.slug).toBe('oficina');
     // Volta para a ebisu para não afetar os outros testes.
-    await http()
-      .post('/v1/auth/trocar-conta')
-      .set('Origin', ORIGEM_WEB)
-      .set('Authorization', `Bearer ${depois.sessao.access_token}`)
-      .send({ tenant_id: IDS.contas.ebisu })
-      .expect(200);
+    await trocarConta(depois.sessao.access_token, depois.cookie, IDS.contas.ebisu).expect(200);
   });
 });
 
@@ -175,20 +175,15 @@ describe('POST /v1/auth/refresh', () => {
   });
 
   it('mantém a conta da sessão depois da troca de conta', async () => {
-    const { sessao } = await entrar();
-    const troca = await http()
-      .post('/v1/auth/trocar-conta')
-      .set('Origin', ORIGEM_WEB)
-      .set('Authorization', `Bearer ${sessao.access_token}`)
-      .send({ tenant_id: IDS.contas.oficina });
+    const { sessao, cookie } = await entrar();
+    const troca = await trocarConta(sessao.access_token, cookie, IDS.contas.oficina);
     const r = await refresh(cookieDe(troca));
     expect(RespostaSessao.parse(r.body).conta.slug).toBe('oficina');
-    await http()
-      .post('/v1/auth/trocar-conta')
-      .set('Origin', ORIGEM_WEB)
-      .set('Authorization', `Bearer ${RespostaSessao.parse(r.body).access_token}`)
-      .send({ tenant_id: IDS.contas.ebisu })
-      .expect(200);
+    await trocarConta(
+      RespostaSessao.parse(r.body).access_token,
+      cookieDe(r),
+      IDS.contas.ebisu,
+    ).expect(200);
   });
 
   it('CSRF: sem Origin ou com Origin de fora, recusa', async () => {
@@ -211,6 +206,25 @@ describe('POST /v1/auth/refresh', () => {
       [IDS.usuarios.bruno],
     );
     expect((await refresh(cookie)).status).toBe(401);
+  });
+
+  it('usuário desativado depois do login: refresh e troca de conta recusam', async () => {
+    const { sessao, cookie } = await entrar('ana@teste.local');
+    const segunda = await entrar('ana@teste.local');
+    await c.sql(`UPDATE usuario SET ativo = false WHERE id = $1`, [IDS.usuarios.ana]);
+    try {
+      expect((await refresh(cookie)).status).toBe(401);
+      const troca = await trocarConta(
+        segunda.sessao.access_token,
+        segunda.cookie,
+        IDS.contas.oficina,
+      );
+      expect(troca.status).toBe(401);
+      expect(cookieDe(troca)).toBeUndefined();
+    } finally {
+      await c.sql(`UPDATE usuario SET ativo = true WHERE id = $1`, [IDS.usuarios.ana]);
+    }
+    void sessao;
   });
 
   it('membro suspenso depois do login: o refresh recusa e a família cai', async () => {
@@ -246,13 +260,53 @@ describe('POST /v1/auth/trocar-conta', () => {
     expect(r.status).toBe(200);
     expect(RespostaSessao.parse(r.body).conta.slug).toBe('oficina');
     expect((await refresh(cookie)).status).toBe(401);
-    await trocar(RespostaSessao.parse(r.body).access_token, IDS.contas.ebisu).expect(200);
+    await trocar(RespostaSessao.parse(r.body).access_token, IDS.contas.ebisu, cookieDe(r)).expect(
+      200,
+    );
+  });
+
+  it('sem o cookie de refresh da sessão atual, recusa: um access token sozinho não vira sessão longa', async () => {
+    const { sessao, cookie } = await entrar();
+    const semCookie = await trocar(sessao.access_token, IDS.contas.oficina);
+    expect(semCookie.status).toBe(401);
+    expect(cookieDe(semCookie)).toBeUndefined();
+    // Cookie de outra pessoa (Bruno) com o token da Ana: também recusa.
+    const doBruno = await entrar('bruno@teste.local');
+    expect((await trocar(sessao.access_token, IDS.contas.oficina, doBruno.cookie)).status).toBe(
+      401,
+    );
+    // Cookie da mesma pessoa, mas de uma sessão em outra conta: recusa.
+    const outraSessao = await entrar();
+    const naOficina = await trocarConta(
+      outraSessao.sessao.access_token,
+      outraSessao.cookie,
+      IDS.contas.oficina,
+    );
+    expect(
+      (await trocar(sessao.access_token, IDS.contas.oficina, cookieDe(naOficina))).status,
+    ).toBe(401);
+    await trocarConta(
+      RespostaSessao.parse(naOficina.body).access_token,
+      cookieDe(naOficina),
+      IDS.contas.ebisu,
+    ).expect(200);
+    // Cookie já revogado (logout): recusa.
+    const outra = await entrar();
+    await http()
+      .post('/v1/auth/logout')
+      .set('Origin', ORIGEM_WEB)
+      .set('Cookie', `${COOKIE}=${outra.cookie}`);
+    expect((await trocar(outra.sessao.access_token, IDS.contas.oficina, outra.cookie)).status).toBe(
+      401,
+    );
+    // A sessão original continua de pé.
+    expect((await refresh(cookie)).status).toBe(200);
   });
 
   it('conta suspensa, alheia ou inexistente: 404 igual', async () => {
-    const { sessao } = await entrar();
+    const { sessao, cookie } = await entrar();
     for (const tenant of [IDS.contas.suspensa, IDS.contas.cancelada, crypto.randomUUID()]) {
-      const r = await trocar(sessao.access_token, tenant);
+      const r = await trocar(sessao.access_token, tenant, cookie);
       expect(r.status).toBe(404);
       expect(r.body.code).toBe('nao_encontrado');
     }
@@ -278,6 +332,13 @@ describe('POST /v1/auth/logout', () => {
     expect(cookieDe(r)).toBe('');
     expect((await refresh(cookie)).status).toBe(401);
     expect((await sair(cookie)).status).toBe(401);
+  });
+
+  it('logout com um token já trocado (reuso) derruba a família inteira', async () => {
+    const { cookie } = await entrar();
+    const novo = cookieDe(await refresh(cookie))!;
+    expect((await sair(cookie)).status).toBe(401);
+    expect((await refresh(novo)).status).toBe(401);
   });
 
   it('CSRF: Origin de fora não consegue derrubar a sessão', async () => {
@@ -322,22 +383,13 @@ describe('GET /v1/eu', () => {
   });
 
   it('o token de uma conta só vê os dados dela (RLS)', async () => {
-    const { sessao } = await entrar();
-    const troca = await http()
-      .post('/v1/auth/trocar-conta')
-      .set('Origin', ORIGEM_WEB)
-      .set('Authorization', `Bearer ${sessao.access_token}`)
-      .send({ tenant_id: IDS.contas.oficina });
+    const { sessao, cookie } = await entrar();
+    const troca = await trocarConta(sessao.access_token, cookie, IDS.contas.oficina);
     const naOficina = RespostaSessao.parse(troca.body);
     const corpo = RespostaEu.parse((await eu(naOficina.access_token)).body);
     expect(corpo.conta.slug).toBe('oficina');
     expect(corpo.empresas.map((e) => e.id)).toEqual([IDS.empresas.oficina]);
-    await http()
-      .post('/v1/auth/trocar-conta')
-      .set('Origin', ORIGEM_WEB)
-      .set('Authorization', `Bearer ${naOficina.access_token}`)
-      .send({ tenant_id: IDS.contas.ebisu })
-      .expect(200);
+    await trocarConta(naOficina.access_token, cookieDe(troca), IDS.contas.ebisu).expect(200);
   });
 
   it('membro suspenso depois de emitido o token: 401', async () => {
