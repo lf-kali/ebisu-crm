@@ -17,7 +17,8 @@
     "db:migrate": "pnpm --filter @ebisu/db migrate:deploy",
     "db:papeis": "pnpm --filter @ebisu/db papeis",
     "db:seed": "pnpm --filter @ebisu/db build && pnpm --filter @ebisu/db seed",
-    "db:seed:demo": "pnpm --filter @ebisu/db build && pnpm --filter @ebisu/db seed:demo"
+    "db:seed:demo": "pnpm --filter @ebisu/db build && pnpm --filter @ebisu/db seed:demo",
+    "dev:tailnet": "./scripts/dev-tailnet.sh"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",
