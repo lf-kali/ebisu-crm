@@ -2,6 +2,7 @@ import { Button } from '@ebisu/ui/components/ui/button';
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
