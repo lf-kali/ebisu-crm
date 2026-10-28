@@ -35,7 +35,8 @@ export default tseslint.config(
           'Literal[value=/set_config|app\\.tenant_id|app\\.membro_id|app\\.api_key_id|app\\.request_id|app\\.ip\\b/i]',
         ].map((selector) => ({
           selector,
-          message: 'Contexto de tenant e autor (app.*) só via comTenant/clienteDoTenant (@ebisu/db).',
+          message:
+            'Contexto de tenant e autor (app.*) só via comTenant/clienteDoTenant (@ebisu/db).',
         })),
       ],
     },
