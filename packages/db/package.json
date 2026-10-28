@@ -28,6 +28,7 @@
     "seed:demo": "node dist/seeds/cli.js demo"
   },
   "dependencies": {
+    "@node-rs/argon2": "^2.2.2",
     "@prisma/client": "6.19.3",
     "pg": "^8.23.1"
   },

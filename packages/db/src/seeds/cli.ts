@@ -16,10 +16,13 @@ const comandos: Record<string, (cliente: PrismaClient) => Promise<string>> = {
     return `Catálogo de permissões: ${await semearCatalogoPermissoes(cliente)} permissões`;
   },
   async demo(cliente) {
+    // Grava uma senha conhecida (SENHA_DEMO): nunca num ambiente de produção.
+    if (process.env.NODE_ENV === 'production')
+      throw new Error('seed de demonstração recusado com NODE_ENV=production');
     const resultado = await semearDemo(cliente);
     return resultado.criado
       ? `Tenant de demonstração criado (${resultado.tenantId}): ${resultado.empresas} empresas, ${resultado.contatos} contatos`
-      : `Tenant de demonstração já existe (${resultado.tenantId}); nada alterado`;
+      : `Tenant de demonstração já existe (${resultado.tenantId}); só as senhas demo foram regravadas`;
   },
 };
 

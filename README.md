@@ -15,7 +15,7 @@ pnpm install
 pnpm db:migrate          # aplica as migrações (packages/db)
 pnpm db:papeis           # define LOGIN/senha de ebisu_app e ebisu_auth
 pnpm db:seed             # catálogo global de permissões
-pnpm db:seed:demo        # opcional: tenant de demonstração (usuários *@demo.ebisu.local)
+pnpm db:seed:demo        # tenant de demonstração e senha dos usuários *@demo.ebisu.local
 pnpm auth:chaves         # gera a chave do access token: cole a saída no .env
 pnpm dev                 # api, worker e web
 ```
@@ -29,21 +29,37 @@ pnpm dev                 # api, worker e web
 | S3 (SeaweedFS) | http://localhost:8333, bucket `ebisu-anexos`           |
 | Mailpit        | SMTP `localhost:1025`, interface http://localhost:8025 |
 
-### Login no web (API simulada)
+### Login no web
 
-Até a F3 entregar a autenticação na API, o web em `pnpm dev` usa uma API simulada no navegador
-(MSW) para login, troca de conta e `GET /v1/eu`, seguindo os contratos de
-`packages/contracts/src/plataforma`. Ela liga com `VITE_API_SIMULADA=1` no `.env` (já vem assim no
-`.env.example`); as demais rotas `/v1` seguem para a API real pelo proxy do Vite.
+O web em `pnpm dev` fala com a API real pelo proxy do Vite (`/v1`). Depois de `pnpm db:seed:demo`,
+todos os usuários de demonstração entram com a senha `demo-ebisu-2026` (só para desenvolvimento;
+o seed recusa rodar com `NODE_ENV=production`). Rodar o seed de novo num banco já semeado só regrava
+essas senhas.
+
+| Usuário                       | Papel                             |
+| ----------------------------- | --------------------------------- |
+| `owner@demo.ebisu.local`      | Dono, todas as empresas           |
+| `admin@demo.ebisu.local`      | Administrador, todas as empresas  |
+| `gerente@demo.ebisu.local`    | Gerente, Centro e Shopping        |
+| `atendente@demo.ebisu.local`  | Atendente, Centro                 |
+| `tecnico@demo.ebisu.local`    | Técnico, Centro (só o que é dele) |
+| `estoquista@demo.ebisu.local` | Estoquista, Centro                |
+| `financeiro@demo.ebisu.local` | Financeiro, Centro                |
+
+Os módulos de domínio (contatos, bancada etc.) ainda não têm rotas na API: as telas deles são
+esboços até as frentes F4 em diante.
+
+**API simulada (opcional).** Para mexer só no front, sem API, Postgres e Redis, ligue
+`VITE_API_SIMULADA=1` no `.env`. Uma API simulada no navegador (MSW) responde login, troca de conta
+e `GET /v1/eu`, seguindo os contratos de `packages/contracts/src/plataforma`:
 
 | Usuário           | Senha      | Contas                                          |
 | ----------------- | ---------- | ----------------------------------------------- |
 | `ana@demo.test`   | `demo1234` | duas (escolhe depois do login), acesso completo |
 | `bruno@demo.test` | `demo1234` | uma, técnico com acesso só a bancada            |
 
-A sessão simulada sobrevive ao F5 e vale em todas as abas, como um cookie: o "cookie" de refresh
-fica no `localStorage` (no lugar do cookie httpOnly da API real). Nada disso entra no build de
-produção.
+A sessão simulada sobrevive ao F5 e vale em todas as abas: o "cookie" de refresh fica no
+`localStorage`. Nada disso entra no build de produção.
 
 ### Acesso pela tailnet
 
