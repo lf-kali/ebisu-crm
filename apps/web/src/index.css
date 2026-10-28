@@ -1,0 +1,4 @@
+@import '@ebisu/ui/globals.css';
+
+/* Os componentes vivem em packages/ui: o Tailwind precisa varrer as classes de lá. */
+@source '../../../packages/ui/src';
