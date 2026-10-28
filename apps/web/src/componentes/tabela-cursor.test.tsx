@@ -159,6 +159,40 @@ describe('TabelaCursor (F12)', () => {
     await esperarPagina(2);
   });
 
+  it('filtro que volta ao valor anterior também recomeça da primeira página', async () => {
+    const usuario = userEvent.setup();
+    apiDeContatos();
+    renderizar();
+    await esperarPagina(1);
+    await usuario.click(botao('Próxima'));
+    expect(await screen.findByText('Contato 3')).toBeTruthy();
+    const busca = screen.getByLabelText('Buscar');
+    await usuario.type(busca, 'x');
+    await usuario.clear(busca);
+    expect(await screen.findByText('Contato 1')).toBeTruthy();
+    await esperarPagina(1);
+    expect(botao('Anterior').disabled).toBe(true);
+  });
+
+  it('página seguinte sem registros avisa e permite voltar', async () => {
+    const usuario = userEvent.setup();
+    servidor.use(
+      http.get('*/v1/contatos', ({ request }) =>
+        HttpResponse.json(
+          new URL(request.url).searchParams.get('cursor')
+            ? { dados: [], proximo_cursor: null }
+            : { dados: TODOS.slice(0, 2), proximo_cursor: '2' },
+        ),
+      ),
+    );
+    renderizar();
+    await esperarPagina(1);
+    await usuario.click(botao('Próxima'));
+    expect(await screen.findByText('Nenhum registro nesta página.')).toBeTruthy();
+    await usuario.click(botao('Anterior'));
+    expect(await screen.findByText('Contato 1')).toBeTruthy();
+  });
+
   it('sem registros mostra o estado vazio', async () => {
     servidor.use(
       http.get('*/v1/contatos', () => HttpResponse.json({ dados: [], proximo_cursor: null })),

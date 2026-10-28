@@ -36,19 +36,32 @@ export interface OpcoesPaginacao<T, F> {
   limite?: number;
 }
 
+/** Serializa os filtros sem depender da ordem das chaves (a queryKey do TanStack faz o mesmo). */
+export const chaveEstavel = (valor: unknown) =>
+  JSON.stringify(valor, (_, v: unknown) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      : v,
+  );
+
 export function usePaginacaoCursor<T, F>({
   chave,
   filtros,
   buscar,
   limite = 25,
 }: OpcoesPaginacao<T, F>) {
-  // Filtros novos começam da primeira página: a pilha vale só para os filtros em que foi montada.
-  const chaveFiltros = JSON.stringify(filtros);
+  // Filtros novos começam da primeira página. A pilha antiga é descartada de fato (ajuste de
+  // estado durante o render, padrão do React): só ignorá-la a faria voltar com o filtro anterior.
+  const chaveFiltros = chaveEstavel(filtros);
   const [estado, setEstado] = useState<{ chaveFiltros: string; pilha: (string | undefined)[] }>({
     chaveFiltros,
     pilha: [undefined],
   });
-  const pilha = estado.chaveFiltros === chaveFiltros ? estado.pilha : [undefined];
+  let pilha = estado.pilha;
+  if (estado.chaveFiltros !== chaveFiltros) {
+    pilha = [undefined];
+    setEstado({ chaveFiltros, pilha });
+  }
   const cursor = pilha.at(-1);
 
   const consulta = useQuery({
@@ -134,6 +147,16 @@ export function TabelaCursor<T>({
           </TableRow>
         </TableHeader>
         <TableBody>
+          {consulta.data.dados.length === 0 ? (
+            <TableRow>
+              <TableCell
+                colSpan={colunas.length}
+                className="py-6 text-center text-muted-foreground"
+              >
+                Nenhum registro nesta página.
+              </TableCell>
+            </TableRow>
+          ) : null}
           {consulta.data.dados.map((item) => (
             <TableRow key={chaveLinha(item)}>
               {colunas.map((coluna) => (
