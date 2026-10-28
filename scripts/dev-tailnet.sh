@@ -2,7 +2,8 @@
 # Sobe o ambiente de dev acessível pela tailnet:
 #   https://<WEB_ALLOWED_HOSTS[0]>:<TAILNET_HTTPS_PORT>  →  Vite em localhost:<WEB_PORT>
 # Usa `sudo tailscale serve` (só a sua tailnet enxerga, nunca funnel) e desfaz o serve ao sair.
-# Não mexe em serves de outras portas e aborta se a porta pedida já for de outro serviço.
+# Falha fechado: se não der para ler o status do tailscale, ou se a porta já tiver qualquer serve
+# (inclusive uma sobra de execução anterior), aborta sem alterar nada.
 set -euo pipefail
 
 RAIZ=$(cd "$(dirname "$0")/.." && pwd)
@@ -25,36 +26,38 @@ PORTA_HTTPS=$(ler_env TAILNET_HTTPS_PORT); PORTA_HTTPS=${PORTA_HTTPS:-8447}
 PORTA_WEB=$(ler_env WEB_PORT); PORTA_WEB=${PORTA_WEB:-5173}
 
 [ -n "$HOST" ] || { echo "Defina WEB_ALLOWED_HOSTS no .env com o nome da máquina na tailnet (ex.: maquina.tailXXXX.ts.net)" >&2; exit 1; }
-for porta in "$PORTA_HTTPS" "$PORTA_WEB"; do
-  [[ $porta =~ ^[0-9]{1,5}$ ]] || { echo "Porta inválida: '$porta'" >&2; exit 1; }
-done
+# Só dígitos, normalizada (08443 → 8443, para comparar com o status) e no intervalo 1–65535.
+normalizar_porta() {
+  if ! [[ $1 =~ ^[0-9]{1,5}$ ]] || (( 10#$1 < 1 || 10#$1 > 65535 )); then
+    echo "Porta inválida: '$1'" >&2
+    exit 1
+  fi
+  echo $(( 10#$1 ))
+}
+PORTA_HTTPS=$(normalizar_porta "$PORTA_HTTPS")
+PORTA_WEB=$(normalizar_porta "$PORTA_WEB")
 command -v tailscale >/dev/null || { echo "tailscale não encontrado no PATH" >&2; exit 1; }
 
-# Quem está na porta pedida? "livre", "nosso" (sobra de uma execução anterior) ou "outro".
-situacao_da_porta() {
-  tailscale serve status --json 2>/dev/null | node -e '
-    const [porta, alvo] = process.argv.slice(1);
-    let s = "";
-    process.stdin.on("data", (d) => (s += d)).on("end", () => {
-      const st = s.trim() ? JSON.parse(s) : {};
-      if (!st.TCP || !st.TCP[porta]) return console.log("livre");
-      const web = Object.entries(st.Web || {}).find(([k]) => k.endsWith(":" + porta));
-      const handlers = web ? Object.values(web[1].Handlers || {}) : [];
-      const nosso = handlers.length === 1 && handlers[0].Proxy === alvo;
-      console.log(nosso ? "nosso" : "outro");
-    });' "$PORTA_HTTPS" "http://127.0.0.1:$PORTA_WEB"
+STATUS=$(tailscale serve status --json 2>/dev/null) && [ -n "$STATUS" ] || {
+  echo "Não consegui ler o status do tailscale serve (tailscaled no ar? logado?). Nada foi alterado." >&2
+  exit 1
 }
-
-case "$(situacao_da_porta)" in
-  livre) ;;
-  nosso) echo "== Reaproveitando o serve da porta $PORTA_HTTPS deixado por uma execução anterior" ;;
-  *)
-    echo "A porta $PORTA_HTTPS do tailscale serve já é usada por outro serviço:" >&2
-    tailscale serve status >&2 || true
-    echo "Escolha outra em TAILNET_HTTPS_PORT no .env. Nada foi alterado." >&2
-    exit 1
-    ;;
-esac
+# A porta está em uso se aparecer em qualquer parte da configuração (TCP, Web ou funnel).
+EM_USO=$(printf '%s' "$STATUS" | node -e '
+  const porta = process.argv[1];
+  let s = "";
+  process.stdin.on("data", (d) => (s += d)).on("end", () => {
+    const st = JSON.parse(s);
+    const chaves = [...Object.keys(st.TCP || {}), ...Object.keys(st.Web || {}), ...Object.keys(st.AllowFunnel || {})];
+    console.log(chaves.some((k) => k === porta || k.endsWith(":" + porta)) ? "sim" : "nao");
+  });' "$PORTA_HTTPS") || { echo "Status do tailscale serve ilegível. Nada foi alterado." >&2; exit 1; }
+if [ "$EM_USO" != nao ]; then
+  echo "A porta $PORTA_HTTPS do tailscale serve já está em uso:" >&2
+  tailscale serve status >&2 || true
+  echo "Escolha outra em TAILNET_HTTPS_PORT. Se for uma sobra deste script, libere com:" >&2
+  echo "  sudo tailscale serve --https=$PORTA_HTTPS off" >&2
+  exit 1
+fi
 
 desfazer() {
   echo
@@ -63,18 +66,28 @@ desfazer() {
 }
 
 echo "== Expondo o web na tailnet: https://$HOST:$PORTA_HTTPS → localhost:$PORTA_WEB"
-trap desfazer EXIT
 sudo tailscale serve --bg --https="$PORTA_HTTPS" "$PORTA_WEB"
+# Só depois do serve dar certo: se ele falhar, não há nada a desfazer.
+trap desfazer EXIT
 
 echo "== Subindo o ambiente (api, worker e web). Ctrl+C encerra e desfaz o serve."
 cd "$RAIZ"
 # O pnpm roda como filho e o script espera com `wait`: assim INT/TERM/HUP (Ctrl+C, kill,
 # terminal fechado) interrompem a espera na hora, encerram o filho e o trap EXIT desfaz o serve.
 # Só SIGKILL escapa: nesse caso, `sudo tailscale serve --https=<porta> off` à mão.
-WEB_HMR_CLIENT_PORT="$PORTA_HTTPS" pnpm dev &
-FILHO=$!
+# Em grupo de processos próprio (setsid): o encerramento derruba o turbo e os filhos dele
+# (vite, api, worker) de uma vez, sem deixar órfãos segurando as portas.
+if command -v setsid >/dev/null; then
+  WEB_HMR_CLIENT_PORT="$PORTA_HTTPS" setsid pnpm dev &
+  FILHO=$!
+  ALVO="-$FILHO"
+else
+  WEB_HMR_CLIENT_PORT="$PORTA_HTTPS" pnpm dev &
+  FILHO=$!
+  ALVO="$FILHO"
+fi
 encerrar() {
-  kill -TERM "$FILHO" 2>/dev/null || true
+  kill -TERM -- "$ALVO" 2>/dev/null || true
   wait "$FILHO" 2>/dev/null || true
 }
 trap 'encerrar; exit 130' INT

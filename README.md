@@ -35,7 +35,9 @@ pnpm dev                 # api, worker e web
 desconhecidos) e, se quiser, outra porta em `TAILNET_HTTPS_PORT`.
 
 - Só a sua tailnet enxerga (`serve`, nunca `funnel`). O `/v1` (API) vai junto, pelo proxy do Vite.
-- Se a porta já for de outro serve da máquina, o script aborta sem alterar nada.
+- Falha fechado: se não conseguir ler o `tailscale serve status`, ou se a porta já tiver qualquer
+  serve (inclusive uma sobra deste script), aborta sem alterar nada e mostra como liberar a porta.
+- O `.env` é lido como `CHAVE=valor` simples (sem `export` nem comentário na mesma linha).
 - Ao sair (Ctrl+C, `kill` ou terminal fechado), desfaz só esse serve
   (`tailscale serve --https=8447 off`). Se o processo morrer com `kill -9`, rode esse comando à mão.
 
