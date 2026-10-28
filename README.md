@@ -2,6 +2,7 @@
 
 CRM para assistências técnicas: leads, orçamentos, bancada (OS), estoque e financeiro gerencial.
 Especificação e regras de negócio em [`docs/`](./docs/) — comece por [`docs/spec-mvp.md`](./docs/spec-mvp.md).
+Visual do web (cores, tipografia, componentes): [`DESIGN.md`](./DESIGN.md).
 
 ## Desenvolvimento local
 

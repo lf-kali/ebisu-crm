@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/styles/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@ebisu/ui/components",
+    "utils": "@ebisu/ui/lib/utils",
+    "hooks": "@ebisu/ui/hooks",
+    "lib": "@ebisu/ui/lib",
+    "ui": "@ebisu/ui/components/ui"
+  }
+}
