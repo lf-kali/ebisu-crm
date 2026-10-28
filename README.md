@@ -56,6 +56,10 @@ desconhecidos) e, se quiser, outra porta em `TAILNET_HTTPS_PORT`.
 - O `.env` é lido como `CHAVE=valor` simples (sem `export` nem comentário na mesma linha).
 - Ao sair (Ctrl+C, `kill` ou terminal fechado), desfaz só esse serve
   (`tailscale serve --https=8447 off`). Se o processo morrer com `kill -9`, rode esse comando à mão.
+- Sem `setsid` (ex.: macOS), o encerramento chega só ao `pnpm`: o script avisa, e vale conferir
+  se sobrou processo nas portas (`lsof -i :5173`).
+- Variáveis `WEB_*` e `VITE_*` passadas pelo ambiente (ex.: `WEB_PORT=5174 pnpm dev`) chegam ao
+  Vite: o `turbo.json` as repassa na tarefa `dev`.
 
 As portas de Postgres e Redis fogem das padrão para não conflitar com instalações nativas; ajuste
 no `.env` se quiser. O bucket é criado pelo serviço `seaweedfs-init` alguns segundos depois do `up`.

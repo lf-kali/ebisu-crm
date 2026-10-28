@@ -42,14 +42,22 @@ STATUS=$(tailscale serve status --json 2>/dev/null) && [ -n "$STATUS" ] || {
   echo "Não consegui ler o status do tailscale serve (tailscaled no ar? logado?). Nada foi alterado." >&2
   exit 1
 }
-# A porta está em uso se aparecer em qualquer parte da configuração (TCP, Web ou funnel).
+# A porta está em uso se aparecer em qualquer parte da configuração (TCP, Web ou funnel),
+# inclusive nos serves em primeiro plano (Foreground, um por sessão) e nos de serviço (Services),
+# que repetem a mesma forma.
 EM_USO=$(printf '%s' "$STATUS" | node -e '
   const porta = process.argv[1];
+  const chaves = (cfg) => [
+    ...Object.keys(cfg.TCP || {}),
+    ...Object.keys(cfg.Web || {}),
+    ...Object.keys(cfg.AllowFunnel || {}),
+    ...Object.values(cfg.Foreground || {}).flatMap(chaves),
+    ...Object.values(cfg.Services || {}).flatMap(chaves),
+  ];
   let s = "";
   process.stdin.on("data", (d) => (s += d)).on("end", () => {
     const st = JSON.parse(s);
-    const chaves = [...Object.keys(st.TCP || {}), ...Object.keys(st.Web || {}), ...Object.keys(st.AllowFunnel || {})];
-    console.log(chaves.some((k) => k === porta || k.endsWith(":" + porta)) ? "sim" : "nao");
+    console.log(chaves(st).some((k) => k === porta || k.endsWith(":" + porta)) ? "sim" : "nao");
   });' "$PORTA_HTTPS") || { echo "Status do tailscale serve ilegível. Nada foi alterado." >&2; exit 1; }
 if [ "$EM_USO" != nao ]; then
   echo "A porta $PORTA_HTTPS do tailscale serve já está em uso:" >&2
@@ -82,6 +90,8 @@ if command -v setsid >/dev/null; then
   FILHO=$!
   ALVO="-$FILHO"
 else
+  # Sem setsid (ex.: macOS): o sinal chega só ao pnpm, e vite/api/worker podem ficar órfãos.
+  echo "Aviso: sem setsid, ao sair confira se sobrou processo nas portas (lsof -i :$PORTA_WEB)." >&2
   WEB_HMR_CLIENT_PORT="$PORTA_HTTPS" pnpm dev &
   FILHO=$!
   ALVO="$FILHO"
