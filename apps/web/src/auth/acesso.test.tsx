@@ -14,6 +14,7 @@ import { renderizarApp } from '../teste/app';
 import { violacoesA11y } from '../teste/axe';
 import { servidor, simulada } from '../teste/servidor';
 import { temPermissao } from './acesso';
+import { donoDaPreferencia } from './empresa';
 
 const ana = USUARIOS.find((u) => u.email === 'ana@demo.test')!;
 const [centro, shopping] = ana.contas[0]!.empresas;
@@ -146,19 +147,25 @@ describe('empresa atual (X-Empresa-Id)', () => {
     expect(recebidos).toEqual([shopping!.id]);
     expect(queryClient.getQueryData(['contatos'])).toBeUndefined();
     expect(queryClient.getQueryData(['eu'])).toBeTruthy();
-    expect(window.localStorage.getItem(`ebisu.empresa.${CONTAS.ebisu.tenant_id}`)).toBe(
+    expect(window.localStorage.getItem(`ebisu.empresa.${CONTAS.ebisu.tenant_id}.${ana.id}`)).toBe(
       shopping!.id,
     );
   });
 
   it('ao voltar (F5), abre na empresa lembrada', async () => {
-    window.localStorage.setItem(`ebisu.empresa.${CONTAS.ebisu.tenant_id}`, shopping!.id);
+    window.localStorage.setItem(`ebisu.empresa.${CONTAS.ebisu.tenant_id}.${ana.id}`, shopping!.id);
     renderizarApp('/');
     expect(await botaoEmpresa(shopping!.nome_fantasia)).toBeTruthy();
   });
 
+  it('a empresa lembrada é do usuário: outro usuário da mesma conta não a herda', () => {
+    const bruno = USUARIOS.find((u) => u.email === 'bruno@demo.test')!;
+    const de = (id: string) => donoDaPreferencia({ usuario: { id }, conta: CONTAS.ebisu });
+    expect(de(ana.id)).not.toBe(de(bruno.id));
+  });
+
   it('empresa lembrada que não está mais no /v1/eu é ignorada', async () => {
-    window.localStorage.setItem(`ebisu.empresa.${CONTAS.ebisu.tenant_id}`, 'removida');
+    window.localStorage.setItem(`ebisu.empresa.${CONTAS.ebisu.tenant_id}.${ana.id}`, 'removida');
     renderizarApp('/');
     expect(await botaoEmpresa(centro!.nome_fantasia)).toBeTruthy();
   });
@@ -184,6 +191,26 @@ describe('empresa atual (X-Empresa-Id)', () => {
     await waitFor(() =>
       expect(screen.getByText('Oficina do Bairro', { selector: 'span.truncate' })).toBeTruthy(),
     );
+  });
+
+  it('trocar de conta não manda o X-Empresa-Id da conta anterior', async () => {
+    const recebidos: Array<string | null> = [];
+    servidor.use(
+      http.get(`*${ROTAS_AUTH.eu}`, ({ request }) => {
+        recebidos.push(request.headers.get('x-empresa-id'));
+        return undefined;
+      }),
+    );
+    const u = userEvent.setup();
+    const { empresa, router } = renderizarApp('/');
+    await waitFor(() => expect(empresa.obter()).toBe(centro!.id));
+    await router.navigate({ to: '/escolher-conta' });
+    recebidos.length = 0;
+    await u.click(await screen.findByRole('button', { name: 'Oficina do Bairro' }));
+    await screen.findByRole('heading', { name: 'Painel' });
+    expect(recebidos.length).toBeGreaterThan(0);
+    expect(recebidos).not.toContain(centro!.id);
+    expect(empresa.obter()).toBe(ana.contas[1]!.empresas[0]!.id);
   });
 
   it('cabeçalho com seletor e menu aberto sem violações de acessibilidade (axe)', async () => {

@@ -7,3 +7,5 @@ coverage/
 .env.*
 !.env.example
 *.log
+# Temporários do gerador de rotas do TanStack Router
+.tanstack/

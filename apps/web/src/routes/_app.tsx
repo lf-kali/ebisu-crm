@@ -10,6 +10,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { ErroApi } from '../api/erro-api';
 import { useAcesso } from '../auth/acesso';
 import { consultaEu } from '../auth/consultas';
+import { donoDaPreferencia } from '../auth/empresa';
 import { ErroDaApi } from '../componentes/erro-da-api';
 import { AppShell, estaAtivo } from '../layout/app-shell';
 import { MenuUsuario } from '../layout/menu-usuario';
@@ -26,7 +27,7 @@ export const Route = createFileRoute('/_app')({
     try {
       const eu = await context.queryClient.ensureQueryData(consultaEu(context.cliente));
       // Antes das páginas: os dados de domínio já saem com o X-Empresa-Id certo.
-      context.empresa.resolver(eu.conta.tenant_id, eu.empresas);
+      context.empresa.resolver(donoDaPreferencia(eu), eu.empresas);
       return eu;
     } catch (erro) {
       // A sessão caiu entre o beforeLoad e o loader (401 e refresh recusado): login, não erro.
@@ -63,16 +64,19 @@ function LayoutApp() {
         const { href } = router.state.location;
         void router
           .navigate({ to: '/login', search: { redirect: href }, replace: true })
-          // Dados da sessão encerrada não podem sobrar para o próximo login.
-          .then(() => queryClient.clear());
+          // Dados e empresa da sessão encerrada não podem sobrar para o próximo login.
+          .then(() => {
+            queryClient.clear();
+            empresa.limpar();
+          });
       }),
-    [sessao, router, queryClient],
+    [sessao, router, queryClient, empresa],
   );
 
   const { eu, empresas, pode } = useAcesso();
   // O /v1/eu mudou (ex.: perdeu acesso à empresa atual): escolhe de novo entre as que restam.
   useEffect(() => {
-    if (eu) empresa.resolver(eu.conta.tenant_id, eu.empresas);
+    if (eu) empresa.resolver(donoDaPreferencia(eu), eu.empresas);
   }, [eu, empresa]);
 
   if (!atual) return null;

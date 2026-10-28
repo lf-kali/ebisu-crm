@@ -11,6 +11,7 @@ import {
 import { getRouteApi } from '@tanstack/react-router';
 import { Building2, ChevronDown } from 'lucide-react';
 import { useAcesso } from '../auth/acesso';
+import { donoDaPreferencia } from '../auth/empresa';
 
 const rotaApp = getRouteApi('/_app');
 
@@ -35,7 +36,7 @@ export function SeletorEmpresa() {
 
   function escolher(id: string) {
     if (!eu || id === empresa?.id) return;
-    empresaAtual.escolher(eu.conta.tenant_id, id);
+    empresaAtual.escolher(donoDaPreferencia(eu), id);
     // Dados de domínio são por empresa: refaz tudo, menos o /v1/eu (que é da conta).
     void queryClient.resetQueries({ predicate: (consulta) => consulta.queryKey[0] !== 'eu' });
   }
