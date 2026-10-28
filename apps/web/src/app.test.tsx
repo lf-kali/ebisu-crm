@@ -14,6 +14,12 @@ describe('App', () => {
     expect(await screen.findByText('API disponível')).toBeTruthy();
   });
 
+  it('mostra API indisponível quando a resposta foge do contrato', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{"status":"talvez"}')));
+    render(<App />);
+    expect(await screen.findByText('API indisponível')).toBeTruthy();
+  });
+
   it('mostra API indisponível quando a requisição falha', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('rede')));
     render(<App />);

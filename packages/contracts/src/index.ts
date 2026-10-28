@@ -5,6 +5,7 @@ export * from './comum/erros.js';
 export * from './comum/paginacao.js';
 export * from './comum/consulta.js';
 export * from './comum/eventos.js';
+export * from './comum/saude.js';
 export type * from './comum/providers.js';
 export * from './orcamentos/index.js';
 export * from './bancada/index.js';

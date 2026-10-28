@@ -7,7 +7,9 @@ import {
   DataHora,
   Dinheiro,
   DinheiroNaoNegativo,
+  MAXIMO_VALORES_IN,
   ParametrosPaginacao,
+  TAMANHO_MAXIMO_CURSOR,
   Problema,
   Quantidade,
   camposDoZod,
@@ -30,6 +32,13 @@ describe('escalares (§5.1)', () => {
     }
     expect(ok(DinheiroNaoNegativo, '-1.00')).toBe(false);
     expect(ok(DinheiroNaoNegativo, '1.00')).toBe(true);
+  });
+
+  it('dinheiro e quantidade em forma canônica: sem zeros à esquerda nem zero negativo', () => {
+    for (const v of ['007.00', '00.00', '-0.00', '-01.00']) expect(ok(Dinheiro, v), v).toBe(false);
+    for (const v of ['0.00', '0.50', '-1.00', '10.00']) expect(ok(Dinheiro, v), v).toBe(true);
+    for (const v of ['007', '00', '-0', '-0.0', '-0.000']) expect(ok(Quantidade, v), v).toBe(false);
+    for (const v of ['0', '0.5', '-0.5', '10']) expect(ok(Quantidade, v), v).toBe(true);
   });
 
   it('quantidade: até 3 casas', () => {
@@ -88,6 +97,13 @@ describe('paginação por cursor (§5.1)', () => {
     });
     for (const limit of ['0', '101', '2.5', 'dez'])
       expect(ok(ParametrosPaginacao, { limit }), limit).toBe(false);
+  });
+
+  it('cursor tem tamanho máximo, na entrada e na decodificação', () => {
+    const longo = 'a'.repeat(TAMANHO_MAXIMO_CURSOR + 1);
+    expect(ok(ParametrosPaginacao, { cursor: longo })).toBe(false);
+    expect(ok(ParametrosPaginacao, { cursor: 'a'.repeat(TAMANHO_MAXIMO_CURSOR) })).toBe(true);
+    expect(() => decodificarCursor(longo, z.unknown())).toThrow(CursorInvalidoError);
   });
 
   it('resposta paginada tem dados e proximo_cursor (string ou null)', () => {
@@ -149,6 +165,33 @@ describe('filtros e ordenação (§5.1)', () => {
     ['valor repetido (array)', { 'filtro[status]': ['a', 'b'] }],
   ])('recusa filtro: %s', (_, query) => {
     expect(() => extrairFiltros(query, campos)).toThrow(ConsultaInvalidaError);
+  });
+
+  it.each([
+    ['valor vazio', { 'filtro[status]': '' }],
+    ['lista in com item vazio', { 'filtro[nome][in]': 'a,,b' }],
+    [
+      'lista in grande demais',
+      { 'filtro[nome][in]': Array.from({ length: MAXIMO_VALORES_IN + 1 }, (_, i) => i).join(',') },
+    ],
+  ])('recusa filtro: %s', (_, query) => {
+    expect(() => extrairFiltros(query, campos)).toThrow(ConsultaInvalidaError);
+  });
+
+  it('lista in no limite é aceita', () => {
+    const valores = Array.from({ length: MAXIMO_VALORES_IN }, (_, i) => String(i));
+    expect(extrairFiltros({ 'filtro[nome][in]': valores.join(',') }, campos).nome?.in).toEqual(
+      valores,
+    );
+  });
+
+  it('nomes reservados nunca viram filtro, mesmo se o endpoint os permitir', () => {
+    for (const nome of ['__proto__', 'constructor', 'prototype']) {
+      expect(() => extrairFiltros({ [`filtro[${nome}]`]: 'x' }, [nome])).toThrow(
+        ConsultaInvalidaError,
+      );
+    }
+    expect(Object.getPrototypeOf(extrairFiltros({ 'filtro[status]': 'A' }, campos))).toBeNull();
   });
 
   it('ordem: "-created_at,nome" e recusa campo não permitido ou repetido', () => {

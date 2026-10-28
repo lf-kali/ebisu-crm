@@ -1,7 +1,7 @@
 // Contratos do domínio bancada (F7). Esqueleto: a frente do domínio é dona desta pasta (spec §3.3).
 import { z } from 'zod';
 
-// Espelha o enum StatusOS do schema.prisma (teste de paridade em test/enums.test.ts).
+// Espelha o enum StatusOS do schema.prisma (teste de paridade em test/paridade.test.ts).
 export const StatusOS = z
   .enum([
     'ABERTA',

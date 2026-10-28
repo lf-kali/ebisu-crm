@@ -1,18 +1,13 @@
-import 'reflect-metadata';
 import type { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { AppModule } from '../src/app.module.js';
-import { configurarApp } from '../src/configurar-app.js';
+import { criarAppDeTeste } from './app-de-teste.js';
 
 describe('GET /v1/saude', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
-    const modulo = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = configurarApp(modulo.createNestApplication());
-    await app.init();
+    app = await criarAppDeTeste();
   });
 
   afterAll(async () => {
@@ -28,5 +23,6 @@ describe('GET /v1/saude', () => {
   it('não expõe a rota fora do prefixo /v1', async () => {
     const resposta = await request(app.getHttpServer()).get('/saude');
     expect(resposta.status).toBe(404);
+    expect(resposta.body.code).toBe('nao_encontrado');
   });
 });

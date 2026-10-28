@@ -3,3 +3,4 @@ dist/
 coverage/
 docs/
 .vscode/
+apps/api/openapi.json
