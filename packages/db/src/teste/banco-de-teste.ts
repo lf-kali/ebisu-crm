@@ -1,9 +1,12 @@
+// Banco de teste (Testcontainers): Postgres efêmero com as migrações e os papéis aplicados.
+// Exportado como `@ebisu/db/teste` para os testes de integração da API; não é usado em produção.
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import pg from 'pg';
 
-const PASTA_PACOTE = fileURLToPath(new URL('..', import.meta.url));
+// Funciona em src/teste (testes do pacote) e em dist/teste (outros pacotes via @ebisu/db/teste).
+const PASTA_PACOTE = fileURLToPath(new URL('../..', import.meta.url));
 export const IMAGEM_POSTGRES = 'postgres:16.15-alpine';
 export const SENHA_APP = 'senha-app-teste';
 export const SENHA_AUTH = 'senha-auth-teste';

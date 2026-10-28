@@ -8,7 +8,7 @@ import {
   TenantInvalidoError,
   TransacaoNoClienteDoTenantError,
 } from '../src/tenancy.js';
-import { type BancoDeTeste, criarBancoDeTeste } from './banco-de-teste.js';
+import { type BancoDeTeste, criarBancoDeTeste } from '../src/teste/banco-de-teste.js';
 
 // Dois tenants, uma empresa cada; T1 com 2 contatos e T2 com 1.
 const T1 = randomUUID();

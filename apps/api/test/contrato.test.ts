@@ -11,7 +11,7 @@ describe('contrato: validação de entrada e saída, envelope de erro (§5.1, §
   const http = () => request(app.getHttpServer());
 
   beforeAll(async () => {
-    app = await criarAppDeTeste([ExemploController]);
+    app = await criarAppDeTeste({ controllers: [ExemploController] });
   });
   afterAll(async () => {
     await app?.close();

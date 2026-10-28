@@ -18,7 +18,7 @@ import {
   TENANT_DEMO_ID,
 } from '../src/seeds/index.js';
 import { comTenant } from '../src/tenancy.js';
-import { type BancoDeTeste, criarBancoDeTeste } from './banco-de-teste.js';
+import { type BancoDeTeste, criarBancoDeTeste } from '../src/teste/banco-de-teste.js';
 
 describe('dados de referência (puros)', () => {
   it('toda permissão de papel existe no catálogo, sem chaves repetidas', () => {
