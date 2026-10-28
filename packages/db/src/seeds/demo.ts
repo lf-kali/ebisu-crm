@@ -277,7 +277,6 @@ async function criarCarteira(
   return fases.length;
 }
 
-/** Cria o tenant de demonstração com padrões, equipe e carteira. Roda com o papel migrador. */
 /**
  * Grava SENHA_DEMO nos usuários *@demo.ebisu.local, inclusive num banco já semeado (antes do F3
  * eles não tinham senha). argon2id com os parâmetros da API (apps/api/src/modules/auth/senha.ts).
@@ -297,7 +296,14 @@ async function definirSenhasDemo(cliente: PrismaClient): Promise<number> {
   return count;
 }
 
+/**
+ * Cria o tenant de demonstração com padrões, equipe e carteira e grava SENHA_DEMO nos usuários
+ * demo. Roda com o papel migrador. Recusa NODE_ENV=production aqui (não só no CLI): quem importar
+ * a função também não grava a senha conhecida num ambiente de produção.
+ */
 export async function semearDemo(cliente: PrismaClient, agora = new Date()) {
+  if (process.env.NODE_ENV === 'production')
+    throw new Error('seed de demonstração recusado com NODE_ENV=production');
   await semearCatalogoPermissoes(cliente);
   const resultado = await semearTenantDemo(cliente, agora);
   await definirSenhasDemo(cliente);

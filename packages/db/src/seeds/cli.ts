@@ -16,9 +16,7 @@ const comandos: Record<string, (cliente: PrismaClient) => Promise<string>> = {
     return `Catálogo de permissões: ${await semearCatalogoPermissoes(cliente)} permissões`;
   },
   async demo(cliente) {
-    // Grava uma senha conhecida (SENHA_DEMO): nunca num ambiente de produção.
-    if (process.env.NODE_ENV === 'production')
-      throw new Error('seed de demonstração recusado com NODE_ENV=production');
+    // Recusa NODE_ENV=production (dentro de semearDemo): grava uma senha conhecida.
     const resultado = await semearDemo(cliente);
     return resultado.criado
       ? `Tenant de demonstração criado (${resultado.tenantId}): ${resultado.empresas} empresas, ${resultado.contatos} contatos`

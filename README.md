@@ -34,7 +34,8 @@ pnpm dev                 # api, worker e web
 O web em `pnpm dev` fala com a API real pelo proxy do Vite (`/v1`). Depois de `pnpm db:seed:demo`,
 todos os usuários de demonstração entram com a senha `demo-ebisu-2026` (só para desenvolvimento;
 o seed recusa rodar com `NODE_ENV=production`). Rodar o seed de novo num banco já semeado só regrava
-essas senhas.
+essas senhas. O cookie de sessão é `Secure`: em `http://localhost` use Chrome ou Firefox (o Safari
+não o aceita sem HTTPS; nele, use `pnpm dev:tailnet`).
 
 | Usuário                       | Papel                             |
 | ----------------------------- | --------------------------------- |

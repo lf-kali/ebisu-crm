@@ -220,6 +220,20 @@ describe('semeadura no banco', () => {
     expect(depois.senha_hash).toBeNull();
   });
 
+  it('seed de demonstração recusa NODE_ENV=production sem tocar no banco', async () => {
+    const demo = { email: { endsWith: '@demo.ebisu.local' } };
+    await admin.usuario.updateMany({ where: demo, data: { senha_hash: null } });
+    const anterior = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      await expect(semearDemo(admin)).rejects.toThrow(/NODE_ENV=production/);
+    } finally {
+      process.env.NODE_ENV = anterior;
+    }
+    expect(await admin.usuario.count({ where: { ...demo, senha_hash: { not: null } } })).toBe(0);
+    await semearDemo(admin);
+  });
+
   it('seed de demonstração é coerente com as regras (CRM-2, CRM-4, DSP-2)', async () => {
     const r = await comTenant(app, TENANT_DEMO_ID, async (tx) => ({
       membros: await tx.membro.count({ where: { status: 'ATIVO' } }),
