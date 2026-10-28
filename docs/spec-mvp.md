@@ -148,7 +148,7 @@ ebisu-crm/
 | `packages/contracts/src/comum/**` (paginação, erros, ids) | F2 | Só leitura |
 | `packages/contracts/src/<dominio>/**` | Frente do domínio | — |
 | Catálogo de permissões (`core/rbac/permissoes.ts`) e seed de papéis | F3 | Acrescentam chaves só no bloco do seu domínio |
-| Catálogo de eventos (`core/eventos/catalogo.ts`) | F2 | Frentes propõem eventos novos via PR para F2 |
+| Catálogo de eventos (`packages/contracts/src/comum/eventos.ts`, compartilhado por API e worker; a API mantém só o despachante em `core/eventos`) | F2 | Frentes propõem eventos novos via PR para F2 |
 | Registro de módulos (`app.module.ts`) | F0 | Uma linha por módulo |
 | Rotas e layout do web (`apps/web/src/routes/__root*`) | F12 | Rotas de domínio em pasta própria |
 
