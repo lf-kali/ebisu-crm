@@ -6,7 +6,7 @@ import { comoJson, gravarResposta, travarERecuperar } from '../idempotencia/idem
 import type { Comando, ContextoDaRequisicao } from './contexto.js';
 
 // Único ponto que abre transação para dados de domínio (spec §3.2, §5.4): aplica a
-// Idempotency-Key (PR 3a); audit log e eventos entram aqui depois.
+// Idempotency-Key (PR 3a) e informa o autor ao audit log do banco (PR 3b); eventos depois.
 
 /**
  * Envolve uma escrita que grava referências (FKs, compostas por empresa: SEG-2). Se uma delas não
@@ -34,15 +34,27 @@ export class ExecutorDeComandos {
     entrada: Entrada,
   ): Promise<Saida> {
     const { idempotencia, ...resto } = contexto;
-    return comTenant(this.app, contexto.tenantId, async (tx) => {
-      if (!idempotencia) return comando({ ...resto, tx }, entrada);
-      // A chave fica travada até o fim desta transação; a resposta é gravada nela (plano f3-3a).
-      const salva = await travarERecuperar(tx, contexto.tenantId, idempotencia);
-      if (salva) return salva.resposta as Saida;
-      const resposta = comoJson(await comando({ ...resto, tx }, entrada));
-      await gravarResposta(tx, contexto.tenantId, idempotencia, resposta);
-      return resposta as Saida;
-    });
+    // Autor da transação: o trigger auditar() grava no audit_log (plano f3-3b, SEG-8).
+    const ator = {
+      membroId: contexto.membroId,
+      apiKeyId: contexto.apiKeyId,
+      requestId: contexto.requestId,
+      ip: contexto.ip,
+    };
+    return comTenant(
+      this.app,
+      contexto.tenantId,
+      async (tx) => {
+        if (!idempotencia) return comando({ ...resto, tx }, entrada);
+        // A chave fica travada até o fim desta transação; a resposta é gravada nela (plano f3-3a).
+        const salva = await travarERecuperar(tx, contexto.tenantId, idempotencia);
+        if (salva) return salva.resposta as Saida;
+        const resposta = comoJson(await comando({ ...resto, tx }, entrada));
+        await gravarResposta(tx, contexto.tenantId, idempotencia, resposta);
+        return resposta as Saida;
+      },
+      { ator },
+    );
   }
 }
 

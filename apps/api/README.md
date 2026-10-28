@@ -62,6 +62,14 @@ o contrato já exige. Cada requisição chama o `executarComando` uma vez só: u
 devolveria a resposta da primeira. A trava, a leitura e a gravação da chave cabem na transação do
 comando (padrão do Prisma: 5 s); se ela estourar, tudo é desfeito e a repetição roda de novo.
 
+## Audit log
+
+O banco audita sozinho (trigger `auditar()`, migração `20261028010000_audit_log`): toda escrita
+nas tabelas de negócio grava em `audit_log` o autor, o `request_id`, o IP e os nomes das colunas
+alteradas, nunca os valores (SEG-8). O `executarComando` passa o autor; o comando não faz nada.
+Tabela nova precisa ganhar o trigger na migração ou entrar na lista de fora em
+`packages/db/test/auditoria.test.ts`, senão o teste falha.
+
 ## Testes de isolamento
 
 `test/isolamento/suite.ts` traz `testarIsolamento`: cada frente de domínio chama a função para o

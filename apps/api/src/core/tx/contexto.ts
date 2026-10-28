@@ -15,6 +15,8 @@ export interface ContextoDaRequisicao {
   /** Permissões efetivas na empresa, com o escopo de cada uma (SEG-4). */
   permissoes: ReadonlyMap<string, EscopoPermissao>;
   requestId: string;
+  /** IP do cliente (audit log). */
+  ip: string | null;
   /** POST de domínio: a Idempotency-Key e o hash do pedido (o executarComando a aplica). */
   idempotencia?: Idempotencia;
 }

@@ -5,6 +5,7 @@ export {
   TenantInvalidoError,
   TransacaoNoClienteDoTenantError,
   type ClienteDoTenant,
+  type Ator,
   type OpcoesTransacao,
 } from './tenancy.js';
 export * from './seeds/index.js';
