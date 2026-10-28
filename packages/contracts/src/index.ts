@@ -7,6 +7,7 @@ export * from './comum/consulta.js';
 export * from './comum/eventos.js';
 export * from './comum/saude.js';
 export type * from './comum/providers.js';
+export * from './plataforma/index.js';
 export * from './orcamentos/index.js';
 export * from './bancada/index.js';
 export * from './notificacoes/index.js';

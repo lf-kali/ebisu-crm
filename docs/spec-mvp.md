@@ -444,6 +444,7 @@ Permissões no formato `recurso.acao` (catálogo completo no seed de F3). CRUD p
 | Frente | Endpoint | Permissão | Regras |
 |---|---|---|---|
 | F3 | `POST /v1/auth/registrar` · `/login` · `/refresh` · `/logout` | público | SEG-6 |
+| F3 | `POST /v1/auth/trocar-conta` | autenticado | SEG-6 |
 | F3 | `GET /v1/eu` | autenticado | — |
 | F3 | CRUD `/v1/empresas`, `/v1/membros`, `POST /v1/membros/convites`, `/v1/api-keys` | `config.*` | SEG-3 |
 | F4 | CRUD `/v1/contatos` (+ `GET ?q=` busca por nome/e-mail/telefone) | `contato.*` | CRM-1 |
