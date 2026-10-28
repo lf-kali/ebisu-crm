@@ -50,6 +50,18 @@ Escritas que gravam referências passam por `comReferencias(...)`: uma FK violad
 inexistente ou de outra empresa) vira 422 `validacao`, sem dizer qual dos dois casos aconteceu.
 Fora dele (ex.: FK `RESTRICT` barrando uma exclusão), o comando trata o caso como conflito.
 
+## Idempotência
+
+Todo POST com `@Permissao` exige `Idempotency-Key` (UUID); o `executarComando` aplica a regra sem
+nada no comando. Repetir com a mesma chave devolve a mesma resposta, byte a byte, sem novos
+efeitos; a mesma chave com outro pedido (corpo, rota, parâmetros, empresa ou autor) dá 422
+`idempotencia_divergente`; com a chave em uso por outra requisição, 409 `idempotencia_em_andamento`.
+Só sucesso é memorizado (a resposta é gravada na mesma transação dos efeitos) e vale 24 h. Por
+isso a saída do comando precisa ser JSON puro (strings no lugar de `Date`/`Decimal`), o mesmo que
+o contrato já exige. Cada requisição chama o `executarComando` uma vez só: uma segunda chamada com o mesmo contexto
+devolveria a resposta da primeira. A trava, a leitura e a gravação da chave cabem na transação do
+comando (padrão do Prisma: 5 s); se ela estourar, tudo é desfeito e a repetição roda de novo.
+
 ## Testes de isolamento
 
 `test/isolamento/suite.ts` traz `testarIsolamento`: cada frente de domínio chama a função para o
