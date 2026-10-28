@@ -23,8 +23,10 @@
   --accent: oklch(0.96 0.02 275);
   --accent-foreground: oklch(0.3 0.12 275);
   --destructive: oklch(0.55 0.22 27);
+  --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
+  /* Borda de campo: componente de interface, precisa de 3:1 (WCAG 1.4.11). */
+  --input: oklch(0.65 0 0);
   --ring: oklch(0.51 0.2 275);
   --sucesso: oklch(0.52 0.14 150);
   --sucesso-foreground: oklch(0.985 0 0);
@@ -55,8 +57,9 @@
   --accent: oklch(0.3 0.06 275);
   --accent-foreground: oklch(0.92 0.04 275);
   --destructive: oklch(0.7 0.19 22);
+  --destructive-foreground: oklch(0.145 0 0);
   --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 15%);
+  --input: oklch(1 0 0 / 35%);
   --ring: oklch(0.72 0.15 275);
   --sucesso: oklch(0.72 0.14 150);
   --sucesso-foreground: oklch(0.145 0 0);
@@ -93,6 +96,7 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -111,7 +115,7 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring;
   }
   body {
     @apply bg-background text-foreground antialiased;

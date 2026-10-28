@@ -77,6 +77,9 @@ export function AppShell({ children, caminhoAtual, cabecalho, itens = NAVEGACAO 
           <SheetContent side="left" className="w-72 bg-sidebar p-4">
             <SheetHeader className="p-0 pb-4">
               <SheetTitle>ebisuCRM</SheetTitle>
+              <SheetDescription className="sr-only">
+                Escolha um módulo para navegar.
+              </SheetDescription>
             </SheetHeader>
             <nav aria-label="Menu principal">
               <ListaNavegacao

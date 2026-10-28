@@ -1,0 +1,103 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+
+// Guarda de contraste (DESIGN.md): lê os tokens do globals.css e mede os pares que os
+// componentes usam, compondo transparências como o navegador (em sRGB). Texto ≥ 4,5:1;
+// componente de interface e foco ≥ 3:1 (WCAG 1.4.3 e 1.4.11).
+
+const css = readFileSync(new URL('../src/styles/globals.css', import.meta.url), 'utf8');
+
+function tokens(seletor: ':root' | '.dark'): Record<string, string> {
+  const bloco =
+    new RegExp(`(?:^|\\n)${seletor.replace('.', '\\.')} \\{([^}]*)\\}`).exec(css)?.[1] ?? '';
+  return Object.fromEntries(
+    [...bloco.matchAll(/--([a-z-]+):\s*([^;]+);/g)].map(([, k, v]) => [k!, v!.trim()]),
+  );
+}
+
+type Rgb = [number, number, number];
+const codificar = (x: number) => (x <= 0.0031308 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - 0.055);
+const decodificar = (x: number) => (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4);
+
+/** oklch(L C h [/ a%]) → sRGB codificado + alpha. */
+function lerOklch(valor: string): { rgb: Rgb; alpha: number } {
+  const m = /^oklch\(([\d.]+) ([\d.]+) ([\d.]+)(?: \/ ([\d.]+)%)?\)$/.exec(valor);
+  if (!m) throw new Error(`Cor não suportada no teste: ${valor}`);
+  const [L, C, h] = [Number(m[1]), Number(m[2]), (Number(m[3]) * Math.PI) / 180];
+  const [a, b] = [C * Math.cos(h), C * Math.sin(h)];
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const mm = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  const linear: Rgb = [
+    4.0767416621 * l - 3.3077115913 * mm + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * mm - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * mm + 1.707614701 * s,
+  ];
+  return {
+    rgb: linear.map((x) => codificar(Math.min(Math.max(x, 0), 1))) as Rgb,
+    alpha: m[4] ? Number(m[4]) / 100 : 1,
+  };
+}
+
+function sobre(frente: { rgb: Rgb; alpha: number }, fundo: Rgb, alphaExtra = 1): Rgb {
+  const a = frente.alpha * alphaExtra;
+  return frente.rgb.map((c, i) => a * c + (1 - a) * fundo[i]!) as Rgb;
+}
+
+const luminancia = (rgb: Rgb) => {
+  const [r, g, b] = rgb.map(decodificar) as Rgb;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contraste = (x: Rgb, y: Rgb) => {
+  const [a, b] = [luminancia(x), luminancia(y)].sort((p, q) => q - p) as [number, number];
+  return (a + 0.05) / (b + 0.05);
+};
+
+// [frente, fundo, mínimo, alpha da frente, alpha do fundo] — fundo composto sobre `background`.
+const PARES: Array<[string, string, number, number?, number?]> = [
+  ['foreground', 'background', 4.5],
+  ['card-foreground', 'card', 4.5],
+  ['primary-foreground', 'primary', 4.5],
+  ['primary-foreground', 'primary', 4.5, 1, 0.9], // hover do botão
+  ['primary', 'background', 4.5],
+  ['muted-foreground', 'background', 4.5],
+  ['muted-foreground', 'muted', 4.5],
+  ['muted-foreground', 'card', 4.5],
+  ['accent-foreground', 'accent', 4.5],
+  ['sidebar-accent-foreground', 'sidebar-accent', 4.5],
+  ['sidebar-foreground', 'sidebar', 4.5],
+  ['destructive', 'background', 4.5],
+  ['destructive', 'background', 4.5, 0.9], // text-destructive/90 do alert
+  ['destructive-foreground', 'destructive', 4.5],
+  ['destructive-foreground', 'destructive', 4.5, 1, 0.9], // hover do botão
+  ['sucesso', 'background', 4.5],
+  ['sucesso-foreground', 'sucesso', 4.5],
+  ['alerta', 'background', 4.5],
+  ['ring', 'background', 3], // anel de foco (opaco)
+  ['input', 'background', 3], // borda de campo
+];
+
+describe.each([':root', '.dark'] as const)('contraste dos tokens (%s)', (seletor) => {
+  const t = tokens(seletor);
+  const base = tokens(':root');
+  const cor = (nome: string) => lerOklch(t[nome] ?? base[nome]!);
+  const fundo = cor('background').rgb;
+
+  it.each(PARES)('%s sobre %s ≥ %s:1', (frente, atras, minimo, alphaFrente = 1, alphaFundo = 1) => {
+    const corFundo = sobre(cor(atras), fundo, alphaFundo);
+    const corFrente = sobre(cor(frente), corFundo, alphaFrente);
+    expect(contraste(corFrente, corFundo)).toBeGreaterThanOrEqual(minimo);
+  });
+});
+
+describe('componentes não usam combinações que fogem da tabela de contraste', () => {
+  const pasta = new URL('../src/components/ui/', import.meta.url);
+  const arquivos = readdirSync(pasta).filter((f) => f.endsWith('.tsx'));
+
+  it.each(arquivos)('%s', (arquivo) => {
+    const fonte = readFileSync(new URL(arquivo, pasta), 'utf8');
+    // Anel de foco translúcido não chega a 3:1; texto branco sobre cor de status idem.
+    expect(fonte).not.toMatch(/ring-ring\/\d+|outline-ring\/\d+/);
+    expect(fonte).not.toMatch(/text-white/);
+  });
+});
