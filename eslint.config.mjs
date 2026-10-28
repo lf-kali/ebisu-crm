@@ -31,11 +31,11 @@ export default tseslint.config(
       'no-restricted-syntax': [
         'error',
         ...[
-          'TemplateElement[value.raw=/set_config|app\\.tenant_id/i]',
-          'Literal[value=/set_config|app\\.tenant_id/i]',
+          'TemplateElement[value.raw=/set_config|app\\.tenant_id|app\\.membro_id|app\\.api_key_id|app\\.request_id|app\\.ip\\b/i]',
+          'Literal[value=/set_config|app\\.tenant_id|app\\.membro_id|app\\.api_key_id|app\\.request_id|app\\.ip\\b/i]',
         ].map((selector) => ({
           selector,
-          message: 'Contexto de tenant só via comTenant/clienteDoTenant (@ebisu/db).',
+          message: 'Contexto de tenant e autor (app.*) só via comTenant/clienteDoTenant (@ebisu/db).',
         })),
       ],
     },

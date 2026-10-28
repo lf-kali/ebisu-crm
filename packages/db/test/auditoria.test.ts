@@ -280,6 +280,45 @@ describe('audit log automático (trigger auditar) — SEG-8', () => {
     ).rejects.toThrow();
   });
 
+  it('o tenant gravado é o da linha, mesmo com outro tenant no contexto da transação', async () => {
+    // Só uma escrita privilegiada (fora do RLS) chega aqui; a aplicação sempre tem os dois iguais.
+    const contato = randomUUID();
+    await admin.query('BEGIN');
+    try {
+      await admin.query(`SELECT set_config('app.tenant_id', $1, true)`, [T2]);
+      await admin.query(
+        `INSERT INTO contato (id, tenant_id, empresa_id, nome, email, updated_at)
+         VALUES ($1, $2, $3, 'Privilegiado', 'priv@teste.local', now())`,
+        [contato, T1, EMPRESA],
+      );
+      await admin.query('COMMIT');
+    } catch (erro) {
+      await admin.query('ROLLBACK');
+      throw erro;
+    }
+    expect((await auditoria(contato))[0]).toMatchObject({ tenant_id: T1, acao: 'create' });
+  });
+
+  it('uma tabela temporária "audit_log" na sessão não desvia a auditoria (search_path fixo)', async () => {
+    const contato = randomUUID();
+    await comTenant(app, T1, async (tx) => {
+      await tx.$executeRawUnsafe(
+        'CREATE TEMP TABLE audit_log (LIKE public.audit_log INCLUDING DEFAULTS) ON COMMIT DROP',
+      );
+      await tx.contato.create({
+        data: {
+          id: contato,
+          tenant_id: T1,
+          empresa_id: EMPRESA,
+          nome: 'Desvio',
+          email: 'desvio@teste.local',
+          campos_faltantes: [],
+        },
+      });
+    });
+    expect(await auditoria(contato)).toHaveLength(1);
+  });
+
   it('autor com id que não é UUID é recusado antes de qualquer escrita', async () => {
     await expect(
       comTenant(app, T1, async () => undefined, { ator: { membroId: "x'; DROP" } }),

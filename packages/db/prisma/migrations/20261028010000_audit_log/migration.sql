@@ -3,16 +3,19 @@
 -- API key, de app.membro_id/app.api_key_id), em qual requisição (app.request_id, app.ip) e os
 -- NOMES das colunas alteradas, nunca os valores (SEG-8). Os app.* são definidos por comTenant,
 -- na mesma transação do tenant. Roda com o papel de quem escreve (SECURITY INVOKER): o ebisu_app
--- só grava auditoria da própria conta (RLS do audit_log).
+-- só grava auditoria da própria conta (RLS do audit_log). search_path fixo, com pg_temp por último:
+-- uma tabela temporária "audit_log" criada na sessão não desvia a auditoria.
 
-CREATE OR REPLACE FUNCTION auditar() RETURNS trigger
-LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION public.auditar() RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
 DECLARE
   antes  jsonb := CASE WHEN TG_OP <> 'INSERT' THEN to_jsonb(OLD) END;
   depois jsonb := CASE WHEN TG_OP <> 'DELETE' THEN to_jsonb(NEW) END;
   linha  jsonb := COALESCE(depois, antes);
   -- Tabela filha (sem tenant_id): o tenant da transação.
-  tenant uuid  := COALESCE((linha ->> 'tenant_id')::uuid, app_tenant_id());
+  tenant uuid  := COALESCE((linha ->> 'tenant_id')::uuid, public.app_tenant_id());
   campos text[];
   acao   text;
 BEGIN
@@ -44,7 +47,7 @@ BEGIN
     END;
   END IF;
 
-  INSERT INTO audit_log (
+  INSERT INTO public.audit_log (
     id, tenant_id, empresa_id, ator_membro_id, ator_api_key_id,
     entidade_tipo, entidade_id, acao, diff, ip, request_id
   ) VALUES (
@@ -84,10 +87,10 @@ BEGIN
   ] LOOP
     EXECUTE format(
       'CREATE TRIGGER auditoria AFTER INSERT OR UPDATE OR DELETE ON %I
-         FOR EACH ROW EXECUTE FUNCTION auditar()', t);
+         FOR EACH ROW EXECUTE FUNCTION public.auditar()', t);
   END LOOP;
 END $$;
 
 -- papel_permissao não tem id: a entidade é o papel.
 CREATE TRIGGER auditoria AFTER INSERT OR UPDATE OR DELETE ON papel_permissao
-  FOR EACH ROW EXECUTE FUNCTION auditar('papel_id');
+  FOR EACH ROW EXECUTE FUNCTION public.auditar('papel_id');
