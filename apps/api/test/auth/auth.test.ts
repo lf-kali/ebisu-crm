@@ -2,8 +2,9 @@ import { generateKeyPairSync } from 'node:crypto';
 import { RespostaEu, RespostaSessao } from '@ebisu/contracts';
 import { SignJWT } from 'jose';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { limitadorEmMemoria } from '../../src/core/limite/limitador.js';
+import { SessoesService } from '../../src/modules/auth/sessoes.service.js';
 import { hashDoRefresh } from '../../src/modules/auth/tokens.js';
 import { ORIGEM_WEB } from '../app-de-teste.js';
 import { type Cenario, criarCenario, IDS, SENHA } from './cenario.js';
@@ -105,6 +106,15 @@ describe('POST /v1/auth/login', () => {
     for (const r of respostas) expect(cookieDe(r)).toBeUndefined();
   });
 
+  it('login só por JSON: formulário de outro site não entra (login CSRF)', async () => {
+    const r = await http()
+      .post('/v1/auth/login')
+      .type('form')
+      .send({ email: 'ana@teste.local', senha: SENHA });
+    expect(r.status).toBe(422);
+    expect(cookieDe(r)).toBeUndefined();
+  });
+
   it('entrada inválida dá 422 com o campo', async () => {
     const r = await http().post('/v1/auth/login').send({ email: 'nao-e-email', senha: '' });
     expect(r.status).toBe(422);
@@ -190,6 +200,21 @@ describe('POST /v1/auth/refresh', () => {
     const { cookie } = await entrar();
     expect((await refresh(cookie, null)).status).toBe(403);
     expect((await refresh(cookie, 'https://mal.example')).status).toBe(403);
+    expect((await refresh(cookie)).status).toBe(200);
+  });
+
+  it('falha transitória (5xx) no refresh não apaga o cookie: o usuário não é deslogado', async () => {
+    const { cookie } = await entrar();
+    const espiao = vi
+      .spyOn(c.app.get(SessoesService), 'renovar')
+      .mockRejectedValueOnce(new Error('banco fora do ar'));
+    try {
+      const r = await refresh(cookie);
+      expect(r.status).toBe(500);
+      expect(cookieDe(r)).toBeUndefined();
+    } finally {
+      espiao.mockRestore();
+    }
     expect((await refresh(cookie)).status).toBe(200);
   });
 
@@ -382,6 +407,26 @@ describe('POST /v1/auth/logout', () => {
         [hashDoRefresh(cookie)],
       );
       expect(rows[0]!.vivos).toBe(0);
+    }
+  });
+
+  it('reuso do token antigo e refresh do atual ao mesmo tempo: a família cai inteira (tokens diferentes)', async () => {
+    // Token A já trocado (o "roubado" reapresentado) e B o atual, da mesma família.
+    const vivosDaFamilia = async (token: string) =>
+      (
+        await c.sql(
+          `SELECT count(*)::int AS vivos FROM refresh_token
+           WHERE familia = (SELECT familia FROM refresh_token WHERE token_hash = $1)
+             AND revogado_em IS NULL`,
+          [hashDoRefresh(token)],
+        )
+      ).rows[0]!.vivos;
+    for (let i = 0; i < 15; i += 1) {
+      const { cookie: a } = await entrar();
+      const b = cookieDe(await refresh(a))!;
+      const [reuso] = await Promise.all([i % 2 ? sair(a) : refresh(a), refresh(b)]);
+      expect(reuso.status).toBe(401);
+      expect(await vivosDaFamilia(a)).toBe(0);
     }
   });
 

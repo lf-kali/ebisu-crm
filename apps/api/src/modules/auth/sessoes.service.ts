@@ -97,14 +97,12 @@ export class SessoesService {
    */
   async renovar(token: string | undefined, origem: Origem): Promise<SessaoEmitida> {
     if (!token) throw naoAutenticado();
-    // Tudo numa transação que trava a linha do token (FOR UPDATE): um segundo refresh com o
-    // mesmo token espera o primeiro terminar, inclusive gravar o token novo, e só então vê o
-    // reuso e revoga a família com o token novo junto. A revogação é gravada (commit) antes do
-    // 401: por isso a transação devolve null em vez de lançar o erro.
+    // Tudo numa transação com a família da sessão travada (travarSessao): outro refresh, troca
+    // ou logout da mesma família espera este terminar, inclusive gravar o token novo, e só
+    // então vê o reuso e revoga a família com o token novo junto. A revogação é gravada
+    // (commit) antes do 401: por isso a transação devolve null em vez de lançar o erro.
     const emitida = await this.db.$transaction(async (tx) => {
-      const [atual] = await tx.$queryRaw<LinhaRefresh[]>`
-        SELECT id, usuario_id, tenant_id, familia, expira_em, revogado_em
-        FROM refresh_token WHERE token_hash = ${hashDoRefresh(token)} FOR UPDATE`;
+      const atual = await this.travarSessao(tx, token);
       if (!atual || !atual.tenant_id) return null;
       if (atual.revogado_em || atual.expira_em <= new Date()) {
         await this.revogarFamilia(tx, atual.familia);
@@ -140,9 +138,7 @@ export class SessoesService {
   ): Promise<SessaoEmitida> {
     if (!tokenAtual) throw naoAutenticado();
     const resultado = await this.db.$transaction(async (tx) => {
-      const [atual] = await tx.$queryRaw<LinhaRefresh[]>`
-        SELECT id, usuario_id, tenant_id, familia, expira_em, revogado_em
-        FROM refresh_token WHERE token_hash = ${hashDoRefresh(tokenAtual)} FOR UPDATE`;
+      const atual = await this.travarSessao(tx, tokenAtual);
       const sessaoValida =
         atual &&
         !atual.revogado_em &&
@@ -166,16 +162,14 @@ export class SessoesService {
   }
 
   /**
-   * Logout: revoga a família inteira da sessão. Trava a linha do token, como a rotação: um
-   * refresh em voo termina antes (e o token novo dele cai junto) ou espera e vê a família
-   * revogada. Sem isso, um logout com 204 podia deixar um token novo vivo.
+   * Logout: revoga a família inteira da sessão. Trava a família, como a rotação: um refresh em
+   * voo termina antes (e o token novo dele cai junto) ou espera e vê a família revogada. Sem
+   * isso, um logout com 204 podia deixar um token novo vivo.
    */
   async sair(token: string | undefined): Promise<void> {
     if (!token) throw naoAutenticado();
     const tinhaSessao = await this.db.$transaction(async (tx) => {
-      const [atual] = await tx.$queryRaw<LinhaRefresh[]>`
-        SELECT id, usuario_id, tenant_id, familia, expira_em, revogado_em
-        FROM refresh_token WHERE token_hash = ${hashDoRefresh(token)} FOR UPDATE`;
+      const atual = await this.travarSessao(tx, token);
       if (!atual) return false;
       await this.revogarFamilia(tx, atual.familia);
       // Token já trocado ou revogado: é reuso (ou logout repetido). A família cai do mesmo
@@ -220,6 +214,25 @@ export class SessoesService {
       },
       refresh,
     };
+  }
+
+  /**
+   * Lê a sessão do token com a FAMÍLIA inteira travada (advisory lock da transação). Travar só a
+   * linha do token não basta: um refresh do token atual (B) e o reuso do antigo (A), da mesma
+   * família, travam linhas diferentes, e a revogação de um não enxergava o token novo do outro
+   * (READ COMMITTED: o snapshot é do início do comando). Com a família travada, as operações da
+   * família viram fila; a releitura depois do lock já vê o que a anterior gravou.
+   */
+  private async travarSessao(tx: Prisma.TransactionClient, token: string) {
+    const hash = hashDoRefresh(token);
+    const [linha] = await tx.$queryRaw<Array<{ familia: string }>>`
+      SELECT familia FROM refresh_token WHERE token_hash = ${hash}`;
+    if (!linha) return undefined;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${linha.familia}, 0))`;
+    const [atual] = await tx.$queryRaw<LinhaRefresh[]>`
+      SELECT id, usuario_id, tenant_id, familia, expira_em, revogado_em
+      FROM refresh_token WHERE token_hash = ${hash}`;
+    return atual;
   }
 
   private async revogarFamilia(db: Banco, familia: string): Promise<void> {

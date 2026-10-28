@@ -38,6 +38,9 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<RespostaSessao> {
+    // Só JSON: um formulário de outro site (urlencoded, sem preflight de CORS) não faz login.
+    if (!req.is('application/json'))
+      throw new ErroDominio('validacao', { detail: 'Envie o corpo em JSON (application/json).' });
     const espera = Math.max(
       await this.limitador.registrar(
         `login:ip:${req.ip}`,
@@ -76,8 +79,9 @@ export class AuthController {
       gravarRefresh(res, refresh);
       return resposta;
     } catch (erro) {
-      // Sessão inválida: o cookie não serve para mais nada.
-      apagarRefresh(res);
+      // Sessão inválida: o cookie não serve para mais nada. Falha transitória (5xx) não apaga:
+      // o usuário não pode ser deslogado por uma instabilidade do banco.
+      if (erro instanceof ErroDominio && erro.code === 'nao_autenticado') apagarRefresh(res);
       throw erro;
     }
   }
