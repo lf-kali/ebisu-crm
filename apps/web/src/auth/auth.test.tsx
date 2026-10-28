@@ -201,6 +201,79 @@ describe('sessão: refresh e saída', () => {
     expect(simulada.contagem.refresh).toBe(1);
   });
 
+  it('logout que falha no servidor não finge que saiu: avisa e mantém a sessão', async () => {
+    servidor.use(
+      http.post(`*${ROTAS_AUTH.logout}`, () =>
+        HttpResponse.json(criarProblema('erro_interno'), { status: 500 }),
+      ),
+    );
+    const { router, sessao } = renderizarApp('/contatos');
+    const u = usuario();
+    const menu = await abrirMenuUsuario(u, 'Ana Souza');
+    await u.click(within(menu).getByRole('menuitem', { name: 'Sair' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('Não foi possível sair');
+    expect(router.state.location.pathname).toBe('/contatos');
+    expect(sessao.obter()).not.toBeNull();
+  });
+
+  it('logout com sessão já encerrada no servidor (401) conta como saída', async () => {
+    // Sessão encerrada no servidor: logout e refresh respondem 401.
+    const naoAutenticado = () =>
+      HttpResponse.json(criarProblema('nao_autenticado'), { status: 401 });
+    servidor.use(
+      http.post(`*${ROTAS_AUTH.logout}`, naoAutenticado),
+      http.post(`*${ROTAS_AUTH.refresh}`, () =>
+        simulada.temRefresh() ? undefined : naoAutenticado(),
+      ),
+    );
+    renderizarApp('/contatos');
+    const u = usuario();
+    const menu = await abrirMenuUsuario(u, 'Ana Souza');
+    simulada.revogarRefresh();
+    await u.click(within(menu).getByRole('menuitem', { name: 'Sair' }));
+    expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeTruthy();
+  });
+
+  it('entrar limpa o cache de antes do login', async () => {
+    const { queryClient } = renderizarApp('/', { logado: null });
+    await screen.findByRole('heading', { name: 'Entrar' });
+    queryClient.setQueryData(['dado-antigo'], 1);
+    await entrar('bruno@demo.test');
+    await screen.findByRole('heading', { name: 'Painel' });
+    expect(queryClient.getQueryData(['dado-antigo'])).toBeUndefined();
+  });
+
+  it('trocar de conta limpa o cache da conta anterior', async () => {
+    const { queryClient } = renderizarApp('/escolher-conta');
+    await screen.findByRole('heading', { name: 'Escolha a conta' });
+    queryClient.setQueryData(['contatos-da-conta-anterior'], ['x']);
+    await usuario().click(await screen.findByRole('button', { name: 'Oficina do Bairro' }));
+    await screen.findByRole('heading', { name: 'Painel' });
+    expect(queryClient.getQueryData(['contatos-da-conta-anterior'])).toBeUndefined();
+  });
+
+  it('401 no /v1/eu da carga inicial, com refresh recusado, leva ao login (não à tela de erro)', async () => {
+    simulada.jaLogado('ana@demo.test');
+    servidor.use(
+      http.get(`*${ROTAS_AUTH.eu}`, () =>
+        HttpResponse.json(criarProblema('nao_autenticado'), { status: 401 }),
+      ),
+    );
+    let refreshs = 0;
+    servidor.use(
+      http.post(`*${ROTAS_AUTH.refresh}`, () => {
+        refreshs += 1;
+        // O primeiro refresh (do beforeLoad) passa; o do 401 do loader é recusado.
+        return refreshs === 1
+          ? undefined
+          : HttpResponse.json(criarProblema('nao_autenticado'), { status: 401 });
+      }),
+    );
+    const { router } = renderizarApp('/contatos', { logado: null });
+    expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeTruthy();
+    expect(router.state.location.search).toEqual({ redirect: '/contatos' });
+  });
+
   it('access token vencido: renova uma vez só e repete as requisições', async () => {
     simulada.jaLogado('ana@demo.test');
     const { sessao, cliente } = criarSessaoECliente();
@@ -249,6 +322,10 @@ describe('destinoSeguro', () => {
     ['javascript:alert(1)', '/'],
     ['/login', '/'],
     ['/escolher-conta?redirect=/x', '/'],
+    ['/..//mal.example', '/'],
+    ['/.//mal.example', '/'],
+    ['/a/..//mal.example', '/'],
+    ['/./\\mal.example', '/'],
   ])('%s → %s', (valor, esperado) => {
     expect(destinoSeguro(valor)).toBe(esperado);
   });

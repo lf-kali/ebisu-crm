@@ -7,6 +7,7 @@ import {
   useRouterState,
 } from '@tanstack/react-router';
 import { useEffect, useSyncExternalStore } from 'react';
+import { ErroApi } from '../api/erro-api';
 import { consultaEu } from '../auth/consultas';
 import { ErroDaApi } from '../componentes/erro-da-api';
 import { AppShell } from '../layout/app-shell';
@@ -18,7 +19,16 @@ export const Route = createFileRoute('/_app')({
     const sessao = await context.sessao.garantir();
     if (!sessao) throw redirect({ to: '/login', search: { redirect: location.href } });
   },
-  loader: ({ context }) => context.queryClient.ensureQueryData(consultaEu(context.cliente)),
+  loader: async ({ context, location }) => {
+    try {
+      return await context.queryClient.ensureQueryData(consultaEu(context.cliente));
+    } catch (erro) {
+      // A sessão caiu entre o beforeLoad e o loader (401 e refresh recusado): login, não erro.
+      if (erro instanceof ErroApi && erro.status === 401)
+        throw redirect({ to: '/login', search: { redirect: location.href } });
+      throw erro;
+    }
+  },
   component: LayoutApp,
   notFoundComponent: () => (
     <EstadoVazio titulo="Página não encontrada" descricao="Confira o endereço ou use o menu." />

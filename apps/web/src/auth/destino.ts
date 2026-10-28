@@ -13,6 +13,9 @@ export function destinoSeguro(valor: unknown): string {
   }
   if (url.origin !== BASE) return '/';
   const caminho = `${url.pathname}${url.search}${url.hash}`;
+  // A origem confere, mas "/..//site.com" normaliza para "//site.com", que é protocol-relative na
+  // saída: nunca devolver caminho que comece com duas barras.
+  if (caminho.startsWith('//')) return '/';
   // Voltar para as telas de entrada criaria um ciclo.
   return url.pathname === '/login' || url.pathname === '/escolher-conta' ? '/' : caminho;
 }

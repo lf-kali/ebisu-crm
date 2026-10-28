@@ -135,6 +135,8 @@ export function criarApiSimulada({ persistir }: { persistir?: Storage } = {}) {
     },
     /** Testes: vence todos os access tokens (o próximo uso dá 401). */
     expirarAcessos: () => acessos.clear(),
+    /** Testes: encerra a sessão no servidor (como um logout feito em outro lugar). */
+    revogarRefresh: () => gravarRefresh(null),
     temRefresh: () => refresh !== null,
     contagem,
   };

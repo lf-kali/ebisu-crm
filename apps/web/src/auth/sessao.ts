@@ -99,15 +99,18 @@ export function criarSessao({ cliente, agora = Date.now, travar = travaPadrao }:
       definir(sessao);
       return sessao;
     },
-    /** Sai mesmo se a API falhar: a sessão local some de qualquer jeito. */
+    /**
+     * Encerra a sessão na API e só então a local. Se a API falhar, o erro sobe e a sessão fica:
+     * limpar só a local seria fingir a saída, porque o cookie continua valendo e o próximo
+     * refresh a restauraria. 401 = já não havia sessão no servidor, o que conta como saída.
+     */
     async sair(): Promise<void> {
       try {
         await cliente.post(ROTAS_AUTH.logout, { resposta: null });
-      } catch {
-        // Sem rede ou sessão já expirada: o cookie expira sozinho no servidor.
-      } finally {
-        definir(null);
+      } catch (erro) {
+        if (!(erro instanceof ErroApi && erro.status === 401)) throw erro;
       }
+      definir(null);
     },
   };
 }
