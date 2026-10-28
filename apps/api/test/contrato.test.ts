@@ -111,7 +111,9 @@ describe('contrato: validação de entrada e saída, envelope de erro (§5.1, §
       const r = await http().post(`/v1/exemplo?modo=${modo}`).send({ nome: 'Tela', valor: '1.00' });
       expect(r.status).toBe(500);
       expect(r.body.code).toBe('erro_interno');
-      expect(JSON.stringify(r.body)).not.toMatch(/10\.0\.0\.1|detalhe interno|gateway|conflito sem/);
+      expect(JSON.stringify(r.body)).not.toMatch(
+        /10\.0\.0\.1|detalhe interno|gateway|conflito sem/,
+      );
       expect(logErro).toHaveBeenCalledTimes(1);
     },
   );
