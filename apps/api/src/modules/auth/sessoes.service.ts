@@ -165,17 +165,24 @@ export class SessoesService {
     return resultado;
   }
 
-  /** Logout: revoga a família inteira da sessão. Sem sessão válida, 401. */
+  /**
+   * Logout: revoga a família inteira da sessão. Trava a linha do token, como a rotação: um
+   * refresh em voo termina antes (e o token novo dele cai junto) ou espera e vê a família
+   * revogada. Sem isso, um logout com 204 podia deixar um token novo vivo.
+   */
   async sair(token: string | undefined): Promise<void> {
     if (!token) throw naoAutenticado();
-    const atual = await this.db.refreshToken.findUnique({
-      where: { token_hash: hashDoRefresh(token) },
+    const tinhaSessao = await this.db.$transaction(async (tx) => {
+      const [atual] = await tx.$queryRaw<LinhaRefresh[]>`
+        SELECT id, usuario_id, tenant_id, familia, expira_em, revogado_em
+        FROM refresh_token WHERE token_hash = ${hashDoRefresh(token)} FOR UPDATE`;
+      if (!atual) return false;
+      await this.revogarFamilia(tx, atual.familia);
+      // Token já trocado ou revogado: é reuso (ou logout repetido). A família cai do mesmo
+      // jeito, mas a resposta é 401: não havia sessão válida neste token.
+      return !atual.revogado_em;
     });
-    if (!atual) throw naoAutenticado();
-    await this.revogarFamilia(this.db, atual.familia);
-    // Token já trocado ou revogado: é reuso (ou logout repetido). A família cai do mesmo jeito,
-    // mas a resposta é 401: não havia sessão válida neste token.
-    if (atual.revogado_em) throw naoAutenticado();
+    if (!tinhaSessao) throw naoAutenticado();
   }
 
   private async emitir(

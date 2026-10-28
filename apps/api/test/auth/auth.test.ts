@@ -303,6 +303,35 @@ describe('POST /v1/auth/trocar-conta', () => {
     expect((await refresh(cookie)).status).toBe(200);
   });
 
+  it('troca de conta e refresh simultâneos: nenhum token da sessão antiga fica vivo', async () => {
+    for (let i = 0; i < 5; i += 1) {
+      const { sessao, cookie } = await entrar();
+      const [, troca] = await Promise.all([
+        refresh(cookie),
+        trocarConta(sessao.access_token, cookie, IDS.contas.oficina),
+      ]);
+      const { rows } = await c.sql(
+        `SELECT count(*)::int AS vivos FROM refresh_token
+         WHERE familia = (SELECT familia FROM refresh_token WHERE token_hash = $1)
+           AND revogado_em IS NULL`,
+        [hashDoRefresh(cookie)],
+      );
+      // Se a troca venceu, a família antiga caiu inteira; se o refresh venceu, a troca deu 401
+      // e a família segue com um token vivo (o do refresh), sem sessão nova.
+      if (troca.status === 200) {
+        expect(rows[0]!.vivos).toBe(0);
+        await trocarConta(
+          RespostaSessao.parse(troca.body).access_token,
+          cookieDe(troca),
+          IDS.contas.ebisu,
+        ).expect(200);
+      } else {
+        expect(troca.status).toBe(401);
+        expect(rows[0]!.vivos).toBe(1);
+      }
+    }
+  });
+
   it('conta suspensa, alheia ou inexistente: 404 igual', async () => {
     const { sessao, cookie } = await entrar();
     for (const tenant of [IDS.contas.suspensa, IDS.contas.cancelada, crypto.randomUUID()]) {
@@ -339,6 +368,21 @@ describe('POST /v1/auth/logout', () => {
     const novo = cookieDe(await refresh(cookie))!;
     expect((await sair(cookie)).status).toBe(401);
     expect((await refresh(novo)).status).toBe(401);
+  });
+
+  it('logout e refresh simultâneos: depois do logout, nenhum token da família fica vivo', async () => {
+    for (let i = 0; i < 5; i += 1) {
+      const { cookie } = await entrar();
+      const [, saida] = await Promise.all([refresh(cookie), sair(cookie)]);
+      expect([204, 401]).toContain(saida.status);
+      const { rows } = await c.sql(
+        `SELECT count(*)::int AS vivos FROM refresh_token
+         WHERE familia = (SELECT familia FROM refresh_token WHERE token_hash = $1)
+           AND revogado_em IS NULL`,
+        [hashDoRefresh(cookie)],
+      );
+      expect(rows[0]!.vivos).toBe(0);
+    }
   });
 
   it('CSRF: Origin de fora não consegue derrubar a sessão', async () => {
