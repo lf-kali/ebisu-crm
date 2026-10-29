@@ -7,6 +7,7 @@ import { SaudeModule } from './core/saude/saude.module.js';
 import { TxModule } from './core/tx/executar.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { EmpresasModule } from './modules/empresas/empresas.module.js';
+import { MembrosModule } from './modules/membros/membros.module.js';
 
 // Registro de módulos (dono: F0). Uma linha por módulo de domínio.
 @Module({
@@ -19,6 +20,7 @@ import { EmpresasModule } from './modules/empresas/empresas.module.js';
     SaudeModule,
     AuthModule,
     EmpresasModule,
+    MembrosModule,
   ],
 })
 export class AppModule {}

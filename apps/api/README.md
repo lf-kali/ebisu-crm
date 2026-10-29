@@ -31,6 +31,14 @@ se não existir, a API não sobe. As respostas de erro seguem o catálogo da spe
 | Falta a permissão                                | 403 `sem_permissao`                    |
 | Registro de outra empresa ou conta               | 404 `nao_encontrado` (nunca 403)       |
 
+## Membros e o dono da conta
+
+`/v1/membros` (`config.membros`) e `/v1/papeis` e as atribuições (`config.rbac`) são rotas da conta.
+Só um dono (OWNER em todas as empresas) dá ou tira o papel de dono e suspende ou reativa um dono;
+ninguém muda o próprio status; e a conta nunca fica sem um dono ativo (409 `transicao_invalida`).
+As mudanças de status e de atribuições passam pela trava dos donos da conta (`travarDonos`, advisory
+lock da transação), para duas mudanças simultâneas não deixarem a conta sem dono.
+
 ## Rate limit e IP
 
 Os limites por IP (login e cadastro) usam `req.ip`. A API não confia em `X-Forwarded-For`: atrás de
