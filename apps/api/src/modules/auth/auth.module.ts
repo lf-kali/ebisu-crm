@@ -4,6 +4,7 @@ import { EuController } from '../eu/eu.controller.js';
 import { EuService } from '../eu/eu.service.js';
 import { AuthController } from './auth.controller.js';
 import { GuardaOrigem } from './guardas.js';
+import { RegistroService } from './registro.service.js';
 import { SessoesService } from './sessoes.service.js';
 import { criarTokensDeAcesso, TOKENS_DE_ACESSO } from './tokens.js';
 
@@ -11,6 +12,7 @@ import { criarTokensDeAcesso, TOKENS_DE_ACESSO } from './tokens.js';
   controllers: [AuthController, EuController],
   providers: [
     SessoesService,
+    RegistroService,
     EuService,
     GuardaOrigem,
     {

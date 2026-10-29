@@ -4,6 +4,7 @@
   "sourceRoot": "src",
   "compilerOptions": {
     "tsConfigPath": "tsconfig.build.json",
-    "deleteOutDir": true
+    "deleteOutDir": true,
+    "assets": ["modules/auth/senhas-vazadas.txt", "modules/auth/senhas-vazadas.LICENSE"]
   }
 }

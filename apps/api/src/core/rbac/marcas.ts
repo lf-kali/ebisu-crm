@@ -6,7 +6,10 @@ import { CHAVES_PERMISSAO } from '@ebisu/db';
 export const CHAVE_ACESSO = 'ebisu:acesso';
 
 export type Acesso =
-  { tipo: 'publica' } | { tipo: 'autenticado' } | { tipo: 'permissao'; chave: string };
+  | { tipo: 'publica' }
+  | { tipo: 'autenticado' }
+  | { tipo: 'permissao'; chave: string }
+  | { tipo: 'conta'; chave: string };
 
 function marcar(acesso: Acesso): MethodDecorator {
   return (_alvo, _nome, descritor) => {
@@ -30,6 +33,16 @@ export function Permissao(chave: string): MethodDecorator {
   if (!CHAVES_PERMISSAO.has(chave))
     throw new Error(`@Permissao com chave fora do catálogo: ${chave}`);
   return marcar({ tipo: 'permissao', chave });
+}
+
+/**
+ * Rota da conta, sem empresa (ex.: `/v1/empresas`; plano f3-4a, decisão 8): não lê
+ * `X-Empresa-Id` e exige a permissão com escopo TENANT num papel atribuído a todas as empresas.
+ */
+export function PermissaoNaConta(chave: string): MethodDecorator {
+  if (!CHAVES_PERMISSAO.has(chave))
+    throw new Error(`@PermissaoNaConta com chave fora do catálogo: ${chave}`);
+  return marcar({ tipo: 'conta', chave });
 }
 
 /** As marcas declaradas no handler (vazio se nenhuma). */

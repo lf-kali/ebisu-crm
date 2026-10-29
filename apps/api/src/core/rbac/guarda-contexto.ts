@@ -19,7 +19,7 @@ import { PRISMA_APP, PRISMA_AUTH } from '../banco/banco.module.js';
 import { ErroDominio } from '../erros/erro-dominio.js';
 import { idempotenciaDa } from '../idempotencia/idempotencia.js';
 import { requestIdDa } from '../requisicao/request-id.js';
-import type { ContextoDaRequisicao } from '../tx/contexto.js';
+import type { ContextoDaConta, ContextoDaRequisicao } from '../tx/contexto.js';
 import { type Acesso, marcasDe } from './marcas.js';
 import { permissoesPorEmpresa } from './permissoes.js';
 
@@ -31,7 +31,7 @@ export const CABECALHO_EMPRESA = 'x-empresa-id';
 
 export interface RequisicaoAutenticada extends Request {
   identidade: Identidade;
-  contexto?: ContextoDaRequisicao;
+  contexto?: ContextoDaRequisicao | ContextoDaConta;
 }
 
 const naoAutenticado = () => new ErroDominio('nao_autenticado');
@@ -42,7 +42,8 @@ function acessoDa(contexto: ExecutionContext): Acesso {
   // Erro de programação, não do cliente: vira 500 e o teste de marcas barra no CI.
   if (marcas.length !== 1 || !acesso) {
     throw new Error(
-      `Rota precisa de exatamente uma marca de acesso (@Publica, @SoAutenticado ou @Permissao): ` +
+      `Rota precisa de exatamente uma marca de acesso ` +
+        `(@Publica, @SoAutenticado, @Permissao ou @PermissaoNaConta): ` +
         `${contexto.getClass().name}.${contexto.getHandler().name} tem ${marcas.length}`,
     );
   }
@@ -80,9 +81,10 @@ export class GuardaContexto implements CanActivate {
     if (!identidade) throw naoAutenticado();
     // O formato dos cabeçalhos é conferido antes de ir ao banco.
     const empresaId = acesso.tipo === 'permissao' ? empresaDoCabecalho(req) : null;
-    // Todo POST de domínio é idempotente (plano f3-3a, decisão 1).
+    // Todo POST de domínio, e da conta, é idempotente (plano f3-3a, decisão 1; f3-4a, decisão 8).
+    const comPermissao = acesso.tipo === 'permissao' || acesso.tipo === 'conta';
     const idempotencia =
-      empresaId && req.method === 'POST'
+      comPermissao && req.method === 'POST'
         ? idempotenciaDa(req, empresaId, identidade.membroId)
         : undefined;
 
@@ -95,23 +97,45 @@ export class GuardaContexto implements CanActivate {
 
     const permissoes = await comTenant(this.app, identidade.tenantId, async (tx) => {
       if (!(await this.sessaoAtiva(tx, identidade))) throw naoAutenticado();
+      if (acesso.tipo === 'conta') return this.permissoesNaConta(tx, identidade.membroId);
       return empresaId ? this.permissoesNaEmpresa(tx, identidade.membroId, empresaId) : null;
     });
     req.identidade = identidade;
-    if (acesso.tipo !== 'permissao' || !empresaId || !permissoes) return true;
+    if (!comPermissao || !permissoes) return true;
 
     if (!permissoes.has(acesso.chave)) throw new ErroDominio('sem_permissao');
-    req.contexto = {
+    const base = {
       tenantId: identidade.tenantId,
-      empresaId,
       membroId: identidade.membroId,
       apiKeyId: null,
-      permissoes,
       requestId: requestIdDa(contexto.switchToHttp().getResponse<Response>()) ?? randomUUID(),
       ip: req.ip ?? null,
       ...(idempotencia ? { idempotencia } : {}),
     };
+    req.contexto =
+      acesso.tipo === 'conta'
+        ? { ...base, empresaId: null, permissoes: permissoes as Map<string, 'TENANT'> }
+        : { ...base, empresaId: empresaId!, permissoes };
     return true;
+  }
+
+  /**
+   * Permissões na conta inteira: só as de escopo TENANT, de papéis atribuídos a todas as empresas
+   * (empresa_id nulo). Um papel atribuído a uma empresa só não vale para a conta, mesmo com TENANT.
+   */
+  private async permissoesNaConta(
+    tx: Prisma.TransactionClient,
+    membroId: string,
+  ): Promise<Map<string, 'TENANT'>> {
+    const atribuicoes = await tx.atribuicaoPapel.findMany({
+      where: { membro_id: membroId, empresa_id: null },
+      select: { papel: { select: { permissoes: { where: { escopo: 'TENANT' } } } } },
+    });
+    return new Map(
+      atribuicoes.flatMap((a) =>
+        a.papel.permissoes.map((p) => [p.permissao_chave, 'TENANT'] as const),
+      ),
+    );
   }
 
   /** Membro ATIVO, do mesmo usuário do token, numa conta em teste ou ativa (como no login). */
@@ -161,6 +185,14 @@ export class GuardaContexto implements CanActivate {
 /** Contexto validado da rota de domínio (só em rota com `@Permissao`). */
 export const Contexto = createParamDecorator((_: unknown, contexto: ExecutionContext) => {
   const valor = contexto.switchToHttp().getRequest<RequisicaoAutenticada>().contexto;
-  if (!valor) throw new Error('@Contexto() só funciona em rota com @Permissao');
+  if (!valor?.empresaId) throw new Error('@Contexto() só funciona em rota com @Permissao');
+  return valor;
+});
+
+/** Contexto validado da rota da conta (só em rota com `@PermissaoNaConta`). */
+export const ContextoConta = createParamDecorator((_: unknown, contexto: ExecutionContext) => {
+  const valor = contexto.switchToHttp().getRequest<RequisicaoAutenticada>().contexto;
+  if (!valor || valor.empresaId !== null)
+    throw new Error('@ContextoConta() só funciona em rota com @PermissaoNaConta');
   return valor;
 });

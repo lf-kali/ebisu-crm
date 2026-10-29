@@ -8,13 +8,19 @@ Toda rota tem um `@Contrato` (schemas de entrada e saída, que também geram o `
 **exatamente uma** marca de acesso. Rota sem marca, ou com duas, responde 500 e o teste de marcas
 falha no CI.
 
-| Marca                        | Quando                                                  | O guard confere                                                                       |
-| ---------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `@Publica()`                 | Saúde, login, refresh, logout                           | Nada                                                                                  |
-| `@SoAutenticado()`           | Rotas da pessoa, sem empresa (`/v1/eu`, troca de conta) | Bearer válido; usuário ativo; membro `ATIVO`; conta `TRIAL`/`ATIVO`                   |
-| `@Permissao('recurso.acao')` | Toda rota de domínio                                    | O mesmo, mais `X-Empresa-Id` ativa e atribuída ao membro, e a permissão nessa empresa |
+| Marca                               | Quando                                                  | O guard confere                                                                                          |
+| ----------------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `@Publica()`                        | Saúde, login, refresh, logout                           | Nada                                                                                                     |
+| `@SoAutenticado()`                  | Rotas da pessoa, sem empresa (`/v1/eu`, troca de conta) | Bearer válido; usuário ativo; membro `ATIVO`; conta `TRIAL`/`ATIVO`                                      |
+| `@Permissao('recurso.acao')`        | Toda rota de domínio                                    | O mesmo, mais `X-Empresa-Id` ativa e atribuída ao membro, e a permissão nessa empresa                    |
+| `@PermissaoNaConta('recurso.acao')` | Rotas da conta, sem empresa (`/v1/empresas`)            | O mesmo que `@SoAutenticado`, mais a permissão com escopo TENANT num papel atribuído a todas as empresas |
 
-A chave de `@Permissao` precisa existir no catálogo (`packages/db/src/seeds/catalogo-permissoes.ts`);
+Nas rotas da conta, o comando recebe um `TxContextDaConta` (`empresaId: null`; use
+`@ContextoConta()` no lugar de `@Contexto()`). Um papel com a permissão em escopo EMPRESA, ou
+atribuído a uma empresa só, não abre essas rotas: elas mexem na conta inteira. Os POST delas também
+exigem `Idempotency-Key`.
+
+A chave de `@Permissao` (e de `@PermissaoNaConta`) precisa existir no catálogo (`packages/db/src/seeds/catalogo-permissoes.ts`);
 se não existir, a API não sobe. As respostas de erro seguem o catálogo da spec §5.2:
 
 | Situação                                         | Resposta                               |

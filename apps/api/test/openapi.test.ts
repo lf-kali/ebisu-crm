@@ -130,6 +130,30 @@ describe('OpenAPI gerado dos contratos (D-A02, §4 F2)', () => {
     }
   });
 
+  it('rotas da conta (@PermissaoNaConta): sem X-Empresa-Id; o POST pede Idempotency-Key', () => {
+    const doc = gerarDocumento(app) as unknown as {
+      paths: Record<string, Record<string, Record<string, unknown>>>;
+    };
+    const post = doc.paths['/v1/empresas']!.post!;
+    expect(post.parameters).toEqual([
+      expect.objectContaining({ in: 'header', name: 'Idempotency-Key', required: true }),
+    ]);
+    expect(Object.keys(post.responses as object)).toEqual([
+      '201',
+      '401',
+      '403',
+      '409',
+      '422',
+      'default',
+    ]);
+    expect(post.security).toEqual([{ bearer: [] }]);
+    expect(post.description).toContain('escopo TENANT');
+    const get = doc.paths['/v1/empresas']!.get!;
+    expect(JSON.stringify(get.parameters)).not.toMatch(/X-Empresa-Id|Idempotency-Key/);
+    const registrar = doc.paths['/v1/auth/registrar']!.post!;
+    expect(registrar.security).toBeUndefined();
+  });
+
   it('recusa gerar o documento se alguma rota não tiver @Contrato', async () => {
     const { Controller, Get } = await import('@nestjs/common');
     @Controller('sem-contrato')
