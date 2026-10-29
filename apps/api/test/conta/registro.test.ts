@@ -135,7 +135,7 @@ describe('cadastro de conta', () => {
   });
 
   it('e-mail existente com outra senha dá 401 e não cria nada', async () => {
-    const email = novoEmail('senha-errada');
+    const email = novoEmail('errou');
     expect((await registrar(corpoDeCadastro({ email }))).status).toBe(201);
     const antes = await contas();
     const r = await registrar(corpoDeCadastro({ email, senha: 'outra-senha-bem-longa-9' }));
@@ -169,6 +169,8 @@ describe('cadastro de conta', () => {
     ['só espaços', ' '.repeat(12)],
     ['com poucos caracteres diferentes', 'abcabcabcabc'],
     ['vazada em largura total (NFKC)', 'ＰＡＳＳＷＯＲＤ１２３４'],
+    ['vazada com caractere invisível', 'pass\u200bword1234'],
+    ['vazada com espaços no meio', 'p a s s w o r d 1 2 3 4'],
   ])('senha %s dá 422 em `senha` e não cria nada', async (_caso, senha) => {
     const antes = await contas();
     const r = await registrar(corpoDeCadastro({ email: 'fulano.vip@cadastro.local', senha }));
@@ -216,17 +218,13 @@ describe('cadastro de conta', () => {
   it('cadastros simultâneos com o mesmo nome de conta: todos entram, com slugs diferentes', async () => {
     const nome = 'Corrida de Slug';
     const respostas = await Promise.all(
-      Array.from({ length: 5 }, () => registrar(corpoDeCadastro({ conta: { nome } }))),
+      Array.from({ length: 12 }, () => registrar(corpoDeCadastro({ conta: { nome } }))),
     );
-    expect(respostas.map((r) => r.status)).toEqual([201, 201, 201, 201, 201]);
-    const slugs = respostas.map((r) => r.body.conta.slug as string).sort();
-    expect(slugs).toEqual([
-      'corrida-de-slug',
-      'corrida-de-slug-2',
-      'corrida-de-slug-3',
-      'corrida-de-slug-4',
-      'corrida-de-slug-5',
-    ]);
+    expect(respostas.map((r) => r.status)).toEqual(Array(12).fill(201));
+    const slugs = respostas.map((r) => r.body.conta.slug as string);
+    expect(new Set(slugs).size).toBe(12);
+    expect(slugs).toContain('corrida-de-slug');
+    for (const slug of slugs) expect(slug).toMatch(/^corrida-de-slug(-\d+|-[0-9a-f]{6})?$/);
   });
 
   it('cadastros simultâneos com o mesmo e-mail: um usuário, uma conta por cadastro', async () => {

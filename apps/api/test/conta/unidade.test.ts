@@ -32,6 +32,19 @@ describe('política de senha', () => {
     expect(recusa('ＰＡＳＳＷＯＲＤ１２３４')).toThrow(ErroDominio);
   });
 
+  it('espaços e caracteres invisíveis não escondem senha vazada nem dado pessoal', () => {
+    expect(recusa('password\u200b1234')).toThrow(ErroDominio);
+    expect(recusa('pass\u00adword1234')).toThrow(ErroDominio);
+    expect(recusa('p a s s w o r d 1 2 3 4')).toThrow(ErroDominio);
+    expect(recusa('car valho-2026-forte')).toThrow(ErroDominio);
+  });
+
+  it('a parte do e-mail sem pontuação, e cada pedaço dela, também contam', () => {
+    const outra = { email: 'marina.duarte@oficina.com.br', nome: 'M D' };
+    expect(() => validarSenha('marinaduarte99xx', outra)).toThrow(ErroDominio);
+    expect(() => validarSenha('x-duarte-y-2026!', outra)).toThrow(ErroDominio);
+  });
+
   it('recusa tamanho fora de 12 a 128', () => {
     expect(recusa('a'.repeat(11))).toThrow(ErroDominio);
     expect(recusa('a1-'.repeat(43))).toThrow(ErroDominio);

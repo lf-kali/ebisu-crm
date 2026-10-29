@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { type EntradaRegistro, normalizarCnpj } from '@ebisu/contracts';
 import {
@@ -31,10 +31,10 @@ export interface OrigemDoCadastro extends Origem {
 
 const TAMANHO_SLUG = 50;
 /**
- * Tentativas de slug. Cada colisão quer dizer que outro cadastro com o mesmo nome terminou antes,
- * então N cadastros simultâneos com o mesmo nome precisam de até N tentativas.
+ * Tentativas de slug. A primeira usa o slug livre (base ou base-N); depois de uma colisão (outro
+ * cadastro simultâneo com o mesmo nome), um sufixo aleatório, que praticamente não colide de novo.
  */
-const TENTATIVAS_SLUG = 5;
+const TENTATIVAS_SLUG = 3;
 
 /** "Assistência São José" vira "assistencia-sao-jose". */
 export function slugDe(nome: string): string {
@@ -109,8 +109,10 @@ export class RegistroService {
     entrada: EntradaRegistro,
     origem: OrigemDoCadastro,
   ): Promise<string> {
+    const base = slugDe(entrada.conta.nome);
     for (let tentativa = 1; ; tentativa++) {
-      const slug = await this.slugLivre(slugDe(entrada.conta.nome));
+      const slug =
+        tentativa === 1 ? await this.slugLivre(base) : `${base}-${randomBytes(3).toString('hex')}`;
       try {
         return await this.gravarConta(usuarioId, slug, entrada, origem);
       } catch (erro) {

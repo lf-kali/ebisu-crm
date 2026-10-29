@@ -31,14 +31,26 @@ export function senhasVazadas(): ReadonlySet<string> {
 /** Minúsculas e sem acento: "José" e "jose" contam como o mesmo nome. */
 const simplificar = (texto: string) => texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
-/** O e-mail, a parte antes do @, o nome inteiro (sem espaços) e cada palavra do nome. */
+/**
+ * O e-mail, a parte antes do @ (inteira, sem pontuação e em pedaços) e o nome (inteiro, sem
+ * espaços e cada palavra).
+ */
 function partesPessoais(email: string, nome: string): string[] {
   const palavras = simplificar(nome).split(/[^a-z0-9]+/);
   const usuario = simplificar(email).split('@')[0] ?? '';
-  return [simplificar(email), usuario, palavras.join(''), ...palavras].filter(
-    (parte) => parte.length >= PARTE_MINIMA,
-  );
+  const pedacos = usuario.split(/[^a-z0-9]+/);
+  return [
+    simplificar(email),
+    usuario,
+    pedacos.join(''),
+    ...pedacos,
+    palavras.join(''),
+    ...palavras,
+  ].filter((parte) => parte.length >= PARTE_MINIMA);
 }
+
+/** Sem espaços nem caracteres invisíveis: "pass\u200bword 1234" conta como "password1234". */
+const compactar = (texto: string) => texto.replace(/[\p{Cf}\p{Z}\s]/gu, '');
 
 /** 422 `validacao` no campo `senha`, sem dizer qual regra falhou. */
 export function validarSenha(senha: string, pessoa: { email: string; nome: string }): void {
@@ -50,7 +62,8 @@ export function validarSenha(senha: string, pessoa: { email: string; nome: strin
     senha.length > SENHA_MAXIMO ||
     new Set(normal).size < DISTINTOS_MINIMO ||
     senhasVazadas().has(normal.toLowerCase()) ||
-    partesPessoais(pessoa.email, pessoa.nome).some((parte) => simples.includes(parte));
+    senhasVazadas().has(compactar(normal).toLowerCase()) ||
+    partesPessoais(pessoa.email, pessoa.nome).some((parte) => compactar(simples).includes(parte));
   if (fraca)
     throw new ErroDominio('validacao', {
       campos: [
