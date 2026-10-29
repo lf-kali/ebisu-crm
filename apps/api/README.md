@@ -39,6 +39,16 @@ ninguém muda o próprio status; e a conta nunca fica sem um dono ativo (409 `tr
 As mudanças de status e de atribuições passam pela trava dos donos da conta (`travarDonos`, advisory
 lock da transação), para duas mudanças simultâneas não deixarem a conta sem dono.
 
+## Convites
+
+`POST /v1/membros/convites` (`config.membros` e `config.rbac`; dono só por um dono) grava o convite
+e uma linha em `email_saida`, na mesma transação. O worker reivindica as linhas de todas as contas
+por `reivindicar_email_saida()` (única passagem entre contas, devolve só ids), gera o token no
+envio e grava só o hash. O aceite é público (`/v1/auth/convites/consultar` e `/aceitar`, só JSON,
+limite por IP): e-mail novo cria o acesso; usuário verificado precisa da senha dele; usuário não
+verificado define senha nova e perde as sessões antigas. Link inválido, vencido, usado ou
+revogado: 410 `link_invalido`. Convidar e reenviar têm limite (30 por hora por conta, 3 por dia por e-mail de destino e por convite reenviado, 5 por dia em conta com menos de 24 h; no sistema, 300 por hora para contas antigas e 100 para contas novas). Os limites da conta vêm antes do comando e o teto global só conta convite enfileirado; a repetição idempotente não gasta cota.
+
 ## Rate limit e IP
 
 Os limites por IP (login e cadastro) usam `req.ip`. A API não confia em `X-Forwarded-For`: atrás de

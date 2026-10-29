@@ -17,6 +17,7 @@ const FORA_DA_AUDITORIA = [
   'idempotencia_requisicao',
   'sequencia_documento',
   'notificacao',
+  'email_saida',
   'job_lote',
   'historico_etapa_negocio',
   'orcamento_status_historico',
