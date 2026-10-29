@@ -31,7 +31,7 @@ import {
 
 const PosicaoCursor = z.object({ id: Uuid });
 
-function posicaoDo(cursor: string | undefined): string | undefined {
+export function posicaoDo(cursor: string | undefined): string | undefined {
   if (!cursor) return undefined;
   try {
     return decodificarCursor(cursor, PosicaoCursor).id;
@@ -43,13 +43,13 @@ function posicaoDo(cursor: string | undefined): string | undefined {
   }
 }
 
-const invalida = (mensagem: string) =>
+export const invalida = (mensagem: string) =>
   new ErroDominio('validacao', {
     campos: [{ campo: 'atribuicoes', code: 'atribuicao_invalida', mensagem }],
   });
 
 /** Quem age é dono (decisão 3). API key (sem membro) nunca é. */
-async function exigirDono(ctx: TxContextDaConta) {
+export async function exigirDono(ctx: TxContextDaConta) {
   if (!ctx.membroId || !(await ehDono(ctx.tx, ctx.membroId)))
     throw new ErroDominio('sem_permissao', {
       detail: 'Só um dono da conta mexe no papel de dono.',
@@ -108,14 +108,14 @@ export async function editar(
   return membroOu404(ctx, id);
 }
 
-const minusculo = (id: string) => id.toLowerCase();
+export const minusculo = (id: string) => id.toLowerCase();
 
 /**
  * Valida as referências (papéis da conta e empresas ativas da conta, decisão 7) e devolve se cada
  * atribuição pedida é do papel de dono. Quem diz o que é dono é a chave lida do banco, nunca uma
  * comparação de ids como texto (o banco compara uuid sem caixa).
  */
-async function referenciasValidas(ctx: TxContextDaConta, entrada: EntradaAtribuicoes) {
+export async function referenciasValidas(ctx: TxContextDaConta, entrada: EntradaAtribuicoes) {
   const idsPapel = [...new Set(entrada.atribuicoes.map((a) => minusculo(a.papel_id)))];
   const papeis = await papeisDaConta(ctx.tx, idsPapel);
   if (papeis.length !== idsPapel.length) throw invalida('Papel inexistente nesta conta.');

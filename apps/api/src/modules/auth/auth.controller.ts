@@ -1,8 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { Controller, Inject, Post, Req, Res, UseGuards } from '@nestjs/common';
 import {
+  ConsultaConvite,
+  EntradaAceite,
   EntradaLogin,
   EntradaRegistro,
+  EntradaTokenConvite,
   EntradaTrocarConta,
   RespostaSessao,
 } from '@ebisu/contracts';
@@ -14,6 +17,7 @@ import { requestIdDa } from '../../core/requisicao/request-id.js';
 import { apagarRefresh, gravarRefresh, lerRefresh } from './cookie-refresh.js';
 import type { RequisicaoAutenticada } from '../../core/rbac/guarda-contexto.js';
 import { Publica, SoAutenticado } from '../../core/rbac/marcas.js';
+import { ConvitesService } from './convites.service.js';
 import { GuardaOrigem } from './guardas.js';
 import { RegistroService } from './registro.service.js';
 import { normalizarEmail, type Origem, SessoesService } from './sessoes.service.js';
@@ -32,6 +36,8 @@ const LIMITE_POR_IP: Limite = { maximo: 30, janela: 60 };
 const LIMITE_POR_EMAIL: Limite = { maximo: 10, janela: 15 * 60 };
 /** Cadastros: 5 por hora por IP e por e-mail (plano f3-4a, decisão 5). */
 const LIMITE_CADASTRO: Limite = { maximo: 5, janela: 60 * 60 };
+/** Consulta e aceite de convite: por IP (plano f3-4b2, decisão 6). */
+const LIMITE_CONVITE: Limite = { maximo: 20, janela: 15 * 60 };
 
 const origemDe = (req: Request): Origem => ({ ip: req.ip, userAgent: req.headers['user-agent'] });
 
@@ -46,6 +52,7 @@ export class AuthController {
   constructor(
     private readonly sessoes: SessoesService,
     private readonly registro: RegistroService,
+    private readonly convites: ConvitesService,
     @Inject(LIMITADOR) private readonly limitador: Limitador,
   ) {}
 
@@ -87,6 +94,54 @@ export class AuthController {
       [`login:email:${email}`, LIMITE_POR_EMAIL],
     ]);
     const { resposta, refresh } = await this.registro.registrar(entrada, {
+      ...origemDe(req),
+      requestId: requestIdDa(res) ?? randomUUID(),
+    });
+    gravarRefresh(res, refresh);
+    return resposta;
+  }
+
+  @Post('convites/consultar')
+  @Publica()
+  @Contrato({
+    resumo: 'Consulta um convite pelo token do link',
+    descricao:
+      'Diz a conta, o e-mail e o que a tela deve pedir. Link inválido, vencido, usado ou ' +
+      'revogado: 410 link_invalido.',
+    tags: ['auth'],
+    corpo: EntradaTokenConvite,
+    resposta: ConsultaConvite,
+  })
+  async consultarConvite(
+    @Corpo() entrada: EntradaTokenConvite,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<ConsultaConvite> {
+    exigirJson(req);
+    await this.limitar(res, [[`convite:ip:${req.ip}`, LIMITE_CONVITE]]);
+    return this.convites.consultar(entrada.token);
+  }
+
+  @Post('convites/aceitar')
+  @Publica()
+  @Contrato({
+    resumo: 'Aceita um convite e entra na conta',
+    descricao:
+      'E-mail sem usuário: cria o acesso (nome e senha). Usuário que já confirmou o e-mail: a ' +
+      'senha dele. E-mail ainda não confirmado: senha nova, e as sessões antigas são encerradas.',
+    tags: ['auth'],
+    corpo: EntradaAceite,
+    resposta: RespostaSessao,
+    status: 201,
+  })
+  async aceitarConvite(
+    @Corpo() entrada: EntradaAceite,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<RespostaSessao> {
+    exigirJson(req);
+    await this.limitar(res, [[`convite:ip:${req.ip}`, LIMITE_CONVITE]]);
+    const { resposta, refresh } = await this.convites.aceitar(entrada, {
       ...origemDe(req),
       requestId: requestIdDa(res) ?? randomUUID(),
     });

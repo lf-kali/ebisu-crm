@@ -29,6 +29,13 @@ pnpm dev                 # api, worker e web
 | S3 (SeaweedFS) | http://localhost:8333, bucket `ebisu-anexos`           |
 | Mailpit        | SMTP `localhost:1025`, interface http://localhost:8025 |
 
+### Convites e e-mails
+
+Convidar alguém para a conta (`POST /v1/membros/convites`) põe o e-mail num outbox; o worker
+(`pnpm dev` já o sobe) envia pelo SMTP do Mailpit a cada poucos segundos. Os e-mails aparecem em
+http://localhost:8025, com o link `{WEB_URL}/convite#token=...`. O token só existe no e-mail: no
+banco fica o hash.
+
 ### Login no web
 
 O web em `pnpm dev` fala com a API real pelo proxy do Vite (`/v1`). Depois de `pnpm db:seed:demo`,

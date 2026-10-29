@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import type {
   EdicaoMembro,
   EntradaAtribuicoes,
+  EntradaConvite,
   ListaMembros,
   Membro,
   ParametrosPaginacao,
@@ -10,9 +11,10 @@ import type { PrismaClient } from '@ebisu/db';
 import { PRISMA_AUTH } from '../../core/banco/banco.module.js';
 import type { ContextoDaConta } from '../../core/tx/contexto.js';
 import { ExecutorDeComandos } from '../../core/tx/executar.js';
+import * as convites from './convites.comandos.js';
 import * as comandos from './membros.comandos.js';
 import type { LinhaMembro } from './membros.repositorio.js';
-import { dadosDosUsuarios } from './usuarios.repositorio.js';
+import { dadosDosUsuarios, idDoUsuario } from './usuarios.repositorio.js';
 
 /** Roda os comandos e completa cada membro com o nome e o e-mail do usuário. */
 @Injectable()
@@ -58,6 +60,29 @@ export class MembrosService {
 
   async atribuir(ctx: ContextoDaConta, id: string, entrada: EntradaAtribuicoes) {
     return this.um(await this.executor.executarComando(ctx, comandos.atribuir, { id, entrada }));
+  }
+
+  /** E-mail normalizado como no cadastro; o usuário (se existir) só para checar se já é membro. */
+  async convidar(ctx: ContextoDaConta, entrada: EntradaConvite) {
+    const email = entrada.email.trim().toLowerCase();
+    const usuarioId = await idDoUsuario(this.auth, email);
+    return this.executor.executarComando(ctx, convites.convidar, {
+      email,
+      atribuicoes: entrada.atribuicoes,
+      usuarioId,
+    });
+  }
+
+  listarConvites(ctx: ContextoDaConta, query: ParametrosPaginacao) {
+    return this.executor.executarComando(ctx, convites.listar, query);
+  }
+
+  reenviarConvite(ctx: ContextoDaConta, id: string) {
+    return this.executor.executarComando(ctx, convites.reenviar, id);
+  }
+
+  revogarConvite(ctx: ContextoDaConta, id: string) {
+    return this.executor.executarComando(ctx, convites.revogar, id);
   }
 
   async papeis(ctx: ContextoDaConta) {

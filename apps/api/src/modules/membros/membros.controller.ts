@@ -1,6 +1,9 @@
-import { Controller, Get, Patch, Put } from '@nestjs/common';
+import { Controller, Delete, Get, Patch, Post, Put } from '@nestjs/common';
 import {
+  Convite,
   EdicaoMembro,
+  EntradaConvite,
+  ListaConvites,
   EntradaAtribuicoes,
   ListaMembros,
   ListaPapeis,
@@ -23,6 +26,70 @@ type PorId = z.infer<typeof PorId>;
 const REGRA_DO_DONO =
   'Dar ou tirar o papel de dono (OWNER), ou suspender um dono, exige ser dono (403). A conta ' +
   'nunca fica sem um dono ativo (409 transicao_invalida).';
+
+/**
+ * Convites (plano docs/planos/f3-4b2-convites.md). Registrado antes do MembrosController:
+ * `GET /membros/convites` precisa vir antes de `GET /membros/:id`.
+ */
+@Controller('membros/convites')
+export class ConvitesController {
+  constructor(private readonly membros: MembrosService) {}
+
+  @Post()
+  @PermissaoNaConta('config.membros')
+  @Contrato({
+    resumo: 'Convida uma pessoa para a conta, já com os papéis',
+    descricao:
+      'O e-mail sai pelo worker, com um link que vale 7 dias e uma vez. Exige também ' +
+      `config.rbac (dar papéis). ${REGRA_DO_DONO}`,
+    tags: ['membros'],
+    corpo: EntradaConvite,
+    resposta: Convite,
+    status: 201,
+  })
+  convidar(@ContextoConta() contexto: ContextoDaConta, @Corpo() entrada: EntradaConvite) {
+    return this.membros.convidar(contexto, entrada);
+  }
+
+  @Get()
+  @PermissaoNaConta('config.membros')
+  @Contrato({
+    resumo: 'Lista os convites pendentes',
+    tags: ['membros'],
+    query: ParametrosPaginacao,
+    resposta: ListaConvites,
+  })
+  listar(@ContextoConta() contexto: ContextoDaConta, @Consulta() query: ParametrosPaginacao) {
+    return this.membros.listarConvites(contexto, query);
+  }
+
+  @Post(':id/reenviar')
+  @PermissaoNaConta('config.membros')
+  @Contrato({
+    resumo: 'Reenvia o convite',
+    descricao: 'Renova a validade e invalida o link anterior. Exige também config.rbac.',
+    tags: ['membros'],
+    params: PorId,
+    resposta: Convite,
+  })
+  reenviar(@ContextoConta() contexto: ContextoDaConta, @Parametros() { id }: PorId) {
+    return this.membros.reenviarConvite(contexto, id);
+  }
+
+  @Delete(':id')
+  @PermissaoNaConta('config.membros')
+  @Contrato({
+    resumo: 'Revoga o convite',
+    descricao: 'O link deixa de valer na hora. Convite já aceito: 409.',
+    tags: ['membros'],
+    params: PorId,
+    resposta: null,
+    status: 204,
+  })
+  async revogar(@ContextoConta() contexto: ContextoDaConta, @Parametros() { id }: PorId) {
+    await this.membros.revogarConvite(contexto, id);
+  }
+}
 
 @Controller('membros')
 export class MembrosController {

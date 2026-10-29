@@ -59,6 +59,8 @@ model Tenant {
   tipos_acessorio TipoAcessorio[]
   checklists      ChecklistModelo[]
   idempotencias   IdempotenciaRequisicao[]
+  convites        Convite[]
+  emails_saida    EmailSaida[]
 
   @@map("tenant")
 }
@@ -342,6 +344,69 @@ enum StatusIdempotencia {
 
 /// Guarda o resultado de POSTs com Idempotency-Key. Repetição com o mesmo
 /// hash devolve a resposta salva; hash diferente → 422; EM_PROCESSAMENTO → 409.
+/// Convite para entrar na conta (F3-4b2; plano docs/planos/f3-4b2-convites.md). O token do link
+/// só existe como hash, gerado pelo worker no envio; um uso; vence em 7 dias. Um convite pendente
+/// por e-mail na conta (índice parcial convite_pendente_uq na migração).
+model Convite {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  tenant_id     String    @db.Uuid
+  /// Normalizado (trim + minúsculas), como usuario.email.
+  email         String
+  /// [{papel_id, empresa_id | null}], revalidadas no aceite.
+  atribuicoes   Json
+  /// Membro que convidou (sem FK: o convite sobrevive à saída de quem convidou).
+  convidado_por String?   @db.Uuid
+  /// SHA-256 (hex) do token do último envio; null antes do envio e depois de reenviar ou revogar.
+  token_hash    String?   @unique
+  expira_em     DateTime
+  aceito_em     DateTime?
+  revogado_em   DateTime?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  tenant Tenant       @relation(fields: [tenant_id], references: [id])
+  emails EmailSaida[]
+
+  @@unique([tenant_id, id])
+  @@index([tenant_id, email])
+  @@map("convite")
+}
+
+enum TipoEmailSaida {
+  CONVITE
+}
+
+enum StatusEmailSaida {
+  PENDENTE
+  ENVIANDO
+  ENVIADO
+  FALHOU
+  CANCELADO
+}
+
+/// Outbox mínimo de e-mails do sistema (F3-4b2). Guarda o tipo e a referência, nunca o conteúdo
+/// nem o token: o worker monta a mensagem no envio. Reivindicado por reivindicar_email_saida().
+model EmailSaida {
+  id         String           @id @default(uuid(7)) @db.Uuid
+  tenant_id  String           @db.Uuid
+  tipo       TipoEmailSaida
+  convite_id String?          @db.Uuid
+  status     StatusEmailSaida @default(PENDENTE)
+  tentativas Int              @default(0)
+  /// PENDENTE: quando pode sair; ENVIANDO: fim do prazo do worker que a reivindicou.
+  proxima_em DateTime         @default(now())
+  erro       String?
+  enviado_em DateTime?
+  created_at DateTime         @default(now())
+  updated_at DateTime         @updatedAt
+
+  tenant  Tenant   @relation(fields: [tenant_id], references: [id])
+  convite Convite? @relation(fields: [tenant_id, convite_id], references: [tenant_id, id], onDelete: Cascade)
+
+  @@index([status, proxima_em])
+  @@map("email_saida")
+}
+
 model IdempotenciaRequisicao {
   tenant_id    String             @db.Uuid
   chave        String

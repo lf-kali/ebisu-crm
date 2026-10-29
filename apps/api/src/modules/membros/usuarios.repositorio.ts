@@ -14,3 +14,9 @@ export async function dadosDosUsuarios(
   });
   return new Map(usuarios.map((u) => [u.id, { nome: u.nome, email: u.email }]));
 }
+
+/** Id do usuário com este e-mail (já normalizado), ou null. Só para checar se já é membro. */
+export async function idDoUsuario(auth: PrismaClient, email: string): Promise<string | null> {
+  const usuario = await auth.usuario.findUnique({ where: { email }, select: { id: true } });
+  return usuario?.id ?? null;
+}
