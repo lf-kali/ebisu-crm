@@ -109,9 +109,10 @@ RETURNS TABLE (id uuid, tenant_id uuid)
 LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp AS $$
   UPDATE public.email_saida e
      SET status = 'ENVIANDO', tentativas = e.tentativas + 1,
-         -- Prazo entre 1 s e 1 h: quem chama não consegue prender as linhas de todas as contas.
+         -- Prazo entre 1 min e 1 h: quem chama não consegue prender as linhas de todas as contas
+         -- nem esgotar as tentativas delas reivindicando em sequência.
          proxima_em = (now() AT TIME ZONE 'utc')
-           + least(greatest(prazo, interval '1 second'), interval '1 hour'),
+           + least(greatest(prazo, interval '1 minute'), interval '1 hour'),
          updated_at = now() AT TIME ZONE 'utc'
    WHERE e.id IN (
      SELECT s.id FROM public.email_saida s

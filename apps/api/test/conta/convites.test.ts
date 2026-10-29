@@ -292,6 +292,39 @@ describe('reenviar e revogar', () => {
     expect(status).toEqual([201, 201, 201, 201, 429]);
   });
 
+  it('tentativas barradas de uma conta não esgotam o teto global das outras', async () => {
+    const limitado = await c.criarApp(limitadorEmMemoria());
+    const http2 = () => request(limitado.getHttpServer());
+    // Atacante: conta recém-cadastrada martelando reenvios de convites que nem existem.
+    const atacante = await contaNova(limitado, { conta: { nome: 'Conta Atacante' } });
+    const status = new Map<number, number>();
+    for (let i = 0; i < 310; i++) {
+      const r = await http2()
+        .post(`/v1/membros/convites/${randomUUID()}/reenviar`)
+        .set('Authorization', `Bearer ${atacante.token}`)
+        .set('Idempotency-Key', randomUUID());
+      status.set(r.status, (status.get(r.status) ?? 0) + 1);
+    }
+    expect(status.get(429)).toBeGreaterThan(0);
+    // Vítima: conta antiga, dentro da própria cota, segue convidando.
+    const vitima = await contaNova(limitado, { conta: { nome: 'Conta Vítima Antiga' } });
+    await c.sql(`UPDATE tenant SET created_at = now() - interval '2 days' WHERE id = $1`, [
+      vitima.tenantId,
+    ]);
+    const papeis = ListaPapeis.parse(
+      (await http2().get('/v1/papeis').set('Authorization', `Bearer ${vitima.token}`)).body,
+    ).dados;
+    const r = await http2()
+      .post('/v1/membros/convites')
+      .set('Authorization', `Bearer ${vitima.token}`)
+      .set('Idempotency-Key', randomUUID())
+      .send({
+        email: novoEmail(),
+        atribuicoes: [{ papel_id: papeis.find((p) => p.chave === 'ADMIN')!.id, empresa_id: null }],
+      });
+    expect(r.status).toBe(201);
+  });
+
   it('convite de outra conta dá 404', async () => {
     const x = await conta('Conta Daqui');
     const y = await conta('Conta de Lá');

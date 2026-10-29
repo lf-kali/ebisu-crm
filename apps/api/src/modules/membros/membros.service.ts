@@ -30,8 +30,12 @@ const LIMITES_CONVITE = {
   reenvio: { maximo: 3, janela: DIA },
   /** Conta com menos de 24 h: o cadastro é aberto, então conta nova convida pouco (usuário). */
   contaNova: { maximo: 5, janela: DIA },
-  /** Teto do sistema inteiro: várias contas novas juntas não viram um canal de spam. */
+  /**
+   * Teto do sistema inteiro, contado só por convite de fato enfileirado (depois do comando). Dois
+   * baldes: contas novas juntas não esgotam o das contas antigas, que convidam de verdade.
+   */
   global: { maximo: 300, janela: 60 * 60 },
+  globalNovas: { maximo: 100, janela: 60 * 60 },
 } as const;
 
 type Chaves = ReadonlyArray<[string, { maximo: number; janela: number }]>;
@@ -52,23 +56,38 @@ export class MembrosService {
     @Inject(LIMITADOR) private readonly limitador: Limitador,
   ) {}
 
+  /** Conta uma tentativa em cada chave; se alguma estourou, LimiteExcedido. */
+  private async registrar(chaves: Chaves): Promise<void> {
+    let espera = 0;
+    for (const [chave, { maximo, janela }] of chaves)
+      espera = Math.max(espera, await this.limitador.registrar(chave, maximo, janela));
+    if (espera > 0) throw new LimiteExcedido(espera);
+  }
+
   /**
-   * O comando com o limite na frente. Roda dentro do executarComando, depois da checagem de
-   * idempotência: repetir o POST com a mesma Idempotency-Key devolve a resposta salva e não gasta
-   * cota (plano f3-3a).
+   * O comando com os limites (plano f3-4b2, decisão 11). Roda dentro do executarComando, depois da
+   * checagem de idempotência: repetir o POST com a mesma Idempotency-Key devolve a resposta salva
+   * e não gasta cota (plano f3-3a). Ordem:
+   * 1. limites da própria conta (conta, destino ou reenvio, conta nova): quem abusa só gasta a
+   *    própria cota;
+   * 2. o comando (403, 404, 409 param aqui, sem tocar no teto global);
+   * 3. o teto global, só pelo convite de fato enfileirado; estourado, a transação desfaz tudo.
    */
   private comLimite<E, S>(chaves: Chaves, comando: (ctx: TxContextDaConta, e: E) => Promise<S>) {
     return async (ctx: TxContextDaConta, entrada: E): Promise<S> => {
       const nova = Date.now() - (await contaCriadaEm(ctx.tx, ctx.tenantId)).getTime() < DIA * 1000;
-      const todas: Chaves = [...chaves, ['convite:global', LIMITES_CONVITE.global]];
-      const comNova: Chaves = nova
-        ? [...todas, [`convite:conta-nova:${ctx.tenantId}`, LIMITES_CONVITE.contaNova]]
-        : todas;
-      let espera = 0;
-      for (const [chave, { maximo, janela }] of comNova)
-        espera = Math.max(espera, await this.limitador.registrar(chave, maximo, janela));
-      if (espera > 0) throw new LimiteExcedido(espera);
-      return comando(ctx, entrada);
+      await this.registrar(
+        nova
+          ? [...chaves, [`convite:conta-nova:${ctx.tenantId}`, LIMITES_CONVITE.contaNova]]
+          : chaves,
+      );
+      const saida = await comando(ctx, entrada);
+      await this.registrar([
+        nova
+          ? ['convite:global-novas', LIMITES_CONVITE.globalNovas]
+          : ['convite:global', LIMITES_CONVITE.global],
+      ]);
+      return saida;
     };
   }
 

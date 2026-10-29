@@ -18,6 +18,12 @@ export interface OpcoesEnvio {
   aoFalhar?: (id: string, erro: unknown) => void;
 }
 
+/** Nome da conta no e-mail: uma linha, sem controles, até 60 caracteres e entre aspas. */
+export const nomeNoEmail = (nome: string) => {
+  const limpo = nome.replace(/[\p{Cc}\p{Cf}\s]+/gu, ' ').trim();
+  return `"${limpo.length > 60 ? `${limpo.slice(0, 59)}…` : limpo}"`;
+};
+
 /** Espera antes da próxima tentativa: 30 s, 1 min, 2 min, 4 min... */
 export const esperaDaTentativa = (tentativas: number) =>
   ESPERA_BASE_MS * 2 ** Math.max(tentativas - 1, 0);
@@ -97,12 +103,13 @@ async function montarMensagem(
   });
   // O token vai no fragmento: o navegador não o manda a servidores nem a logs.
   const link = `${webUrl.replace(/\/+$/, '')}/convite#token=${token}`;
+  const conta = nomeNoEmail(email.tenant.nome);
   const validade = convite.expira_em.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
   return {
     para: convite.email,
-    assunto: `Convite para a conta ${email.tenant.nome} no ebisuCRM`,
+    assunto: `Convite para a conta ${conta} no ebisuCRM`,
     texto: [
-      `Você foi convidado para a conta ${email.tenant.nome} no ebisuCRM.`,
+      `Você foi convidado para a conta ${conta} no ebisuCRM.`,
       '',
       `Para aceitar, abra o link abaixo (vale até ${validade} e só uma vez):`,
       link,

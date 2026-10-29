@@ -2,7 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { hashDoTokenConvite, PrismaClient } from '@ebisu/db';
 import { type BancoDeTeste, criarBancoDeTeste } from '@ebisu/db/teste';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { esperaDaTentativa, MAXIMO_TENTATIVAS, processarEmails } from '../src/emails/processar.js';
+import {
+  esperaDaTentativa,
+  MAXIMO_TENTATIVAS,
+  nomeNoEmail,
+  processarEmails,
+} from '../src/emails/processar.js';
 import type { MensagemEmail, Remetente } from '../src/emails/remetente.js';
 
 // Outbox de e-mails (plano docs/planos/f3-4b2-convites.md, decisão 5) contra um Postgres real,
@@ -67,6 +72,16 @@ const linha = async (id: string) =>
   (await admin.query(`SELECT * FROM email_saida WHERE id = $1`, [id])).rows[0];
 const tokenDo = (mensagem: MensagemEmail) =>
   /#token=([A-Za-z0-9_-]{43})$/m.exec(mensagem.texto)![1]!;
+
+describe('nome da conta no e-mail', () => {
+  it('uma linha, sem controles, entre aspas e até 60 caracteres', () => {
+    expect(nomeNoEmail('Oficina\r\nBcc: x@y.z')).toBe('"Oficina Bcc: x@y.z"');
+    expect(nomeNoEmail('a\u200bb')).toBe('"a b"');
+    const longo = nomeNoEmail('x'.repeat(200));
+    expect(longo.length).toBe(62);
+    expect(longo.endsWith('…"')).toBe(true);
+  });
+});
 
 describe('envio do outbox', () => {
   it('envia o convite com o link; só o hash do token fica no banco', async () => {
