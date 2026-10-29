@@ -88,17 +88,18 @@ export async function contaNova(app: INestApplication, sobrescrever: Record<stri
 }
 
 /**
- * Membro extra na conta (pelo superusuário, sem RLS), com um papel próprio: as permissões dadas
- * e a atribuição numa empresa ou em todas (null). Devolve o token do login dele.
+ * Membro extra na conta (pelo superusuário, sem RLS), ATIVO, com um papel padrão da conta (pela
+ * chave, ex.: ADMIN) ou um papel próprio com as permissões dadas, atribuído numa empresa ou em
+ * todas (null). Devolve o id do membro e o token do login dele.
  */
-export async function membroCom(
+export async function novoMembro(
   cenario: CenarioConta,
   tenantId: string,
-  permissoes: Record<string, 'PROPRIO' | 'EMPRESA' | 'TENANT'>,
+  papel: string | Record<string, 'PROPRIO' | 'EMPRESA' | 'TENANT'>,
   empresaId: string | null,
-): Promise<string> {
+): Promise<{ token: string; membroId: string; email: string }> {
   const email = novoEmail('membro');
-  const [usuarioId, membroId, papelId] = [randomUUID(), randomUUID(), randomUUID()];
+  const [usuarioId, membroId] = [randomUUID(), randomUUID()];
   await cenario.sql(
     `INSERT INTO usuario (id, email, nome, senha_hash, updated_at) VALUES ($1, $2, 'Membro', $3, now())`,
     [usuarioId, email, await gerarHashSenha(SENHA)],
@@ -107,15 +108,27 @@ export async function membroCom(
     `INSERT INTO membro (id, tenant_id, usuario_id, status, updated_at) VALUES ($1, $2, $3, 'ATIVO', now())`,
     [membroId, tenantId, usuarioId],
   );
-  await cenario.sql(
-    `INSERT INTO papel (id, tenant_id, chave, nome, updated_at) VALUES ($1, $2, $3, $3, now())`,
-    [papelId, tenantId, `TESTE_${papelId.slice(0, 8)}`],
-  );
-  for (const [chave, escopo] of Object.entries(permissoes))
+  let papelId: string;
+  if (typeof papel === 'string') {
+    const [linha] = (
+      await cenario.sql(`SELECT id FROM papel WHERE tenant_id = $1 AND chave = $2`, [
+        tenantId,
+        papel,
+      ])
+    ).rows;
+    papelId = linha!.id as string;
+  } else {
+    papelId = randomUUID();
     await cenario.sql(
-      `INSERT INTO papel_permissao (papel_id, permissao_chave, escopo) VALUES ($1, $2, $3)`,
-      [papelId, chave, escopo],
+      `INSERT INTO papel (id, tenant_id, chave, nome, updated_at) VALUES ($1, $2, $3, $3, now())`,
+      [papelId, tenantId, `TESTE_${papelId.slice(0, 8)}`],
     );
+    for (const [chave, escopo] of Object.entries(papel))
+      await cenario.sql(
+        `INSERT INTO papel_permissao (papel_id, permissao_chave, escopo) VALUES ($1, $2, $3)`,
+        [papelId, chave, escopo],
+      );
+  }
   await cenario.sql(
     `INSERT INTO atribuicao_papel (id, tenant_id, membro_id, papel_id, empresa_id) VALUES ($1, $2, $3, $4, $5)`,
     [randomUUID(), tenantId, membroId, papelId, empresaId],
@@ -124,5 +137,15 @@ export async function membroCom(
     .post('/v1/auth/login')
     .send({ email, senha: SENHA });
   expect(login.status).toBe(200);
-  return RespostaSessao.parse(login.body).access_token;
+  return { token: RespostaSessao.parse(login.body).access_token, membroId, email };
+}
+
+/** Membro com um papel próprio (as permissões dadas); devolve só o token. */
+export async function membroCom(
+  cenario: CenarioConta,
+  tenantId: string,
+  permissoes: Record<string, 'PROPRIO' | 'EMPRESA' | 'TENANT'>,
+  empresaId: string | null,
+): Promise<string> {
+  return (await novoMembro(cenario, tenantId, permissoes, empresaId)).token;
 }

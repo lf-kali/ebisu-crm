@@ -12,6 +12,7 @@ import {
   TAMANHO_MAXIMO_CURSOR,
   Problema,
   Quantidade,
+  Uuid,
   camposDoZod,
   codificarCursor,
   criarProblema,
@@ -202,5 +203,14 @@ describe('filtros e ordenação (§5.1)', () => {
     expect(extrairOrdem(undefined, campos)).toEqual([]);
     expect(() => extrairOrdem('senha_hash', campos)).toThrow(ConsultaInvalidaError);
     expect(() => extrairOrdem('nome,-nome', campos)).toThrow(ConsultaInvalidaError);
+  });
+});
+
+describe('Uuid', () => {
+  it('sai sempre em minúsculas (ids são comparados como texto)', () => {
+    expect(Uuid.parse('0190D7C0-0000-7000-8000-00000000DE30')).toBe(
+      '0190d7c0-0000-7000-8000-00000000de30',
+    );
+    expect(Uuid.safeParse('nao-e-uuid').success).toBe(false);
   });
 });

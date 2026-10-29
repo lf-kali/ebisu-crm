@@ -164,8 +164,11 @@ describe('desativar', () => {
     expect(lida.body.ativo).toBe(false);
     const eu = await pedir(conta.token, 'get', '/v1/eu');
     expect(eu.body.empresas.map((e: { id: string }) => e.id)).toEqual([segunda.id]);
-    // Agora a segunda é a última ativa.
+    // Agora a segunda é a última ativa, mesmo com o id em maiúsculas.
     expect((await pedir(conta.token, 'delete', `/v1/empresas/${segunda.id}`)).status).toBe(409);
+    expect(
+      (await pedir(conta.token, 'delete', `/v1/empresas/${segunda.id.toUpperCase()}`)).status,
+    ).toBe(409);
   });
 
   it('desativação concorrente: espera a outra transação e não deixa a conta sem empresa ativa', async () => {

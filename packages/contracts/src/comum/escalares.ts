@@ -2,7 +2,12 @@ import { z } from 'zod';
 
 // Escalares da API (spec §5.1). Campos em snake_case, iguais ao banco.
 
-export const Uuid = z.uuid().meta({ id: 'Uuid', description: 'Identificador UUID' });
+// Sempre em minúsculas: o banco compara uuid sem caixa, mas o código compara ids como texto. Um id
+// em maiúsculas que passasse cru furaria essas comparações (ex.: a regra do dono, PR 4b-1).
+export const Uuid = z
+  .uuid()
+  .overwrite((id) => id.toLowerCase())
+  .meta({ id: 'Uuid', description: 'Identificador UUID' });
 
 // Dinheiro: string decimal com 2 casas, como o Decimal(14,2) do banco (até 12 dígitos inteiros).
 // Pode ser negativo (ex.: estorno de pagamento, FIN-3); use DinheiroNaoNegativo onde não puder.
