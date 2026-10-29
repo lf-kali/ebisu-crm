@@ -323,7 +323,8 @@ describe('reenviar e revogar', () => {
         atribuicoes: [{ papel_id: papeis.find((p) => p.chave === 'ADMIN')!.id, empresa_id: null }],
       });
     expect(r.status).toBe(201);
-  });
+    // 310 requisições: no runner do CI passa dos 5 s padrão.
+  }, 30_000);
 
   it('convite de outra conta dá 404', async () => {
     const x = await conta('Conta Daqui');
