@@ -49,22 +49,11 @@ export class AuthController {
     @Inject(LIMITADOR) private readonly limitador: Limitador,
   ) {}
 
-  /** Conta uma tentativa por IP e por e-mail; estourado, 429 com Retry-After. */
-  private async limitar(
-    rota: string,
-    req: Request,
-    res: Response,
-    email: string,
-    limites: { ip: Limite; email: Limite },
-  ): Promise<void> {
-    const espera = Math.max(
-      await this.limitador.registrar(`${rota}:ip:${req.ip}`, limites.ip.maximo, limites.ip.janela),
-      await this.limitador.registrar(
-        `${rota}:email:${normalizarEmail(email)}`,
-        limites.email.maximo,
-        limites.email.janela,
-      ),
-    );
+  /** Conta uma tentativa em cada chave; se alguma estourou, 429 com Retry-After. */
+  private async limitar(res: Response, chaves: ReadonlyArray<[string, Limite]>): Promise<void> {
+    let espera = 0;
+    for (const [chave, { maximo, janela }] of chaves)
+      espera = Math.max(espera, await this.limitador.registrar(chave, maximo, janela));
     if (espera > 0) {
       res.setHeader('Retry-After', String(espera));
       throw new ErroDominio('limite_excedido');
@@ -89,10 +78,14 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<RespostaSessao> {
     exigirJson(req);
-    await this.limitar('registro', req, res, entrada.email, {
-      ip: LIMITE_CADASTRO,
-      email: LIMITE_CADASTRO,
-    });
+    const email = normalizarEmail(entrada.email);
+    // O cadastro com e-mail existente confere a senha: conta também no limite de e-mail do login,
+    // para não somar mais tentativas de adivinhar a senha.
+    await this.limitar(res, [
+      [`registro:ip:${req.ip}`, LIMITE_CADASTRO],
+      [`registro:email:${email}`, LIMITE_CADASTRO],
+      [`login:email:${email}`, LIMITE_POR_EMAIL],
+    ]);
     const { resposta, refresh } = await this.registro.registrar(entrada, {
       ...origemDe(req),
       requestId: requestIdDa(res) ?? randomUUID(),
@@ -117,10 +110,10 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<RespostaSessao> {
     exigirJson(req);
-    await this.limitar('login', req, res, entrada.email, {
-      ip: LIMITE_POR_IP,
-      email: LIMITE_POR_EMAIL,
-    });
+    await this.limitar(res, [
+      [`login:ip:${req.ip}`, LIMITE_POR_IP],
+      [`login:email:${normalizarEmail(entrada.email)}`, LIMITE_POR_EMAIL],
+    ]);
     const { resposta, refresh } = await this.sessoes.entrar(entrada, origemDe(req));
     gravarRefresh(res, refresh);
     return resposta;

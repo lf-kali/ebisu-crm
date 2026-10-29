@@ -28,7 +28,7 @@ export function cnpjValido(valor: string): boolean {
   return cnpj.endsWith(`${primeiro}${segundo}`);
 }
 
-export const Cnpj = z.string().max(18).refine(cnpjValido, 'CNPJ inválido').meta({
+export const Cnpj = z.string().trim().max(18).refine(cnpjValido, 'CNPJ inválido').meta({
   id: 'Cnpj',
   description: 'CNPJ numérico ou alfanumérico, com ou sem máscara; a API grava sem máscara',
   example: '11.222.333/0001-81',

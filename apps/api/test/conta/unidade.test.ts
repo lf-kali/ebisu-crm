@@ -18,7 +18,18 @@ describe('política de senha', () => {
 
   it('aceita uma frase longa sem dados pessoais', () => {
     expect(() => validarSenha('cavalo-bateria-grampo-42', pessoa)).not.toThrow();
-    expect(() => validarSenha('ç'.repeat(12), pessoa)).not.toThrow();
+    expect(() => validarSenha('açaí-pão-feijão-já', pessoa)).not.toThrow();
+  });
+
+  it('recusa senha com menos de 5 caracteres diferentes, inclusive só espaços', () => {
+    expect(recusa(' '.repeat(12))).toThrow(ErroDominio);
+    expect(recusa('ç'.repeat(12))).toThrow(ErroDominio);
+    expect(recusa('abcdabcdabcd')).toThrow(ErroDominio);
+    expect(() => validarSenha('abcdeabcdeab', pessoa)).not.toThrow();
+  });
+
+  it('compara com a lista depois de normalizar (NFKC): largura total não escapa', () => {
+    expect(recusa('ＰＡＳＳＷＯＲＤ１２３４')).toThrow(ErroDominio);
   });
 
   it('recusa tamanho fora de 12 a 128', () => {

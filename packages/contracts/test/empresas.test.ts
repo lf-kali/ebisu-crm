@@ -13,6 +13,15 @@ describe('CNPJ', () => {
     expect(cnpjValido('11.222.333/0002-62')).toBe(true);
   });
 
+  it('o schema tira espaços nas pontas antes de validar o tamanho', () => {
+    const r = EntradaEmpresa.safeParse({
+      razao_social: 'X',
+      nome_fantasia: 'X',
+      cnpj: '  11.222.333/0001-81  ',
+    });
+    expect(r.success && r.data.cnpj).toBe('11.222.333/0001-81');
+  });
+
   it('aceita o CNPJ alfanumérico (exemplo da Receita Federal), também em minúsculas', () => {
     expect(cnpjValido('12.ABC.345/01DE-35')).toBe(true);
     expect(cnpjValido('12abc34501de35')).toBe(true);

@@ -31,6 +31,12 @@ se não existir, a API não sobe. As respostas de erro seguem o catálogo da spe
 | Falta a permissão                                | 403 `sem_permissao`                    |
 | Registro de outra empresa ou conta               | 404 `nao_encontrado` (nunca 403)       |
 
+## Rate limit e IP
+
+Os limites por IP (login e cadastro) usam `req.ip`. A API não confia em `X-Forwarded-For`: atrás de
+um proxy reverso, `req.ip` é o do proxy e os limites valem para todos os clientes juntos. Antes do
+deploy com proxy, configure `trust proxy` só para o endereço dele.
+
 ## Dados de domínio
 
 Só o `ExecutorDeComandos.executarComando` (`src/core/tx`) abre transação: ele define o tenant (RLS)

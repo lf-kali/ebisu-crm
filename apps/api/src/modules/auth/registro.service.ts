@@ -30,8 +30,11 @@ export interface OrigemDoCadastro extends Origem {
 }
 
 const TAMANHO_SLUG = 50;
-/** Tentativas de slug: só falha se outro cadastro pegar o mesmo slug entre a leitura e a escrita. */
-const TENTATIVAS_SLUG = 3;
+/**
+ * Tentativas de slug. Cada colisão quer dizer que outro cadastro com o mesmo nome terminou antes,
+ * então N cadastros simultâneos com o mesmo nome precisam de até N tentativas.
+ */
+const TENTATIVAS_SLUG = 5;
 
 /** "Assistência São José" vira "assistencia-sao-jose". */
 export function slugDe(nome: string): string {
@@ -45,10 +48,15 @@ export function slugDe(nome: string): string {
   return slug || 'conta';
 }
 
-const violouUnicidade = (erro: unknown, campo: string) =>
+/**
+ * Violação de unicidade no modelo. Pelo modelo, não pela coluna: dentro da transação do ebisu_app
+ * o Prisma não informa a coluna (`meta.target` vem nulo). Em `tenant`, o único valor que colide é
+ * o slug (o id é um UUID aleatório); em `usuario`, o e-mail.
+ */
+const violouUnicidade = (erro: unknown, modelo: 'Tenant' | 'Usuario') =>
   erro instanceof Prisma.PrismaClientKnownRequestError &&
   erro.code === 'P2002' &&
-  JSON.stringify(erro.meta?.target ?? '').includes(campo);
+  erro.meta?.modelName === modelo;
 
 @Injectable()
 export class RegistroService {
@@ -91,7 +99,7 @@ export class RegistroService {
       return id;
     } catch (erro) {
       // Dois cadastros simultâneos do mesmo e-mail: o segundo segue como e-mail existente.
-      if (violouUnicidade(erro, 'email')) return this.usuarioDoCadastro(email, entrada);
+      if (violouUnicidade(erro, 'Usuario')) return this.usuarioDoCadastro(email, entrada);
       throw erro;
     }
   }
@@ -106,7 +114,7 @@ export class RegistroService {
       try {
         return await this.gravarConta(usuarioId, slug, entrada, origem);
       } catch (erro) {
-        if (tentativa < TENTATIVAS_SLUG && violouUnicidade(erro, 'slug')) continue;
+        if (tentativa < TENTATIVAS_SLUG && violouUnicidade(erro, 'Tenant')) continue;
         throw erro;
       }
     }

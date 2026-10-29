@@ -69,6 +69,11 @@ describe('cadastro de conta', () => {
       )
     ).rows;
     expect(dono).toEqual({ status: 'ATIVO', empresa_id: null, chave: 'OWNER' });
+    // O cadastro não prova o e-mail (decisão 10): o convite do 4b é quem prova.
+    const [verificacao] = (
+      await c.sql(`SELECT email_verificado_em FROM usuario WHERE email = $1`, [corpo.email])
+    ).rows;
+    expect(verificacao!.email_verificado_em).toBeNull();
     const padroes = (
       await c.sql(
         `SELECT (SELECT count(*) FROM funil WHERE empresa_id = $1 AND padrao) AS funis,
@@ -161,6 +166,9 @@ describe('cadastro de conta', () => {
     ['com a parte do e-mail', 'sou-o-fulano.vip-2026'],
     ['com o nome', 'senha-da-MARINA-forte'],
     ['com o sobrenome sem acento', 'xx-duarte-xx-1234'],
+    ['só espaços', ' '.repeat(12)],
+    ['com poucos caracteres diferentes', 'abcabcabcabc'],
+    ['vazada em largura total (NFKC)', 'ＰＡＳＳＷＯＲＤ１２３４'],
   ])('senha %s dá 422 em `senha` e não cria nada', async (_caso, senha) => {
     const antes = await contas();
     const r = await registrar(corpoDeCadastro({ email: 'fulano.vip@cadastro.local', senha }));
@@ -203,6 +211,53 @@ describe('cadastro de conta', () => {
       'oficina-unica-sao-jose-2',
       'oficina-unica-sao-jose-3',
     ]);
+  });
+
+  it('cadastros simultâneos com o mesmo nome de conta: todos entram, com slugs diferentes', async () => {
+    const nome = 'Corrida de Slug';
+    const respostas = await Promise.all(
+      Array.from({ length: 5 }, () => registrar(corpoDeCadastro({ conta: { nome } }))),
+    );
+    expect(respostas.map((r) => r.status)).toEqual([201, 201, 201, 201, 201]);
+    const slugs = respostas.map((r) => r.body.conta.slug as string).sort();
+    expect(slugs).toEqual([
+      'corrida-de-slug',
+      'corrida-de-slug-2',
+      'corrida-de-slug-3',
+      'corrida-de-slug-4',
+      'corrida-de-slug-5',
+    ]);
+  });
+
+  it('cadastros simultâneos com o mesmo e-mail: um usuário, uma conta por cadastro', async () => {
+    const email = novoEmail('simultaneo');
+    const respostas = await Promise.all(
+      ['Loja A', 'Loja B', 'Loja C'].map((nome) =>
+        registrar(corpoDeCadastro({ email, conta: { nome } })),
+      ),
+    );
+    expect(respostas.map((r) => r.status)).toEqual([201, 201, 201]);
+    const usuarios = (await c.sql(`SELECT id FROM usuario WHERE email = $1`, [email])).rows;
+    expect(usuarios).toHaveLength(1);
+    const membros = (
+      await c.sql(`SELECT count(*) AS n FROM membro WHERE usuario_id = $1`, [usuarios[0]!.id])
+    ).rows;
+    expect(Number(membros[0]!.n)).toBe(3);
+  });
+
+  it('o cadastro conta no limite de e-mail do login: não soma tentativas de senha', async () => {
+    const limitado = await c.criarApp(limitadorEmMemoria());
+    const email = novoEmail('oraculo');
+    expect((await cadastrar(limitado, corpoDeCadastro({ email }))).status).toBe(201);
+    const errada = corpoDeCadastro({ email, senha: 'outra-senha-bem-longa-9' });
+    for (let i = 0; i < 4; i++) expect((await cadastrar(limitado, errada)).status).toBe(401);
+    // 5 cadastros já contaram no limite do login (10 em 15 min): sobram 5 logins.
+    const login = () =>
+      request(limitado.getHttpServer())
+        .post('/v1/auth/login')
+        .send({ email, senha: 'outra-senha-bem-longa-9' });
+    for (let i = 0; i < 5; i++) expect((await login()).status).toBe(401);
+    expect((await login()).status).toBe(429);
   });
 
   it('rate limit: o 6º cadastro na hora, do mesmo IP, dá 429 com Retry-After', async () => {

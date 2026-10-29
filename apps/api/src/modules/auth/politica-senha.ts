@@ -10,6 +10,8 @@ export const SENHA_MINIMO = 12;
 export const SENHA_MAXIMO = 128;
 /** Partes do nome ou do e-mail mais curtas que isto não contam (ex.: "ana" em "banana"). */
 const PARTE_MINIMA = 4;
+/** Caracteres diferentes: "            " (12 espaços) e "abcabcabcabc" não passam. */
+const DISTINTOS_MINIMO = 5;
 
 let vazadas: ReadonlySet<string> | undefined;
 
@@ -40,11 +42,14 @@ function partesPessoais(email: string, nome: string): string[] {
 
 /** 422 `validacao` no campo `senha`, sem dizer qual regra falhou. */
 export function validarSenha(senha: string, pessoa: { email: string; nome: string }): void {
-  const simples = simplificar(senha);
+  // NFKC: "ＰＡＳＳＷＯＲＤ１２３４" (largura total) conta como "password1234".
+  const normal = senha.normalize('NFKC');
+  const simples = simplificar(normal);
   const fraca =
     senha.length < SENHA_MINIMO ||
     senha.length > SENHA_MAXIMO ||
-    senhasVazadas().has(senha.toLowerCase()) ||
+    new Set(normal).size < DISTINTOS_MINIMO ||
+    senhasVazadas().has(normal.toLowerCase()) ||
     partesPessoais(pessoa.email, pessoa.nome).some((parte) => simples.includes(parte));
   if (fraca)
     throw new ErroDominio('validacao', {
