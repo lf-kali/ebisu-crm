@@ -55,6 +55,10 @@ export class EnvioEmailsService implements OnApplicationBootstrap, OnApplication
     try {
       const enviados = await processarEmails(this.db, this.remetente, {
         webUrl: this.config.WEB_URL,
+        aoFalhar: (id, erro) =>
+          this.logger.error(
+            `E-mail ${id} falhou: ${erro instanceof Error ? erro.message : String(erro)}`,
+          ),
       });
       if (enviados > 0) this.logger.log(`E-mails processados: ${enviados}`);
     } catch (erro) {

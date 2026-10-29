@@ -14,6 +14,8 @@ const ESPERA_BASE_MS = 30_000;
 export interface OpcoesEnvio {
   webUrl: string;
   limite?: number;
+  /** Erro inesperado num e-mail (banco oscilando): o laço registra e segue. */
+  aoFalhar?: (id: string, erro: unknown) => void;
 }
 
 /** Espera antes da próxima tentativa: 30 s, 1 min, 2 min, 4 min... */
@@ -29,7 +31,14 @@ export async function processarEmails(
   const limite = opcoes.limite ?? 10;
   const linhas = await db.$queryRaw<Array<{ id: string; tenant_id: string }>>`
     SELECT id, tenant_id FROM reivindicar_email_saida(${limite}::int, ${PRAZO}::interval)`;
-  for (const { id, tenant_id } of linhas) await enviarUm(db, remetente, tenant_id, id, opcoes);
+  for (const { id, tenant_id } of linhas) {
+    try {
+      await enviarUm(db, remetente, tenant_id, id, opcoes);
+    } catch (erro) {
+      // Um e-mail com problema não segura os outros do lote; ele volta quando o prazo vencer.
+      opcoes.aoFalhar?.(id, erro);
+    }
+  }
   return linhas.length;
 }
 

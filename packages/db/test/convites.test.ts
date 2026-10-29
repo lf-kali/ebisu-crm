@@ -138,6 +138,31 @@ describe('reivindicar_email_saida()', () => {
     await admin.query(`UPDATE email_saida SET status = 'ENVIADO'`);
   });
 
+  it('compara em UTC, qualquer que seja o timezone da sessão', async () => {
+    await admin.query(`UPDATE email_saida SET status = 'ENVIADO'`);
+    await semear(admin, { tenant: tenants[0]!, convite: randomUUID(), email: 'fuso@teste.local' });
+    await app.query(`SET timezone TO 'America/Sao_Paulo'`);
+    try {
+      const { rows } = await app.query(
+        `SELECT * FROM reivindicar_email_saida(10, interval '5 minutes')`,
+      );
+      expect(rows).toHaveLength(1);
+      const [linha] = (
+        await admin.query(
+          `SELECT extract(epoch FROM proxima_em - (now() AT TIME ZONE 'utc'))::int AS segundos
+             FROM email_saida WHERE id = $1`,
+          [rows[0].id],
+        )
+      ).rows;
+      // O prazo é de 5 minutos a partir de agora (UTC), não 3 horas deslocado.
+      expect(linha.segundos).toBeGreaterThan(280);
+      expect(linha.segundos).toBeLessThanOrEqual(300);
+    } finally {
+      await app.query('RESET timezone');
+      await admin.query(`UPDATE email_saida SET status = 'ENVIADO'`);
+    }
+  });
+
   it('duas reivindicações simultâneas não pegam a mesma linha (SKIP LOCKED)', async () => {
     await semear(admin, { tenant: tenants[0]!, convite: randomUUID(), email: 'a@teste.local' });
     await semear(admin, { tenant: tenants[1]!, convite: randomUUID(), email: 'b@teste.local' });

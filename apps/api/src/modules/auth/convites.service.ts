@@ -58,9 +58,24 @@ export class ConvitesService {
 
   async aceitar(entrada: EntradaAceite, origem: OrigemDoCadastro): Promise<SessaoEmitida> {
     const convite = await this.conviteDoToken(entrada.token);
+    await this.conferirAntes(convite.tenant_id, convite.email, convite.atribuicoes);
     const usuarioId = await this.usuarioDoAceite(convite.email, entrada);
     await this.tornarMembro(convite.id, convite.tenant_id, usuarioId, entrada.token, origem);
     return this.sessoes.abrirNaConta(usuarioId, convite.tenant_id, origem);
+  }
+
+  /**
+   * O que faria o aceite falhar, conferido antes de mexer no usuário (senha nova, sessões): quem
+   * já é membro e papéis ou empresas que sumiram. Só leitura; o tornarMembro confere de novo,
+   * com o convite travado.
+   */
+  private async conferirAntes(tenantId: string, email: string, atribuicoes: unknown) {
+    const usuario = await this.auth.usuario.findUnique({ where: { email }, select: { id: true } });
+    await comTenant(this.app, tenantId, async (tx) => {
+      if (usuario && (await tx.membro.count({ where: { usuario_id: usuario.id } })) > 0)
+        throw new ErroDominio('duplicado', { detail: 'Você já é membro desta conta.' });
+      await exigirAtribuicoesValidas(tx, atribuicoes as AtribuicaoPedida[]);
+    });
   }
 
   /**

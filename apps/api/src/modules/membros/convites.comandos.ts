@@ -25,6 +25,7 @@ import {
   posicaoDo,
   referenciasValidas,
 } from './membros.comandos.js';
+import { PAPEL_DONO } from './membros.repositorio.js';
 
 // Comandos de convites (plano docs/planos/f3-4b2-convites.md, decisões 1 a 4). A rota pede
 // `config.membros`; convidar dá papéis, então o comando também exige `config.rbac`.
@@ -120,5 +121,8 @@ export async function revogar(ctx: TxContextDaConta, id: string): Promise<void> 
   const convite = await conviteOu404(ctx, id);
   if (convite.aceito_em)
     throw new ErroDominio('transicao_invalida', { detail: 'Este convite já foi aceito.' });
+  // Convite de dono: só um dono revoga, como só um dono convida e reenvia.
+  const [contrato] = await paraContrato(ctx.tx, [convite]);
+  if (contrato!.atribuicoes.some((a) => a.papel.chave === PAPEL_DONO)) await exigirDono(ctx);
   if (!convite.revogado_em) await revogarConvite(ctx.tx, id);
 }

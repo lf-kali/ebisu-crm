@@ -9,7 +9,8 @@
 --    só (id, tenant_id) e marca as linhas como ENVIANDO com prazo; o resto do envio é feito pelo
 --    ebisu_app dentro da conta (comTenant). Com FORCE ROW LEVEL SECURITY, o dono da função (quem
 --    roda esta migração, já dono das tabelas) também passa pelo RLS: ganha uma política só de
---    reivindicação em email_saida.
+--    reivindicação em email_saida. As colunas são timestamp sem fuso gravadas em UTC (Prisma):
+--    a função compara com now() em UTC, qualquer que seja o timezone da sessão ou do servidor.
 --
 -- Rollback: DROP FUNCTION reivindicar_email_saida(int, interval); DROP TABLE email_saida, convite;
 -- DROP TYPE "StatusEmailSaida", "TipoEmailSaida".
@@ -108,10 +109,10 @@ RETURNS TABLE (id uuid, tenant_id uuid)
 LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp AS $$
   UPDATE public.email_saida e
      SET status = 'ENVIANDO', tentativas = e.tentativas + 1,
-         proxima_em = now() + prazo, updated_at = now()
+         proxima_em = (now() AT TIME ZONE 'utc') + prazo, updated_at = now() AT TIME ZONE 'utc'
    WHERE e.id IN (
      SELECT s.id FROM public.email_saida s
-      WHERE s.status IN ('PENDENTE', 'ENVIANDO') AND s.proxima_em <= now()
+      WHERE s.status IN ('PENDENTE', 'ENVIANDO') AND s.proxima_em <= (now() AT TIME ZONE 'utc')
       ORDER BY s.proxima_em
       LIMIT least(greatest(limite, 0), 100)
       FOR UPDATE SKIP LOCKED)

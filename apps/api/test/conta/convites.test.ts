@@ -203,6 +203,61 @@ describe('reenviar e revogar', () => {
     expect(lista.dados.map((d) => d.id)).not.toContain(id);
   });
 
+  it('convite de dono só é revogado por um dono', async () => {
+    const x = await conta('Conta Revoga Dono');
+    const admin = await novoMembro(c, x.tenantId, 'ADMIN', null);
+    const r = await convidar(x, novoEmail(), [{ papel_id: x.papeis.OWNER, empresa_id: null }]);
+    expect(r.status).toBe(201);
+    expect((await pedir(admin.token, 'delete', `/v1/membros/convites/${r.body.id}`)).status).toBe(
+      403,
+    );
+    expect((await pedir(x.token, 'delete', `/v1/membros/convites/${r.body.id}`)).status).toBe(204);
+  });
+
+  it('convidar e reenviar têm limite (por e-mail de destino e por convite): 429', async () => {
+    // Cada app de teste tem a própria chave do JWT: a conta nasce no app com o limitador real.
+    const limitado = await c.criarApp(limitadorEmMemoria());
+    const { token } = await contaNova(limitado, { conta: { nome: 'Conta Limitada' } });
+    const empresaId = (
+      await request(limitado.getHttpServer()).get('/v1/eu').set('Authorization', `Bearer ${token}`)
+    ).body.empresas[0].id as string;
+    const papeis = ListaPapeis.parse(
+      (
+        await request(limitado.getHttpServer())
+          .get('/v1/papeis')
+          .set('Authorization', `Bearer ${token}`)
+      ).body,
+    ).dados;
+    const x = {
+      token,
+      tenantId: '',
+      empresaId,
+      papeis: Object.fromEntries(papeis.map((p) => [p.chave, p.id])),
+    };
+    const viaLimitado = (rota: string, corpo?: object) => {
+      const req = request(limitado.getHttpServer())
+        .post(rota)
+        .set('Authorization', `Bearer ${x.token}`)
+        .set('Idempotency-Key', randomUUID());
+      return corpo ? req.send(corpo) : req;
+    };
+    const email = novoEmail('insistente');
+    const corpo = { email, atribuicoes: atendente(x) };
+    const status: number[] = [];
+    for (let i = 0; i < 4; i++)
+      status.push((await viaLimitado('/v1/membros/convites', corpo)).status);
+    expect(status).toEqual([201, 409, 409, 429]);
+
+    const outro = await viaLimitado('/v1/membros/convites', {
+      email: novoEmail(),
+      atribuicoes: atendente(x),
+    });
+    const reenvios: number[] = [];
+    for (let i = 0; i < 4; i++)
+      reenvios.push((await viaLimitado(`/v1/membros/convites/${outro.body.id}/reenviar`)).status);
+    expect(reenvios).toEqual([200, 200, 200, 429]);
+  });
+
   it('convite de outra conta dá 404', async () => {
     const x = await conta('Conta Daqui');
     const y = await conta('Conta de Lá');
@@ -313,6 +368,30 @@ describe('aceitar', () => {
       await c.sql(`SELECT email_verificado_em FROM usuario WHERE email = $1`, [email])
     ).rows;
     expect(usuario!.email_verificado_em).not.toBeNull();
+  });
+
+  it('aceite que vai falhar não mexe na senha nem nas sessões do não verificado', async () => {
+    const x = await conta('Conta Ordem');
+    const email = novoEmail('ordem');
+    const cadastro = await cadastrar(
+      c.app,
+      corpoDeCadastro({ email, conta: { nome: 'Conta Própria' } }),
+    );
+    expect(cadastro.status).toBe(201);
+    const { token } = await conviteEnviado(x, email);
+    // Ele já virou membro da conta por outro caminho: o aceite vai dar 409.
+    const [usuario] = (await c.sql(`SELECT id FROM usuario WHERE email = $1`, [email])).rows;
+    await c.sql(
+      `INSERT INTO membro (id, tenant_id, usuario_id, status, updated_at) VALUES ($1, $2, $3, 'ATIVO', now())`,
+      [randomUUID(), x.tenantId, usuario!.id],
+    );
+    const r = await aceitar({ token, senha: NOVA_SENHA });
+    expect(r.status).toBe(409);
+    expect((await http().post('/v1/auth/login').send({ email, senha: SENHA })).status).toBe(200);
+    const [depois] = (
+      await c.sql(`SELECT email_verificado_em FROM usuario WHERE email = $1`, [email])
+    ).rows;
+    expect(depois!.email_verificado_em).toBeNull();
   });
 
   it('usuário inativo dá 401', async () => {

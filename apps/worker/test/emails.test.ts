@@ -131,6 +131,32 @@ describe('envio do outbox', () => {
     expect(await processarEmails(db, remetente, { webUrl: WEB_URL })).toBe(0);
   });
 
+  it('erro inesperado num e-mail não segura os outros do lote', async () => {
+    await convite();
+    await convite();
+    // Erro cujo `message` explode: nem o registro da falha consegue tratar.
+    class ErroRuim extends Error {
+      override get message(): string {
+        throw new Error('quebrou de novo');
+      }
+    }
+    const enviados: MensagemEmail[] = [];
+    let chamadas = 0;
+    const remetente: Remetente = {
+      async enviar(mensagem) {
+        chamadas += 1;
+        if (chamadas === 1) throw new ErroRuim();
+        enviados.push(mensagem);
+      },
+    };
+    const falhas: string[] = [];
+    expect(
+      await processarEmails(db, remetente, { webUrl: WEB_URL, aoFalhar: (id) => falhas.push(id) }),
+    ).toBe(2);
+    expect(enviados).toHaveLength(1);
+    expect(falhas).toHaveLength(1);
+  });
+
   it('convite revogado, aceito ou vencido: cancela o e-mail sem enviar', async () => {
     const revogado = await convite();
     const aceito = await convite();
