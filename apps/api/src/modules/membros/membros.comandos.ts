@@ -108,18 +108,25 @@ export async function editar(
   return membroOu404(ctx, id);
 }
 
-/** Valida as referências: papéis da conta e empresas ativas da conta (decisão 7). */
-async function papelDeDonoNaLista(ctx: TxContextDaConta, entrada: EntradaAtribuicoes) {
-  const idsPapel = [...new Set(entrada.atribuicoes.map((a) => a.papel_id))];
+const minusculo = (id: string) => id.toLowerCase();
+
+/**
+ * Valida as referências (papéis da conta e empresas ativas da conta, decisão 7) e devolve se cada
+ * atribuição pedida é do papel de dono. Quem diz o que é dono é a chave lida do banco, nunca uma
+ * comparação de ids como texto (o banco compara uuid sem caixa).
+ */
+async function referenciasValidas(ctx: TxContextDaConta, entrada: EntradaAtribuicoes) {
+  const idsPapel = [...new Set(entrada.atribuicoes.map((a) => minusculo(a.papel_id)))];
   const papeis = await papeisDaConta(ctx.tx, idsPapel);
   if (papeis.length !== idsPapel.length) throw invalida('Papel inexistente nesta conta.');
   const idsEmpresa = [
-    ...new Set(entrada.atribuicoes.flatMap((a) => (a.empresa_id ? [a.empresa_id] : []))),
+    ...new Set(entrada.atribuicoes.flatMap((a) => (a.empresa_id ? [minusculo(a.empresa_id)] : []))),
   ];
-  const ativas = await empresasAtivas(ctx.tx, idsEmpresa);
+  const ativas = new Set([...(await empresasAtivas(ctx.tx, idsEmpresa))].map(minusculo));
   if (idsEmpresa.some((id) => !ativas.has(id)))
     throw invalida('Empresa inexistente ou inativa nesta conta.');
-  return papeis.find((p) => p.chave === PAPEL_DONO)?.id;
+  const chaves = new Map(papeis.map((p) => [minusculo(p.id), p.chave]));
+  return (a: { papel_id: string }) => chaves.get(minusculo(a.papel_id)) === PAPEL_DONO;
 }
 
 export async function atribuir(
@@ -128,14 +135,17 @@ export async function atribuir(
 ): Promise<LinhaMembro> {
   await travarDonos(ctx.tx, ctx.tenantId);
   const membro = await membroOu404(ctx, id);
-  const dono = await papelDeDonoNaLista(ctx, entrada);
-  const novas = entrada.atribuicoes;
+  const ehPapelDeDono = await referenciasValidas(ctx, entrada);
+  const novas = entrada.atribuicoes.map((a) => ({
+    papel_id: minusculo(a.papel_id),
+    empresa_id: a.empresa_id === null ? null : minusculo(a.empresa_id),
+  }));
   // Decisão 5: dono vale para a conta inteira.
-  if (novas.some((a) => a.papel_id === dono && a.empresa_id !== null))
+  if (novas.some((a) => ehPapelDeDono(a) && a.empresa_id !== null))
     throw invalida('O papel de dono vale só para todas as empresas.');
 
   const eraDono = temPapelDeDono(membro);
-  const seraDono = novas.some((a) => a.papel_id === dono && a.empresa_id === null);
+  const seraDono = novas.some((a) => ehPapelDeDono(a) && a.empresa_id === null);
   if (eraDono !== seraDono) {
     await exigirDono(ctx);
     if (eraDono && membro.status === 'ATIVO') await exigirOutroDono(ctx, membro.id);

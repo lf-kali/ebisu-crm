@@ -146,14 +146,25 @@ describe('atribuições', () => {
     const depois = RespostaEu.parse((await pedir(outro.token, 'get', '/v1/eu')).body);
     expect(depois.empresas[0]!.permissoes['config.crm']).toBe('EMPRESA');
 
-    // A atribuição que fica não é recriada (mesmo id).
+    // A atribuição que fica não é recriada (mesmo id), nem se o id vier em maiúsculas; o audit
+    // log só registra o que mudou (decisão 9).
     const idTecnico = r.body.atribuicoes.find(
       (a: { papel: { chave: string } }) => a.papel.chave === 'TECNICO',
     ).id;
+    const marca = `put-auditado-${outro.membroId.slice(0, 8)}`;
     const deNovo = await atribuir(x.token, outro.membroId, [
-      { papel_id: x.papeis.TECNICO, empresa_id: null },
-    ]);
+      { papel_id: x.papeis.TECNICO!.toUpperCase(), empresa_id: null },
+    ]).set('X-Request-Id', marca);
     expect(deNovo.body.atribuicoes.map((a: { id: string }) => a.id)).toEqual([idTecnico]);
+    const auditoria = (
+      await c.sql(
+        `SELECT acao, entidade_id FROM audit_log
+          WHERE request_id = $1 AND entidade_tipo = 'atribuicao_papel'`,
+        [marca],
+      )
+    ).rows;
+    expect(auditoria).toEqual([{ acao: 'delete', entidade_id: expect.any(String) }]);
+    expect(auditoria[0]!.entidade_id).not.toBe(idTecnico);
   });
 
   it('papel ou empresa de outra conta, empresa inativa, lista vazia ou repetida dão 422', async () => {
@@ -219,6 +230,27 @@ describe('regra do dono', () => {
     expect(r.status).toBe(200);
     const lido = Membro.parse((await pedir(x.token, 'get', `/v1/membros/${x.donoId}`)).body);
     expect(papeisDe(lido)).toEqual(['OWNER:*']);
+  });
+
+  it('id em maiúsculas não engana a regra do dono (o banco compara uuid sem caixa)', async () => {
+    const x = await conta('Conta Maiúsculas');
+    const admin = await novoMembro(c, x.tenantId, 'ADMIN', null);
+    const OWNER = x.papeis.OWNER!.toUpperCase();
+    const nula = await atribuir(admin.token, admin.membroId, [
+      { papel_id: OWNER, empresa_id: null },
+    ]);
+    expect(nula.status).toBe(403);
+    const naEmpresa = await atribuir(admin.token, admin.membroId, [
+      { papel_id: x.papeis.ADMIN, empresa_id: null },
+      { papel_id: OWNER, empresa_id: x.empresaId.toUpperCase() },
+    ]);
+    expect(naEmpresa.status).toBe(422);
+    const lido = Membro.parse((await pedir(x.token, 'get', `/v1/membros/${admin.membroId}`)).body);
+    expect(papeisDe(lido)).toEqual(['ADMIN:*']);
+    // Pelo dono, o mesmo id em maiúsculas funciona e é gravado normalizado.
+    const pelo = await atribuir(x.token, admin.membroId, [{ papel_id: OWNER, empresa_id: null }]);
+    expect(pelo.status).toBe(200);
+    expect(papeisDe(Membro.parse(pelo.body))).toEqual(['OWNER:*']);
   });
 
   it('dono dá o dono a outro; o novo dono tira o do antigo; o último dono não sai (409)', async () => {
