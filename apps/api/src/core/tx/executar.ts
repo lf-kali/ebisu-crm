@@ -3,7 +3,7 @@ import { comTenant, Prisma, type PrismaClient } from '@ebisu/db';
 import { PRISMA_APP } from '../banco/banco.module.js';
 import { ErroDominio } from '../erros/erro-dominio.js';
 import { comoJson, gravarResposta, travarERecuperar } from '../idempotencia/idempotencia.js';
-import type { Comando, ContextoDaRequisicao } from './contexto.js';
+import type { ComTransacao, ContextoDaConta, ContextoDaRequisicao } from './contexto.js';
 
 // Único ponto que abre transação para dados de domínio (spec §3.2, §5.4): aplica a
 // Idempotency-Key (PR 3a) e informa o autor ao audit log do banco (PR 3b); eventos depois.
@@ -28,9 +28,9 @@ export async function comReferencias<T>(escrita: Promise<T>): Promise<T> {
 export class ExecutorDeComandos {
   constructor(@Inject(PRISMA_APP) private readonly app: PrismaClient) {}
 
-  executarComando<Entrada, Saida>(
-    contexto: ContextoDaRequisicao,
-    comando: Comando<Entrada, Saida>,
+  executarComando<C extends ContextoDaRequisicao | ContextoDaConta, Entrada, Saida>(
+    contexto: C,
+    comando: (ctx: ComTransacao<C>, entrada: Entrada) => Promise<Saida>,
     entrada: Entrada,
   ): Promise<Saida> {
     const { idempotencia, ...resto } = contexto;

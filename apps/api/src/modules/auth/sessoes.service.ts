@@ -91,6 +91,18 @@ export class SessoesService {
   }
 
   /**
+   * Abre a sessão numa conta em que o usuário acabou de entrar (cadastro): família nova, como no
+   * login. A conta precisa estar entre os vínculos ativos (senão 401: não há o que abrir).
+   */
+  async abrirNaConta(usuarioId: string, tenantId: string, origem: Origem): Promise<SessaoEmitida> {
+    const vinculos = await this.vinculosAtivos(usuarioId);
+    const vinculo = vinculos.find((v) => v.conta.tenant_id === tenantId);
+    if (!vinculo) throw naoAutenticado();
+    await this.db.usuario.update({ where: { id: usuarioId }, data: { ultimo_login: new Date() } });
+    return this.emitir(this.db, usuarioId, vinculo, vinculos, randomUUID(), origem);
+  }
+
+  /**
    * Refresh rotativo: cada token vale uma vez. Reusar um token já trocado (ou dois refresh
    * simultâneos com o mesmo token) revoga a família inteira: quem roubou o token e o dono
    * legítimo perdem a sessão, e o dono entra de novo.

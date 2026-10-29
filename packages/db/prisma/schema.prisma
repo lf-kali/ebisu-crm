@@ -128,17 +128,20 @@ model Empresa {
 
 /// Identidade global (um e-mail pode participar de vários tenants).
 model Usuario {
-  id           String    @id @default(uuid(7)) @db.Uuid
+  id                  String    @id @default(uuid(7)) @db.Uuid
   /// Normalizado (trim + minúsculas): CHECK usuario_email_normalizado na migração.
-  email        String    @unique
-  nome         String
-  telefone     String?
-  senha_hash   String?
-  avatar_url   String?
-  ultimo_login DateTime?
-  ativo        Boolean   @default(true)
-  created_at   DateTime  @default(now())
-  updated_at   DateTime  @updatedAt
+  email               String    @unique
+  nome                String
+  telefone            String?
+  senha_hash          String?
+  /// null: ninguém provou ser dono do e-mail (o cadastro não confirma). O convite (F3-4b), que
+  /// chega por e-mail, prova; se o usuário não estava verificado, o convite assume o e-mail.
+  email_verificado_em DateTime?
+  avatar_url          String?
+  ultimo_login        DateTime?
+  ativo               Boolean   @default(true)
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
 
   membros        Membro[]
   refresh_tokens RefreshToken[]

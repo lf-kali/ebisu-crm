@@ -1,30 +1,98 @@
+import { randomUUID } from 'node:crypto';
 import { Controller, Inject, Post, Req, Res, UseGuards } from '@nestjs/common';
-import { EntradaLogin, EntradaTrocarConta, RespostaSessao } from '@ebisu/contracts';
+import {
+  EntradaLogin,
+  EntradaRegistro,
+  EntradaTrocarConta,
+  RespostaSessao,
+} from '@ebisu/contracts';
 import type { Request, Response } from 'express';
 import { Contrato, Corpo } from '../../core/contrato/contrato.js';
 import { ErroDominio } from '../../core/erros/erro-dominio.js';
 import { LIMITADOR, type Limitador } from '../../core/limite/limitador.js';
+import { requestIdDa } from '../../core/requisicao/request-id.js';
 import { apagarRefresh, gravarRefresh, lerRefresh } from './cookie-refresh.js';
 import type { RequisicaoAutenticada } from '../../core/rbac/guarda-contexto.js';
 import { Publica, SoAutenticado } from '../../core/rbac/marcas.js';
 import { GuardaOrigem } from './guardas.js';
+import { RegistroService } from './registro.service.js';
 import { normalizarEmail, type Origem, SessoesService } from './sessoes.service.js';
 
 // Rotas de auth (§5.3; contrato em packages/contracts/src/plataforma/auth.ts). Ignoram a
 // Idempotency-Key: um cache de idempotência nunca pode devolver um token antigo.
 
+interface Limite {
+  maximo: number;
+  /** Segundos. */
+  janela: number;
+}
+
 /** Tentativas de login: por IP e por e-mail (§7). */
-const LIMITE_POR_IP = { maximo: 30, janela: 60 };
-const LIMITE_POR_EMAIL = { maximo: 10, janela: 15 * 60 };
+const LIMITE_POR_IP: Limite = { maximo: 30, janela: 60 };
+const LIMITE_POR_EMAIL: Limite = { maximo: 10, janela: 15 * 60 };
+/** Cadastros: 5 por hora por IP e por e-mail (plano f3-4a, decisão 5). */
+const LIMITE_CADASTRO: Limite = { maximo: 5, janela: 60 * 60 };
 
 const origemDe = (req: Request): Origem => ({ ip: req.ip, userAgent: req.headers['user-agent'] });
+
+/** Só JSON: um formulário de outro site (urlencoded, sem preflight de CORS) não entra. */
+function exigirJson(req: Request): void {
+  if (!req.is('application/json'))
+    throw new ErroDominio('validacao', { detail: 'Envie o corpo em JSON (application/json).' });
+}
 
 @Controller('auth')
 export class AuthController {
   constructor(
     private readonly sessoes: SessoesService,
+    private readonly registro: RegistroService,
     @Inject(LIMITADOR) private readonly limitador: Limitador,
   ) {}
+
+  /** Conta uma tentativa em cada chave; se alguma estourou, 429 com Retry-After. */
+  private async limitar(res: Response, chaves: ReadonlyArray<[string, Limite]>): Promise<void> {
+    let espera = 0;
+    for (const [chave, { maximo, janela }] of chaves)
+      espera = Math.max(espera, await this.limitador.registrar(chave, maximo, janela));
+    if (espera > 0) {
+      res.setHeader('Retry-After', String(espera));
+      throw new ErroDominio('limite_excedido');
+    }
+  }
+
+  @Post('registrar')
+  @Publica()
+  @Contrato({
+    resumo: 'Cadastra uma conta com a primeira empresa e já entra',
+    descricao:
+      'Cria a conta (em teste), a empresa e o dono, e abre a sessão como no login. E-mail já ' +
+      'cadastrado: a senha precisa ser a dele (senão 401) e a conta nova fica com o mesmo usuário.',
+    tags: ['auth'],
+    corpo: EntradaRegistro,
+    resposta: RespostaSessao,
+    status: 201,
+  })
+  async registrar(
+    @Corpo() entrada: EntradaRegistro,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<RespostaSessao> {
+    exigirJson(req);
+    const email = normalizarEmail(entrada.email);
+    // O cadastro com e-mail existente confere a senha: conta também no limite de e-mail do login,
+    // para não somar mais tentativas de adivinhar a senha.
+    await this.limitar(res, [
+      [`registro:ip:${req.ip}`, LIMITE_CADASTRO],
+      [`registro:email:${email}`, LIMITE_CADASTRO],
+      [`login:email:${email}`, LIMITE_POR_EMAIL],
+    ]);
+    const { resposta, refresh } = await this.registro.registrar(entrada, {
+      ...origemDe(req),
+      requestId: requestIdDa(res) ?? randomUUID(),
+    });
+    gravarRefresh(res, refresh);
+    return resposta;
+  }
 
   @Post('login')
   @Publica()
@@ -41,25 +109,11 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<RespostaSessao> {
-    // Só JSON: um formulário de outro site (urlencoded, sem preflight de CORS) não faz login.
-    if (!req.is('application/json'))
-      throw new ErroDominio('validacao', { detail: 'Envie o corpo em JSON (application/json).' });
-    const espera = Math.max(
-      await this.limitador.registrar(
-        `login:ip:${req.ip}`,
-        LIMITE_POR_IP.maximo,
-        LIMITE_POR_IP.janela,
-      ),
-      await this.limitador.registrar(
-        `login:email:${normalizarEmail(entrada.email)}`,
-        LIMITE_POR_EMAIL.maximo,
-        LIMITE_POR_EMAIL.janela,
-      ),
-    );
-    if (espera > 0) {
-      res.setHeader('Retry-After', String(espera));
-      throw new ErroDominio('limite_excedido');
-    }
+    exigirJson(req);
+    await this.limitar(res, [
+      [`login:ip:${req.ip}`, LIMITE_POR_IP],
+      [`login:email:${normalizarEmail(entrada.email)}`, LIMITE_POR_EMAIL],
+    ]);
     const { resposta, refresh } = await this.sessoes.entrar(entrada, origemDe(req));
     gravarRefresh(res, refresh);
     return resposta;

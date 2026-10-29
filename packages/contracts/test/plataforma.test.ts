@@ -48,6 +48,7 @@ describe('contratos de auth (F3, adiantados para a F12)', () => {
   it('rotas de auth batem com a tabela da spec §5.3', () => {
     const spec = readFileSync(new URL('../../../docs/spec-mvp.md', import.meta.url), 'utf8');
     expect(ROTAS_AUTH).toEqual({
+      registrar: '/v1/auth/registrar',
       login: '/v1/auth/login',
       refresh: '/v1/auth/refresh',
       logout: '/v1/auth/logout',

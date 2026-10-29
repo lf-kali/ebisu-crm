@@ -1,6 +1,7 @@
 export const VERSAO_API = 'v1' as const;
 
 export * from './comum/escalares.js';
+export * from './comum/cnpj.js';
 export * from './comum/erros.js';
 export * from './comum/paginacao.js';
 export * from './comum/consulta.js';

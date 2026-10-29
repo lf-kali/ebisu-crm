@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Uuid } from '../comum/escalares.js';
+import { EntradaEmpresa } from './empresas.js';
 
 // Autenticação (spec D-T05, §5.1, §5.3; implementação na F3). Contrato escrito antes da API para o
 // web (F12) usar via MSW; a F3 implementa contra estes schemas.
@@ -35,6 +36,26 @@ export const EntradaLogin = z
   .meta({ id: 'EntradaLogin' });
 export type EntradaLogin = z.infer<typeof EntradaLogin>;
 
+/**
+ * Cadastro (plano docs/planos/f3-4a-cadastro-empresas.md): cria a conta (em teste), a primeira
+ * empresa e o dono, e já devolve a sessão. Sem confirmação de e-mail no MVP. Se o e-mail já tem
+ * cadastro, a senha precisa ser a dele (senão 401, como no login): a conta nova é do mesmo usuário.
+ * Além do tamanho, a API recusa (422 em `senha`) senha vazada conhecida e senha que contém o
+ * e-mail ou o nome.
+ */
+export const EntradaRegistro = z
+  .object({
+    nome: z.string().trim().min(1).max(120).meta({ description: 'Nome de quem cadastra' }),
+    email: z.email().max(254),
+    senha: z.string().min(12).max(128),
+    conta: z.object({
+      nome: z.string().trim().min(1).max(120).meta({ description: 'Nome da conta (empresa-mãe)' }),
+    }),
+    empresa: EntradaEmpresa.meta({ description: 'Primeira empresa da conta' }),
+  })
+  .meta({ id: 'EntradaRegistro' });
+export type EntradaRegistro = z.infer<typeof EntradaRegistro>;
+
 export const ResumoConta = z
   .object({ tenant_id: Uuid, nome: z.string(), slug: z.string() })
   .meta({ id: 'ResumoConta', description: 'Conta (tenant) da qual o usuário é membro ativo' });
@@ -63,6 +84,7 @@ export type EntradaTrocarConta = z.infer<typeof EntradaTrocarConta>;
 
 /** Rotas de auth (§5.3). Refresh e logout não têm corpo: usam o cookie do refresh token. */
 export const ROTAS_AUTH = {
+  registrar: '/v1/auth/registrar',
   login: '/v1/auth/login',
   refresh: '/v1/auth/refresh',
   logout: '/v1/auth/logout',

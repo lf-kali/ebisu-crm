@@ -37,7 +37,12 @@ function canonico(valor: unknown): unknown {
  * Mudar qualquer um com a mesma chave dá 422. O autor no hash impede que outra pessoa da conta,
  * com a mesma chave, receba a resposta de alguém.
  */
-export function idempotenciaDa(req: Request, empresaId: string, autor: string): Idempotencia {
+export function idempotenciaDa(
+  req: Request,
+  /** null nas rotas da conta (`@PermissaoNaConta`). */
+  empresaId: string | null,
+  autor: string,
+): Idempotencia {
   const valor = req.get(CABECALHO_IDEMPOTENCIA);
   if (!valor || !Uuid.safeParse(valor).success)
     throw new ErroDominio('validacao', {
