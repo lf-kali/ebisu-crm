@@ -80,6 +80,15 @@ export async function listarPendentes(
   return { linhas: linhas.slice(0, limite), haMais: linhas.length > limite };
 }
 
+/** Quando a conta foi criada (limite de convites de conta nova). */
+export async function contaCriadaEm(tx: Prisma.TransactionClient, tenantId: string) {
+  const tenant = await tx.tenant.findUniqueOrThrow({
+    where: { id: tenantId },
+    select: { created_at: true },
+  });
+  return tenant.created_at;
+}
+
 /** O usuário já é membro desta conta (qualquer status). */
 export async function jaEhMembro(tx: Prisma.TransactionClient, usuarioId: string) {
   return (await tx.membro.count({ where: { usuario_id: usuarioId } })) > 0;

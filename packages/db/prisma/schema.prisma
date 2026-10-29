@@ -393,8 +393,9 @@ model EmailSaida {
   convite_id String?          @db.Uuid
   status     StatusEmailSaida @default(PENDENTE)
   tentativas Int              @default(0)
-  /// PENDENTE: quando pode sair; ENVIANDO: fim do prazo do worker que a reivindicou.
-  proxima_em DateTime         @default(now())
+  /// PENDENTE: quando pode sair; ENVIANDO: fim do prazo do worker que a reivindicou. Em UTC, como
+  /// a comparação de reivindicar_email_saida(), qualquer que seja o timezone da sessão.
+  proxima_em DateTime         @default(dbgenerated("(now() AT TIME ZONE 'utc'::text)"))
   erro       String?
   enviado_em DateTime?
   created_at DateTime         @default(now())

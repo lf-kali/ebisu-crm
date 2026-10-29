@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Inject, Patch, Post, Put, Res } from '@nestjs/common';
+import { Controller, Delete, Get, Patch, Post, Put, Res } from '@nestjs/common';
 import {
   Convite,
   EdicaoMembro,
@@ -14,12 +14,20 @@ import {
 import type { Response } from 'express';
 import { z } from 'zod';
 import { Consulta, Contrato, Corpo, Parametros } from '../../core/contrato/contrato.js';
-import { ErroDominio } from '../../core/erros/erro-dominio.js';
-import { LIMITADOR, type Limitador } from '../../core/limite/limitador.js';
 import { ContextoConta } from '../../core/rbac/guarda-contexto.js';
 import { PermissaoNaConta } from '../../core/rbac/marcas.js';
 import type { ContextoDaConta } from '../../core/tx/contexto.js';
-import { MembrosService } from './membros.service.js';
+import { LimiteExcedido, MembrosService } from './membros.service.js';
+
+/** 429 dos limites de convite: o cabeçalho Retry-After vai na resposta. */
+async function comRetryAfter<T>(res: Response, acao: () => Promise<T>): Promise<T> {
+  try {
+    return await acao();
+  } catch (erro) {
+    if (erro instanceof LimiteExcedido) res.setHeader('Retry-After', String(erro.espera));
+    throw erro;
+  }
+}
 
 // Membros e papéis da conta (spec §5.3; plano docs/planos/f3-4b1-membros-papeis.md).
 
@@ -31,39 +39,12 @@ const REGRA_DO_DONO =
   'nunca fica sem um dono ativo (409 transicao_invalida).';
 
 /**
- * Limites dos convites (cada um dispara um e-mail do sistema para fora): por conta, por e-mail de
- * destino e por convite reenviado. Sem eles, uma conta recém-cadastrada mandaria e-mails sem teto.
- */
-const LIMITES_CONVITE = {
-  conta: { maximo: 30, janela: 60 * 60 },
-  destino: { maximo: 3, janela: 24 * 60 * 60 },
-  reenvio: { maximo: 3, janela: 24 * 60 * 60 },
-} as const;
-
-/**
  * Convites (plano docs/planos/f3-4b2-convites.md). Registrado antes do MembrosController:
  * `GET /membros/convites` precisa vir antes de `GET /membros/:id`.
  */
 @Controller('membros/convites')
 export class ConvitesController {
-  constructor(
-    private readonly membros: MembrosService,
-    @Inject(LIMITADOR) private readonly limitador: Limitador,
-  ) {}
-
-  /** Conta uma tentativa em cada chave; se alguma estourou, 429 com Retry-After. */
-  private async limitar(
-    res: Response,
-    chaves: ReadonlyArray<[string, { maximo: number; janela: number }]>,
-  ) {
-    let espera = 0;
-    for (const [chave, { maximo, janela }] of chaves)
-      espera = Math.max(espera, await this.limitador.registrar(chave, maximo, janela));
-    if (espera > 0) {
-      res.setHeader('Retry-After', String(espera));
-      throw new ErroDominio('limite_excedido');
-    }
-  }
+  constructor(private readonly membros: MembrosService) {}
 
   @Post()
   @PermissaoNaConta('config.membros')
@@ -82,12 +63,7 @@ export class ConvitesController {
     @Corpo() entrada: EntradaConvite,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const email = entrada.email.trim().toLowerCase();
-    await this.limitar(res, [
-      [`convite:conta:${contexto.tenantId}`, LIMITES_CONVITE.conta],
-      [`convite:destino:${contexto.tenantId}:${email}`, LIMITES_CONVITE.destino],
-    ]);
-    return this.membros.convidar(contexto, entrada);
+    return comRetryAfter(res, () => this.membros.convidar(contexto, entrada));
   }
 
   @Get()
@@ -116,11 +92,7 @@ export class ConvitesController {
     @Parametros() { id }: PorId,
     @Res({ passthrough: true }) res: Response,
   ) {
-    await this.limitar(res, [
-      [`convite:conta:${contexto.tenantId}`, LIMITES_CONVITE.conta],
-      [`convite:reenvio:${contexto.tenantId}:${id}`, LIMITES_CONVITE.reenvio],
-    ]);
-    return this.membros.reenviarConvite(contexto, id);
+    return comRetryAfter(res, () => this.membros.reenviarConvite(contexto, id));
   }
 
   @Delete(':id')

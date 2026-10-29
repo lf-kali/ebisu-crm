@@ -47,8 +47,7 @@ por `reivindicar_email_saida()` (única passagem entre contas, devolve só ids),
 envio e grava só o hash. O aceite é público (`/v1/auth/convites/consultar` e `/aceitar`, só JSON,
 limite por IP): e-mail novo cria o acesso; usuário verificado precisa da senha dele; usuário não
 verificado define senha nova e perde as sessões antigas. Link inválido, vencido, usado ou
-revogado: 410 `link_invalido`. Convidar e reenviar têm limite (30 por hora por conta, 3 por dia por
-e-mail de destino e por convite reenviado).
+revogado: 410 `link_invalido`. Convidar e reenviar têm limite (30 por hora por conta, 3 por dia por e-mail de destino e por convite reenviado, 5 por dia em conta com menos de 24 h, 300 por hora no sistema). O limite conta dentro do comando: a repetição idempotente não gasta cota.
 
 ## Rate limit e IP
 

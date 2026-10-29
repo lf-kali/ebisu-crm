@@ -163,6 +163,53 @@ describe('reivindicar_email_saida()', () => {
     }
   });
 
+  it('linha criada pelo default numa sessão a leste de UTC já sai na hora', async () => {
+    await admin.query(`UPDATE email_saida SET status = 'ENVIADO'`);
+    const convite = randomUUID();
+    await app.query(`SET timezone TO 'Asia/Tokyo'`);
+    await app.query('BEGIN');
+    try {
+      await app.query(`SELECT set_config('app.tenant_id', $1, true)`, [tenants[0]]);
+      await app.query(
+        `INSERT INTO convite (id, tenant_id, email, atribuicoes, expira_em, updated_at)
+         VALUES ($1, $2, 'toquio@teste.local', '[]', now() + interval '7 days', now())`,
+        [convite, tenants[0]],
+      );
+      // Sem proxima_em: vale o default da coluna.
+      await app.query(
+        `INSERT INTO email_saida (id, tenant_id, tipo, convite_id, updated_at)
+         VALUES ($1, $2, 'CONVITE', $3, now())`,
+        [randomUUID(), tenants[0], convite],
+      );
+      await app.query('COMMIT');
+      const { rows } = await app.query(
+        `SELECT * FROM reivindicar_email_saida(10, interval '5 minutes')`,
+      );
+      expect(rows).toHaveLength(1);
+    } finally {
+      await app.query('ROLLBACK').catch(() => undefined);
+      await app.query('RESET timezone');
+      await admin.query(`UPDATE email_saida SET status = 'ENVIADO'`);
+    }
+  });
+
+  it('o prazo pedido é limitado a 1 hora', async () => {
+    await semear(admin, { tenant: tenants[1]!, convite: randomUUID(), email: 'prazo@teste.local' });
+    const { rows } = await app.query(
+      `SELECT * FROM reivindicar_email_saida(10, interval '100 years')`,
+    );
+    expect(rows).toHaveLength(1);
+    const [linha] = (
+      await admin.query(
+        `SELECT extract(epoch FROM proxima_em - (now() AT TIME ZONE 'utc'))::int AS segundos
+           FROM email_saida WHERE id = $1`,
+        [rows[0].id],
+      )
+    ).rows;
+    expect(linha.segundos).toBeLessThanOrEqual(3600);
+    await admin.query(`UPDATE email_saida SET status = 'ENVIADO'`);
+  });
+
   it('duas reivindicações simultâneas não pegam a mesma linha (SKIP LOCKED)', async () => {
     await semear(admin, { tenant: tenants[0]!, convite: randomUUID(), email: 'a@teste.local' });
     await semear(admin, { tenant: tenants[1]!, convite: randomUUID(), email: 'b@teste.local' });

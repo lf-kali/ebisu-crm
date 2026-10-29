@@ -9,12 +9,39 @@ import type {
 } from '@ebisu/contracts';
 import type { PrismaClient } from '@ebisu/db';
 import { PRISMA_AUTH } from '../../core/banco/banco.module.js';
-import type { ContextoDaConta } from '../../core/tx/contexto.js';
+import { ErroDominio } from '../../core/erros/erro-dominio.js';
+import { LIMITADOR, type Limitador } from '../../core/limite/limitador.js';
+import type { ContextoDaConta, TxContextDaConta } from '../../core/tx/contexto.js';
 import { ExecutorDeComandos } from '../../core/tx/executar.js';
 import * as convites from './convites.comandos.js';
 import * as comandos from './membros.comandos.js';
 import type { LinhaMembro } from './membros.repositorio.js';
+import { contaCriadaEm } from './convites.repositorio.js';
 import { dadosDosUsuarios, idDoUsuario } from './usuarios.repositorio.js';
+
+/**
+ * Limites dos convites (cada um dispara um e-mail do sistema para fora): por conta, por e-mail de
+ * destino e por convite reenviado. Sem eles, uma conta recém-cadastrada mandaria e-mails sem teto.
+ */
+const DIA = 24 * 60 * 60;
+const LIMITES_CONVITE = {
+  conta: { maximo: 30, janela: 60 * 60 },
+  destino: { maximo: 3, janela: DIA },
+  reenvio: { maximo: 3, janela: DIA },
+  /** Conta com menos de 24 h: o cadastro é aberto, então conta nova convida pouco (usuário). */
+  contaNova: { maximo: 5, janela: DIA },
+  /** Teto do sistema inteiro: várias contas novas juntas não viram um canal de spam. */
+  global: { maximo: 300, janela: 60 * 60 },
+} as const;
+
+type Chaves = ReadonlyArray<[string, { maximo: number; janela: number }]>;
+
+/** 429 com a espera, para o controller pôr no Retry-After. */
+export class LimiteExcedido extends ErroDominio {
+  constructor(readonly espera: number) {
+    super('limite_excedido');
+  }
+}
 
 /** Roda os comandos e completa cada membro com o nome e o e-mail do usuário. */
 @Injectable()
@@ -22,7 +49,28 @@ export class MembrosService {
   constructor(
     private readonly executor: ExecutorDeComandos,
     @Inject(PRISMA_AUTH) private readonly auth: PrismaClient,
+    @Inject(LIMITADOR) private readonly limitador: Limitador,
   ) {}
+
+  /**
+   * O comando com o limite na frente. Roda dentro do executarComando, depois da checagem de
+   * idempotência: repetir o POST com a mesma Idempotency-Key devolve a resposta salva e não gasta
+   * cota (plano f3-3a).
+   */
+  private comLimite<E, S>(chaves: Chaves, comando: (ctx: TxContextDaConta, e: E) => Promise<S>) {
+    return async (ctx: TxContextDaConta, entrada: E): Promise<S> => {
+      const nova = Date.now() - (await contaCriadaEm(ctx.tx, ctx.tenantId)).getTime() < DIA * 1000;
+      const todas: Chaves = [...chaves, ['convite:global', LIMITES_CONVITE.global]];
+      const comNova: Chaves = nova
+        ? [...todas, [`convite:conta-nova:${ctx.tenantId}`, LIMITES_CONVITE.contaNova]]
+        : todas;
+      let espera = 0;
+      for (const [chave, { maximo, janela }] of comNova)
+        espera = Math.max(espera, await this.limitador.registrar(chave, maximo, janela));
+      if (espera > 0) throw new LimiteExcedido(espera);
+      return comando(ctx, entrada);
+    };
+  }
 
   private async comUsuarios(linhas: LinhaMembro[]): Promise<Membro[]> {
     const usuarios = await dadosDosUsuarios(
@@ -66,7 +114,14 @@ export class MembrosService {
   async convidar(ctx: ContextoDaConta, entrada: EntradaConvite) {
     const email = entrada.email.trim().toLowerCase();
     const usuarioId = await idDoUsuario(this.auth, email);
-    return this.executor.executarComando(ctx, convites.convidar, {
+    const limitado = this.comLimite(
+      [
+        [`convite:conta:${ctx.tenantId}`, LIMITES_CONVITE.conta],
+        [`convite:destino:${ctx.tenantId}:${email}`, LIMITES_CONVITE.destino],
+      ],
+      convites.convidar,
+    );
+    return this.executor.executarComando(ctx, limitado, {
       email,
       atribuicoes: entrada.atribuicoes,
       usuarioId,
@@ -78,7 +133,14 @@ export class MembrosService {
   }
 
   reenviarConvite(ctx: ContextoDaConta, id: string) {
-    return this.executor.executarComando(ctx, convites.reenviar, id);
+    const limitado = this.comLimite(
+      [
+        [`convite:conta:${ctx.tenantId}`, LIMITES_CONVITE.conta],
+        [`convite:reenvio:${ctx.tenantId}:${id}`, LIMITES_CONVITE.reenvio],
+      ],
+      convites.reenviar,
+    );
+    return this.executor.executarComando(ctx, limitado, id);
   }
 
   revogarConvite(ctx: ContextoDaConta, id: string) {

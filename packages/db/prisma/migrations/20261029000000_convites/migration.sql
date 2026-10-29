@@ -46,7 +46,7 @@ CREATE TABLE "email_saida" (
     "convite_id" UUID,
     "status" "StatusEmailSaida" NOT NULL DEFAULT 'PENDENTE',
     "tentativas" INTEGER NOT NULL DEFAULT 0,
-    "proxima_em" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "proxima_em" TIMESTAMP(3) NOT NULL DEFAULT (now() AT TIME ZONE 'utc'::text),
     "erro" TEXT,
     "enviado_em" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -109,7 +109,10 @@ RETURNS TABLE (id uuid, tenant_id uuid)
 LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp AS $$
   UPDATE public.email_saida e
      SET status = 'ENVIANDO', tentativas = e.tentativas + 1,
-         proxima_em = (now() AT TIME ZONE 'utc') + prazo, updated_at = now() AT TIME ZONE 'utc'
+         -- Prazo entre 1 s e 1 h: quem chama não consegue prender as linhas de todas as contas.
+         proxima_em = (now() AT TIME ZONE 'utc')
+           + least(greatest(prazo, interval '1 second'), interval '1 hour'),
+         updated_at = now() AT TIME ZONE 'utc'
    WHERE e.id IN (
      SELECT s.id FROM public.email_saida s
       WHERE s.status IN ('PENDENTE', 'ENVIANDO') AND s.proxima_em <= (now() AT TIME ZONE 'utc')

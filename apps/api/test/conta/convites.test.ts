@@ -217,7 +217,11 @@ describe('reenviar e revogar', () => {
   it('convidar e reenviar têm limite (por e-mail de destino e por convite): 429', async () => {
     // Cada app de teste tem a própria chave do JWT: a conta nasce no app com o limitador real.
     const limitado = await c.criarApp(limitadorEmMemoria());
-    const { token } = await contaNova(limitado, { conta: { nome: 'Conta Limitada' } });
+    const { token, tenantId } = await contaNova(limitado, { conta: { nome: 'Conta Limitada' } });
+    // Conta com mais de 24 h: fora do limite de conta nova (testado à parte).
+    await c.sql(`UPDATE tenant SET created_at = now() - interval '2 days' WHERE id = $1`, [
+      tenantId,
+    ]);
     const empresaId = (
       await request(limitado.getHttpServer()).get('/v1/eu').set('Authorization', `Bearer ${token}`)
     ).body.empresas[0].id as string;
@@ -256,6 +260,36 @@ describe('reenviar e revogar', () => {
     for (let i = 0; i < 4; i++)
       reenvios.push((await viaLimitado(`/v1/membros/convites/${outro.body.id}/reenviar`)).status);
     expect(reenvios).toEqual([200, 200, 200, 429]);
+  });
+
+  it('conta nova (menos de 24 h) manda no máximo 5 convites; repetir com a mesma chave não gasta cota', async () => {
+    const limitado = await c.criarApp(limitadorEmMemoria());
+    const { token } = await contaNova(limitado, { conta: { nome: 'Conta Recém-Criada' } });
+    const http2 = () => request(limitado.getHttpServer());
+    const papeis = ListaPapeis.parse(
+      (await http2().get('/v1/papeis').set('Authorization', `Bearer ${token}`)).body,
+    ).dados;
+    const atribuicoes = [
+      { papel_id: papeis.find((p) => p.chave === 'ADMIN')!.id, empresa_id: null },
+    ];
+    const convidarCom = (chave: string, email: string) =>
+      http2()
+        .post('/v1/membros/convites')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Idempotency-Key', chave)
+        .send({ email, atribuicoes });
+
+    // A mesma requisição repetida devolve a resposta salva sem contar no limite.
+    const chave = randomUUID();
+    const email = novoEmail('repetido');
+    const repeticoes = [];
+    for (let i = 0; i < 5; i++) repeticoes.push(await convidarCom(chave, email));
+    expect(repeticoes.map((r) => r.status)).toEqual([201, 201, 201, 201, 201]);
+    expect(new Set(repeticoes.map((r) => r.body.id)).size).toBe(1);
+
+    const status: number[] = [];
+    for (let i = 0; i < 5; i++) status.push((await convidarCom(randomUUID(), novoEmail())).status);
+    expect(status).toEqual([201, 201, 201, 201, 429]);
   });
 
   it('convite de outra conta dá 404', async () => {
