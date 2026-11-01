@@ -481,6 +481,7 @@ model Contato {
   empresa_id        String            @db.Uuid
   tipo_pessoa       TipoPessoa        @default(PF)
   nome              String
+  nome_busca        String            @default("") /// minúsculas e sem acento (busca ?q=)
   documento         String?
   email             String?
   email_normalizado String?

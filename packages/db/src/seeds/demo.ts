@@ -1,6 +1,7 @@
 import { type Algorithm, hash } from '@node-rs/argon2';
 import type { $Enums, Prisma, PrismaClient } from '@prisma/client';
 import { comTenant } from '../tenancy.js';
+import { normalizarBusca } from '../busca.js';
 import { PAPEIS_PADRAO } from './papeis-padrao.js';
 import { semearCatalogoPermissoes, semearPadroesEmpresa, semearPadroesTenant } from './semear.js';
 
@@ -190,6 +191,7 @@ async function criarCarteira(
       data: {
         ...daEmpresa,
         nome,
+        nome_busca: normalizarBusca(nome),
         email: emailDe(nome),
         email_normalizado: emailDe(nome),
         telefone_e164: telefone,

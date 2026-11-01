@@ -128,6 +128,17 @@ alteradas, nunca os valores (SEG-8). O `executarComando` passa o autor; o comand
 Tabela nova precisa ganhar o trigger na migração ou entrar na lista de fora em
 `packages/db/test/auditoria.test.ts`, senão o teste falha.
 
+## Contatos (CRM)
+
+`/v1/contatos` normaliza antes de gravar (`core/normalizacao`): e-mail com trim e minúsculas em
+`email_normalizado`; telefone e WhatsApp em E.164 (`libphonenumber-js` com metadado completo,
+Brasil como padrão; número inválido dá 422 no campo); CPF ou CNPJ conferido e sem máscara. O dedupe
+(CRM-1) confere e-mail, telefone e WhatsApp entre os contatos não excluídos da empresa antes de
+gravar: repetido dá 409 `duplicado` com `id_existente` e o `campo`; os índices únicos parciais
+fecham a corrida. Campos derivados (ciclo de vida, scores, completude) são recusados na entrada. A
+busca `?q=` usa `nome_busca` (sem acento, gravado pelo repositório a partir do nome), o e-mail e os
+dígitos do telefone. Consentimentos só são acrescentados; revogar é um registro novo.
+
 ## Sequência de documentos
 
 `proximoNumero(ctx, tipo)` (`core/sequencias`) devolve o número do orçamento (`ORC-2610-0001`), da

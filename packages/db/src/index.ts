@@ -8,6 +8,7 @@ export {
   type Ator,
   type OpcoesTransacao,
 } from './tenancy.js';
+export { normalizarBusca } from './busca.js';
 export { gerarApiKey, hashDaApiKey, PREFIXO_API_KEY, prefixoDaApiKey } from './api-keys.js';
 export { gerarTokenConvite, hashDoTokenConvite, VALIDADE_CONVITE_DIAS } from './convites.js';
 export * from './seeds/index.js';
