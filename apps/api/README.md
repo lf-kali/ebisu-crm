@@ -14,6 +14,7 @@ falha no CI.
 | `@SoAutenticado()`                  | Rotas da pessoa, sem empresa (`/v1/eu`, troca de conta) | Bearer válido; usuário ativo; membro `ATIVO`; conta `TRIAL`/`ATIVO`                                      |
 | `@Permissao('recurso.acao')`        | Toda rota de domínio                                    | O mesmo, mais `X-Empresa-Id` ativa e atribuída ao membro, e a permissão nessa empresa                    |
 | `@PermissaoNaConta('recurso.acao')` | Rotas da conta, sem empresa (`/v1/empresas`)            | O mesmo que `@SoAutenticado`, mais a permissão com escopo TENANT num papel atribuído a todas as empresas |
+| `@ApiKeyPublica('recurso.acao')`    | Rotas da chave de navegador, sob `/v1/publico/`         | `X-Api-Key` de navegador válida, com o escopo e um `Origin` cadastrado nela (sem Bearer)                 |
 
 Nas rotas da conta, o comando recebe um `TxContextDaConta` (`empresaId: null`; use
 `@ContextoConta()` no lugar de `@Contexto()`). Um papel com a permissão em escopo EMPRESA, ou
@@ -48,6 +49,33 @@ envio e grava só o hash. O aceite é público (`/v1/auth/convites/consultar` e 
 limite por IP): e-mail novo cria o acesso; usuário verificado precisa da senha dele; usuário não
 verificado define senha nova e perde as sessões antigas. Link inválido, vencido, usado ou
 revogado: 410 `link_invalido`. Convidar e reenviar têm limite (30 por hora por conta, 3 por dia por e-mail de destino e por convite reenviado, 5 por dia em conta com menos de 24 h; no sistema, 300 por hora para contas antigas e 100 para contas novas). Os limites da conta vêm antes do comando e o teto global só conta convite enfileirado; a repetição idempotente não gasta cota.
+
+## API keys e CORS
+
+`/v1/api-keys` (`config.api_keys`, rota de domínio) cria, lista, edita e revoga as chaves da empresa.
+O token (`ebk_live_…`) só aparece na resposta do `POST`; no banco fica só o SHA-256, e a repetição
+idempotente devolve `token: null`. Os escopos de uma chave precisam ser permissões que quem cria tem
+na empresa inteira (EMPRESA ou TENANT, não PROPRIO), nunca `config.*`.
+
+A chave só autentica onde a rota pede: `@Permissao('recurso.acao', { apiKey: true })` aceita a chave
+de **servidor** (o comando roda com `membroId: null`, `apiKeyId` preenchido e a empresa da chave), e
+`@ApiKeyPublica` aceita a de **navegador**. Sem a opção, `X-Api-Key` é ignorado. Antes de abrir uma
+rota para chave, confira que o comando funciona sem membro (responsável, escopo PROPRIO).
+
+| Situação                                                                                    | Resposta                     |
+| ------------------------------------------------------------------------------------------- | ---------------------------- |
+| Chave inválida, revogada, vencida, de empresa ou conta inativa                              | 401 `nao_autenticado`        |
+| Chave do tipo errado para a rota, ou junto com `Authorization`                              | 401 `nao_autenticado`        |
+| Chave de servidor vinda de navegador (com `Origin`)                                         | 403 `sem_permissao`          |
+| Chave de navegador com `Origin` fora da lista                                               | 403 `sem_permissao`          |
+| Falta o escopo                                                                              | 403 `sem_permissao`          |
+| `X-Empresa-Id` diferente da empresa da chave                                                | 403 `empresa_nao_autorizada` |
+| 20 falhas de chave por minuto do mesmo IP; rota pública: 60 por minuto por chave, 30 por IP | 429 `limite_excedido`        |
+
+CORS só existe em `/v1/publico/*` (`core/cors/cors-publico.ts`): o preflight responde a qualquer
+origem (ele não traz a chave) e a requisição de fato só recebe `Access-Control-Allow-Origin`, com a
+origem exata, depois que o guard confere o `Origin` contra a chave. As demais rotas não têm CORS: o
+web usa a mesma origem (proxy do Vite em dev, proxy reverso em produção).
 
 ## Rate limit e IP
 

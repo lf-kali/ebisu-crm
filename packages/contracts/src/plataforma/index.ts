@@ -4,4 +4,5 @@ export * from './auth.js';
 export * from './empresas.js';
 export * from './membros.js';
 export * from './convites.js';
+export * from './api-keys.js';
 export * from './eu.js';

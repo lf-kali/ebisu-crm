@@ -6,6 +6,8 @@ import type { Redis } from 'ioredis';
 export interface Limitador {
   /** Conta uma tentativa na chave; devolve em quantos segundos libera, ou 0 se está liberado. */
   registrar(chave: string, maximo: number, janelaSegundos: number): Promise<number>;
+  /** Sem contar: em quantos segundos libera se a chave já tem `maximo` tentativas, ou 0. */
+  consultar(chave: string, maximo: number): Promise<number>;
 }
 
 export const LIMITADOR = Symbol('LIMITADOR');
@@ -23,6 +25,14 @@ export function limitadorRedis(redis: Redis): Limitador {
         .exec()) as [[null, number], [null, number], [null, number]];
       return contagem > maximo ? Math.max(Number(ttl), 1) : 0;
     },
+    async consultar(chave, maximo) {
+      const completa = `ebisu:limite:${chave}`;
+      const [[, contagem], [, ttl]] = (await redis.multi().get(completa).ttl(completa).exec()) as [
+        [null, string | null],
+        [null, number],
+      ];
+      return Number(contagem ?? 0) >= maximo ? Math.max(Number(ttl), 1) : 0;
+    },
   };
 }
 
@@ -39,6 +49,13 @@ export function limitadorEmMemoria(agora: () => number = Date.now): Limitador {
       janela.contagem += 1;
       janelas.set(chave, janela);
       return janela.contagem > maximo ? Math.ceil((janela.fim - instante) / 1000) : 0;
+    },
+    async consultar(chave, maximo) {
+      const instante = agora();
+      const atual = janelas.get(chave);
+      return atual && atual.fim > instante && atual.contagem >= maximo
+        ? Math.ceil((atual.fim - instante) / 1000)
+        : 0;
     },
   };
 }

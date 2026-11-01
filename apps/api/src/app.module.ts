@@ -5,6 +5,7 @@ import { LimiteModule } from './core/limite/limite.module.js';
 import { RbacModule } from './core/rbac/rbac.module.js';
 import { SaudeModule } from './core/saude/saude.module.js';
 import { TxModule } from './core/tx/executar.js';
+import { ApiKeysModule } from './modules/api-keys/api-keys.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { EmpresasModule } from './modules/empresas/empresas.module.js';
 import { MembrosModule } from './modules/membros/membros.module.js';
@@ -21,6 +22,7 @@ import { MembrosModule } from './modules/membros/membros.module.js';
     AuthModule,
     EmpresasModule,
     MembrosModule,
+    ApiKeysModule,
   ],
 })
 export class AppModule {}

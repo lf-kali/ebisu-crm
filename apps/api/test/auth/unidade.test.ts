@@ -111,6 +111,19 @@ describe('limitador de tentativas', () => {
     expect(await limitador.registrar('k', 3, 60)).toBe(0);
   });
 
+  it('em memória: consultar não conta e acusa o bloqueio a partir do máximo', async () => {
+    let agora = 0;
+    const limitador = limitadorEmMemoria(() => agora);
+    expect(await limitador.consultar('c', 2)).toBe(0);
+    await limitador.registrar('c', 2, 60);
+    expect(await limitador.consultar('c', 2)).toBe(0);
+    expect(await limitador.consultar('c', 2)).toBe(0);
+    await limitador.registrar('c', 2, 60);
+    expect(await limitador.consultar('c', 2)).toBe(60);
+    agora = 61_000;
+    expect(await limitador.consultar('c', 2)).toBe(0);
+  });
+
   describe('Redis (o usado em produção)', () => {
     let container: StartedTestContainer;
     let redis: Redis;
@@ -131,6 +144,18 @@ describe('limitador de tentativas', () => {
       expect(espera).toBeLessThanOrEqual(30);
       expect(await redis.ttl('ebisu:limite:r')).toBeLessThanOrEqual(30);
       expect(await limitador.registrar('outra', 2, 30)).toBe(0);
+    });
+
+    it('consultar não conta e acusa o bloqueio a partir do máximo', async () => {
+      const limitador = limitadorRedis(redis);
+      expect(await limitador.consultar('q', 2)).toBe(0);
+      await limitador.registrar('q', 2, 30);
+      expect(await limitador.consultar('q', 2)).toBe(0);
+      expect(await redis.get('ebisu:limite:q')).toBe('1');
+      await limitador.registrar('q', 2, 30);
+      const espera = await limitador.consultar('q', 2);
+      expect(espera).toBeGreaterThan(0);
+      expect(espera).toBeLessThanOrEqual(30);
     });
   });
 });
