@@ -34,7 +34,7 @@ const linhaDoContato = async (id: string) =>
   ).rows[0];
 
 describe('isolamento entre empresas e contas (contatos de teste)', () => {
-  testarIsolamento(() => cenario, {
+  testarIsolamento(() => ({ http: (...args) => http('admin', ...args), empresas: IDS.empresas }), {
     rota: ROTA,
     ids: { a1: contatos.a1DoM1, a2: contatos.a2, b1: contatos.b1 },
     edicao: { nome: 'invadido' },

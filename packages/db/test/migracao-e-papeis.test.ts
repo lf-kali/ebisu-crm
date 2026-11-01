@@ -106,6 +106,93 @@ describe('migração inicial e papéis de banco', () => {
     expect(rows).toEqual(TABELAS_GLOBAIS.map((tabela) => ({ papel: 'ebisu_auth', tabela })));
   });
 
+  it('SEG-1: toda tabela com tenant_id isola pela conta, na leitura e na escrita', async () => {
+    const { rows } = await admin.query<{
+      tabela: string;
+      usando: string | null;
+      checa: string | null;
+    }>(
+      `SELECT c.relname AS tabela, p.qual AS usando, p.with_check AS checa
+         FROM pg_class c
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         JOIN pg_attribute a ON a.attrelid = c.oid AND a.attname = 'tenant_id' AND NOT a.attisdropped
+         LEFT JOIN pg_policies p
+           ON p.schemaname = 'public' AND p.tablename = c.relname AND p.policyname = 'tenant_isolamento'
+        WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname <> ALL($1::text[])
+        ORDER BY 1`,
+      // Globais de auth (refresh_token tem a conta da sessão, mas só o ebisu_auth a acessa).
+      [TABELAS_GLOBAIS],
+    );
+    expect(rows.length).toBeGreaterThan(30);
+    const fora = rows.filter(
+      (r) =>
+        r.usando !== '(tenant_id = app_tenant_id())' || r.checa !== '(tenant_id = app_tenant_id())',
+    );
+    expect(fora).toEqual([]);
+  });
+
+  it('SEG-1: toda tabela com RLS tem tenant_isolamento; política permissiva extra só na lista fechada', async () => {
+    const semIsolamento = await admin.query<{ tabela: string }>(
+      `SELECT c.relname AS tabela FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relrowsecurity
+          AND NOT EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public'
+                            AND p.tablename = c.relname AND p.policyname = 'tenant_isolamento')
+        ORDER BY 1`,
+    );
+    expect(semIsolamento.rows).toEqual([]);
+    // Cada uma abre leitura entre contas para um papel (decisões dos PRs da F3). Nova política aqui
+    // precisa de revisão de segurança e de entrar nesta lista.
+    const extras = await admin.query<{ politica: string }>(
+      `SELECT tablename || '.' || policyname || ' ' || cmd || ' ' || permissive AS politica
+         FROM pg_policies WHERE schemaname = 'public' AND policyname <> 'tenant_isolamento'
+        ORDER BY 1`,
+    );
+    expect(extras.rows.map((r) => r.politica)).toEqual([
+      'api_key.auth_leitura SELECT PERMISSIVE',
+      'convite.auth_leitura SELECT PERMISSIVE',
+      'email_saida.reivindicacao ALL PERMISSIVE',
+      'empresa.auth_leitura SELECT PERMISSIVE',
+      'membro.auth_leitura SELECT PERMISSIVE',
+      'tenant.auth_leitura SELECT PERMISSIVE',
+    ]);
+    const papeis = await admin.query<{ politica: string; papeis: string[] }>(
+      `SELECT tablename || '.' || policyname AS politica, roles::text[] AS papeis
+         FROM pg_policies WHERE schemaname = 'public' AND policyname = 'auth_leitura'`,
+    );
+    expect(papeis.rows.every((r) => r.papeis.length === 1 && r.papeis[0] === 'ebisu_auth')).toBe(
+      true,
+    );
+  });
+
+  it('SEG-2: toda FK para empresa é composta (tenant_id, empresa_id) → (tenant_id, id)', async () => {
+    const colunas = (lado: 'conkey' | 'confkey', tabela: 'conrelid' | 'confrelid') =>
+      `(SELECT array_agg(a.attname::text ORDER BY k.n)
+          FROM unnest(c.${lado}) WITH ORDINALITY k(att, n)
+          JOIN pg_attribute a ON a.attrelid = c.${tabela} AND a.attnum = k.att)`;
+    const fks = await admin.query<{ tabela: string; colunas: string[]; referencia: string[] }>(
+      `SELECT c.conrelid::regclass::text AS tabela, ${colunas('conkey', 'conrelid')} AS colunas,
+              ${colunas('confkey', 'confrelid')} AS referencia
+         FROM pg_constraint c WHERE c.contype = 'f' AND c.confrelid = 'empresa'::regclass`,
+    );
+    expect(fks.rows.length).toBeGreaterThan(30);
+    expect(
+      fks.rows.filter(
+        (r) =>
+          r.colunas.join() !== 'tenant_id,empresa_id' || r.referencia.join() !== 'tenant_id,id',
+      ),
+    ).toEqual([]);
+    // Coluna empresa_id sem FK para empresa: só o audit_log (append-only, referência genérica).
+    const semFk = await admin.query<{ tabela: string }>(
+      `SELECT col.table_name AS tabela FROM information_schema.columns col
+        WHERE col.table_schema = 'public' AND col.column_name = 'empresa_id'
+          AND NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.contype = 'f'
+                            AND c.conrelid = format('%I', col.table_name)::regclass
+                            AND c.confrelid = 'empresa'::regclass)
+        ORDER BY 1`,
+    );
+    expect(semFk.rows.map((r) => r.tabela)).toEqual(['audit_log']);
+  });
+
   it('ebisu_app e ebisu_auth não acessam o histórico de migrações', async () => {
     expect(await codigoDoErro(app, 'SELECT 1 FROM _prisma_migrations')).toBe(SEM_PERMISSAO);
     expect(await codigoDoErro(auth, 'SELECT 1 FROM _prisma_migrations')).toBe(SEM_PERMISSAO);

@@ -128,9 +128,36 @@ alteradas, nunca os valores (SEG-8). O `executarComando` passa o autor; o comand
 Tabela nova precisa ganhar o trigger na migração ou entrar na lista de fora em
 `packages/db/test/auditoria.test.ts`, senão o teste falha.
 
+## Sequência de documentos
+
+`proximoNumero(ctx, tipo)` (`core/sequencias`) devolve o número do orçamento (`ORC-2610-0001`), da
+ordem de serviço (`OS-…`) ou da compra (`CP-…`): por empresa e por tipo, reiniciando todo mês no
+fuso da empresa. Chame dentro do comando (no `executarComando`): a linha do período fica travada
+até o fim da transação, então dois documentos simultâneos esperam um pelo outro e um comando que
+falha devolve o número (sem buracos). Acima de 9999 no mês, o número ganha um dígito.
+
 ## Testes de isolamento
 
-`test/isolamento/suite.ts` traz `testarIsolamento`: cada frente de domínio chama a função para o
-seu recurso, sobre o cenário de `test/isolamento/cenario.ts` (contas A, B e C; empresas A1, A2 e
-A3 inativa). Ela prova que, com o cabeçalho de A1, ninguém lê, lista, edita ou exclui registros de
-A2 nem da conta B.
+`test/isolamento/suite.ts` traz duas matrizes reaproveitáveis:
+
+- `testarIsolamento`, para recursos por empresa: com o cabeçalho de uma empresa, ninguém lê, lista,
+  edita ou exclui registros de outra empresa nem de outra conta;
+- `testarIsolamentoDaConta`, para rotas da conta: registro de outra conta não é lido, não aparece
+  na lista e não muda por nenhuma escrita pelo id (404).
+
+Toda frente de domínio chama a matriz para cada recurso novo. No banco,
+`packages/db/test/migracao-e-papeis.test.ts` falha sozinho se uma tabela nova vier sem RLS forçado,
+sem a política `tenant_isolamento` certa, com uma política permissiva fora da lista fechada ou com
+FK simples para `empresa`.
+
+Mapa do "pronto quando" da F3 (spec §4):
+
+| Item                                                                                        | Onde é provado                                                                                                                                           |
+| ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Membro da empresa A não lê, altera, exclui nem referencia dados da empresa B                | `test/isolamento/isolamento.test.ts` (matriz, referência entre empresas, PROPRIO), `test/isolamento/rotas-f3.test.ts` (API keys)                         |
+| Um tenant não acessa os dados de outro                                                      | `test/isolamento/rotas-f3.test.ts` (empresas, membros, convites, API keys); `packages/db/test/migracao-e-papeis.test.ts` (RLS e FKs de todas as tabelas) |
+| … por id e por filtro                                                                       | por id: as matrizes acima; filtros (`?filtro[...]`) nascem na F4, com o caso na matriz                                                                   |
+| … por lote e por job                                                                        | `job_lote` e as rotas em massa nascem na F4; job do outbox: `apps/worker/test/emails.test.ts` (duas contas no mesmo lote)                                |
+| Repetir um POST com a mesma `Idempotency-Key` devolve a mesma resposta sem duplicar efeitos | `test/isolamento/idempotencia.test.ts`                                                                                                                   |
+| Reuso de refresh token invalida a família                                                   | `test/auth/auth.test.ts`                                                                                                                                 |
+| Custos somem da resposta sem `financeiro.ver_custos` (SEG-5)                                | os primeiros campos de custo nascem na F6 e na F8, que trazem o teste                                                                                    |
