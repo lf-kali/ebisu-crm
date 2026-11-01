@@ -3,9 +3,12 @@ import {
   Contato,
   type Contato as TipoContato,
   Data,
+  type OpcaoResponsavel,
+  type Origem,
   ROTAS_CONTATOS,
   TipoPessoa,
 } from '@ebisu/contracts';
+import { Carregando } from '@ebisu/ui/components/estados';
 import { Alert, AlertDescription } from '@ebisu/ui/components/ui/alert';
 import { Button } from '@ebisu/ui/components/ui/button';
 import { Label } from '@ebisu/ui/components/ui/label';
@@ -17,6 +20,7 @@ import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { ErroApi } from '../api/erro-api';
 import { useAcesso } from '../auth/acesso';
+import { ErroDaApi } from '../componentes/erro-da-api';
 import { AvisoDeErro } from '../configuracoes/aviso';
 import { aplicarErrosDaApi, Campo } from '../formularios/campo';
 import { Selecao } from '../formularios/selecao';
@@ -151,13 +155,51 @@ export function corpoDoEnvio(
   );
 }
 
+/**
+ * Carrega as origens e os responsáveis antes de montar o formulário: o `<select>` só mostra o valor
+ * do contato se a opção já existe na montagem (o React Hook Form não o reaplica depois).
+ */
 export function FormularioContato({ contato }: { contato: TipoContato | null }) {
+  const { cliente } = rotaApp.useRouteContext();
+  const origens = useQuery(consultaOrigens(cliente));
+  const responsaveis = useQuery(consultaResponsaveis(cliente));
+  if (origens.isError || responsaveis.isError)
+    return (
+      <ErroDaApi
+        erro={origens.error ?? responsaveis.error}
+        acao={
+          <Button
+            variant="outline"
+            onClick={() => void Promise.all([origens.refetch(), responsaveis.refetch()])}
+          >
+            Tentar de novo
+          </Button>
+        }
+      />
+    );
+  if (!origens.data || !responsaveis.data) return <Carregando />;
+  return (
+    <Formulario
+      contato={contato}
+      origens={origens.data.dados}
+      responsaveis={responsaveis.data.dados}
+    />
+  );
+}
+
+function Formulario({
+  contato,
+  origens,
+  responsaveis,
+}: {
+  contato: TipoContato | null;
+  origens: Origem[];
+  responsaveis: OpcaoResponsavel[];
+}) {
   const { cliente } = rotaApp.useRouteContext();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { escopo } = useAcesso();
-  const origens = useQuery(consultaOrigens(cliente));
-  const responsaveis = useQuery(consultaResponsaveis(cliente));
   const [erro, setErro] = useState<unknown>(null);
   const [duplicado, setDuplicado] = useState<{ meio: string; id?: string } | null>(null);
   const form = useForm<Entrada, unknown, Valores>({
@@ -201,8 +243,8 @@ export function FormularioContato({ contato }: { contato: TipoContato | null }) 
     return true;
   }
 
-  const ativas = origens.data?.dados.filter((o) => o.ativo || o.id === contato?.origem_id) ?? [];
-  const opcoesResponsavel = responsaveis.data?.dados ?? [];
+  const ativas = origens.filter((o) => o.ativo || o.id === contato?.origem_id);
+  const opcoesResponsavel = responsaveis;
   const responsavelForaDaLista =
     contato?.responsavel_id && !opcoesResponsavel.some((r) => r.id === contato.responsavel_id);
 

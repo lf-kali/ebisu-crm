@@ -352,6 +352,21 @@ describe('opções de responsável', () => {
     const s = { token: semContato.token, empresaId: x.empresaId };
     expect((await pedir(s, 'get', '/v1/membros/opcoes')).status).toBe(403);
   });
+
+  it('API key não lista os responsáveis, nem com contato.read (rota sem a marca de chave)', async () => {
+    const x = await conta('Conta Opções Chave');
+    const criada = await pedir(x, 'post', '/v1/api-keys', {
+      tipo: 'SERVIDOR',
+      nome: 'n8n',
+      escopos: ['contato.read'],
+    });
+    expect(criada.status, JSON.stringify(criada.body)).toBe(201);
+    const r = await request(c.app.getHttpServer())
+      .get('/v1/membros/opcoes')
+      .set('X-Api-Key', criada.body.token as string)
+      .set('X-Empresa-Id', x.empresaId);
+    expect(r.status).toBe(401);
+  });
 });
 
 describe('consentimentos', () => {

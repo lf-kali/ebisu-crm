@@ -92,7 +92,7 @@ describe('lista', () => {
 describe('formulário', () => {
   async function preencherNovo(u: ReturnType<typeof usuario>, campos: Record<string, string>) {
     for (const [rotulo, valor] of Object.entries(campos))
-      await u.type(screen.getByLabelText(rotulo), valor);
+      await u.type(await screen.findByLabelText(rotulo), valor);
   }
   const criar = (u: ReturnType<typeof usuario>) =>
     u.click(screen.getByRole('button', { name: 'Criar contato' }));
@@ -195,6 +195,16 @@ describe('formulário', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Lead Próprio' })).toBeTruthy();
     const responsavel = () => screen.getByText('Responsável').nextElementSibling!.textContent;
     await waitFor(() => expect(responsavel()).toBe('Ana Souza'));
+  });
+
+  it('editar aberto direto (sem cache) já mostra a origem e o responsável do contato', async () => {
+    const joao = simulada.contatos.contatos(EMPRESA).find((k) => k.nome === 'João Araújo')!;
+    joao.responsavel_id = USUARIOS[1]!.contas[0]!.membroId;
+    renderizarApp(`/contatos/${joao.id}/editar`);
+    const origem = (await screen.findByLabelText('Origem')) as HTMLSelectElement;
+    const responsavel = screen.getByLabelText('Responsável') as HTMLSelectElement;
+    expect(origem.selectedOptions[0]!.textContent).toBe('Indicação');
+    expect(responsavel.selectedOptions[0]!.textContent).toBe('Bruno Lima');
   });
 
   it('editar manda só o que mudou; esvaziar um campo manda null', async () => {

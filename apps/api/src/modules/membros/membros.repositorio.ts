@@ -42,7 +42,11 @@ export async function listarMembros(
   return { membros: linhas.slice(0, limite), haMais: linhas.length > limite };
 }
 
-/** Teto das opções de responsável (decisão 6 do plano f4-web-1-contatos). */
+/**
+ * Teto das opções de responsável (decisão 6 do plano f4-web-1-contatos). O nome mora em `usuario`
+ * (outro papel do banco), então o corte é pelos mais antigos e a ordem de nome vem depois, no
+ * serviço.
+ */
 export const LIMITE_OPCOES = 500;
 
 /** Membros ativos com acesso à empresa (atribuição nela ou em todas): só id e usuário. */

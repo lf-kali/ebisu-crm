@@ -93,9 +93,10 @@ export const OpcaoResponsavel = z
   .meta({ id: 'OpcaoResponsavel' });
 export type OpcaoResponsavel = z.infer<typeof OpcaoResponsavel>;
 
-export const ListaOpcoesResponsavel = z
-  .object({ dados: z.array(OpcaoResponsavel) })
-  .meta({ id: 'ListaOpcoesResponsavel', description: 'Em ordem de nome, até 500' });
+export const ListaOpcoesResponsavel = z.object({ dados: z.array(OpcaoResponsavel) }).meta({
+  id: 'ListaOpcoesResponsavel',
+  description: 'Em ordem de nome; acima de 500 membros, só os 500 mais antigos',
+});
 export type ListaOpcoesResponsavel = z.infer<typeof ListaOpcoesResponsavel>;
 
 export const ROTAS_MEMBROS = {

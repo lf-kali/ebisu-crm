@@ -1684,7 +1684,7 @@
         "required": [
           "dados"
         ],
-        "description": "Em ordem de nome, até 500"
+        "description": "Em ordem de nome; acima de 500 membros, só os 500 mais antigos"
       },
       "OpcaoResponsavel": {
         "type": "object",

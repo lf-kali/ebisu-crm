@@ -11,7 +11,7 @@ import { queryOptions } from '@tanstack/react-query';
 import type { ClienteApi } from '../api/cliente';
 
 // Consultas das telas de contatos (TanStack Query). A lista paginada usa usePaginacaoCursor. Tudo
-// sob ['contatos']: trocar de empresa limpa o cache (auth/acesso).
+// sob ['contatos']: trocar de empresa limpa o cache (routes/_app.tsx).
 
 export const CHAVE_CONTATOS = ['contatos'] as const;
 
