@@ -15,7 +15,8 @@ export default defineConfig({
   use: {
     baseURL: URL_WEB,
     locale: 'pt-BR',
-    trace: 'retain-on-failure',
+    // No CI o trace iria para o artefato com o link do convite e as senhas do teste: só local.
+    trace: process.env.CI ? 'off' : 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
