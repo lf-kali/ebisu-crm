@@ -15,6 +15,8 @@ const x = { token: '', tenantId: '', x1: '', x2: '', donoY: '' };
 const contatos = { a1: '', a2: '', b1: '' };
 const origens = { a1: '', a2: '', b1: '' };
 const motivos = { a1: '', a2: '', b1: '' };
+const negocios = { a1: '', a2: '', b1: '' };
+const tarefas = { a1: '', a2: '', b1: '' };
 
 function pedir(
   token: string,
@@ -43,14 +45,22 @@ async function conta(nome: string) {
   return { token, tenantId, empresaId: eu.empresas[0]!.id, membroId: eu.membro.id };
 }
 
-/** Um contato, uma origem e um motivo na empresa dada. */
+/** Um contato (com um negócio e uma tarefa), uma origem e um motivo na empresa dada. */
 async function semear(token: string, empresa: string, sufixo: string) {
+  const contato = await criado(
+    pedir(token, 'post', '/v1/contatos', empresa, {
+      nome: `Contato ${sufixo}`,
+      email: `c.${sufixo}@iso.test`,
+    }),
+  );
+  const negocio = await criado(
+    pedir(token, 'post', '/v1/negocios', empresa, { contato_id: contato, titulo: `N ${sufixo}` }),
+  );
   return {
-    contato: await criado(
-      pedir(token, 'post', '/v1/contatos', empresa, {
-        nome: `Contato ${sufixo}`,
-        email: `c.${sufixo}@iso.test`,
-      }),
+    contato,
+    negocio,
+    tarefa: await criado(
+      pedir(token, 'post', '/v1/tarefas', empresa, { titulo: `T ${sufixo}`, negocio_id: negocio }),
     ),
     origem: await criado(
       pedir(token, 'post', '/v1/origens', empresa, { nome: `Origem ${sufixo}`, tipo: 'OUTRO' }),
@@ -86,6 +96,8 @@ beforeAll(async () => {
   Object.assign(contatos, { a1: a1.contato, a2: a2.contato, b1: b1.contato });
   Object.assign(origens, { a1: a1.origem, a2: a2.origem, b1: b1.origem });
   Object.assign(motivos, { a1: a1.motivo, a2: a2.motivo, b1: b1.motivo });
+  Object.assign(negocios, { a1: a1.negocio, a2: a2.negocio, b1: b1.negocio });
+  Object.assign(tarefas, { a1: a1.tarefa, a2: a2.tarefa, b1: b1.tarefa });
 }, 180_000);
 afterAll(async () => {
   await c?.fechar();
@@ -121,6 +133,84 @@ describe('motivos de perda (por empresa)', () => {
     ids: motivos,
     edicao: { nome: 'Invadido' },
     linha: (id) => linha(`SELECT empresa_id, nome, ativo FROM motivo_perda WHERE id = $1`, id),
+  });
+});
+
+describe('negócios (por empresa)', () => {
+  testarIsolamento(acesso, {
+    rota: '/v1/negocios',
+    ids: negocios,
+    edicao: { versao_registro: 0, titulo: 'Invadido' },
+    linha: (id) =>
+      linha(
+        `SELECT empresa_id, titulo, etapa_id, status, versao_registro, deleted_at FROM negocio WHERE id = $1`,
+        id,
+      ),
+  });
+
+  it('os comandos não alcançam negócio de outra empresa ou conta (404), e nada muda', async () => {
+    for (const alvo of [negocios.a2, negocios.b1]) {
+      const antes = await linha(
+        `SELECT etapa_id, status, versao_registro FROM negocio WHERE id = $1`,
+        alvo,
+      );
+      for (const [acao, corpo] of [
+        ['mover', { etapa_id: randomUUID(), versao_registro: 0 }],
+        ['perder', { motivo_perda_id: motivos.a1, versao_registro: 0 }],
+        ['nutrir', { nba_adiada_ate: '2099-01-01T00:00:00Z', versao_registro: 0 }],
+      ] as const)
+        expect((await naEmpresa('post', `/v1/negocios/${alvo}/${acao}`, x.x1, corpo)).status).toBe(
+          404,
+        );
+      expect(
+        await linha(`SELECT etapa_id, status, versao_registro FROM negocio WHERE id = $1`, alvo),
+      ).toEqual(antes);
+    }
+  });
+});
+
+describe('tarefas (por empresa)', () => {
+  testarIsolamento(acesso, {
+    rota: '/v1/tarefas',
+    ids: tarefas,
+    edicao: { titulo: 'Invadida' },
+    linha: (id) => linha(`SELECT empresa_id, titulo, status FROM tarefa WHERE id = $1`, id),
+  });
+
+  it('não conclui tarefa de outra empresa ou conta, nem a liga a negócio de outra empresa', async () => {
+    for (const alvo of [tarefas.a2, tarefas.b1])
+      expect((await naEmpresa('post', `/v1/tarefas/${alvo}/concluir`, x.x1)).status).toBe(404);
+    const r = await naEmpresa('post', '/v1/tarefas', x.x1, {
+      titulo: 'X',
+      negocio_id: negocios.a2,
+    });
+    expect(r.status).toBe(422);
+  });
+});
+
+describe('funil (por empresa)', () => {
+  it('cada empresa lê o seu; etapas de outra empresa no PATCH dão 422 e nada muda', async () => {
+    const f1 = (await naEmpresa('get', '/v1/funil', x.x1)).body as {
+      id: string;
+      etapas: Array<Record<string, unknown>>;
+    };
+    const f2 = (await naEmpresa('get', '/v1/funil', x.x2)).body as {
+      id: string;
+      etapas: Array<Record<string, unknown>>;
+    };
+    expect(f1.id).not.toBe(f2.id);
+    const etapas = f2.etapas.map(({ id, nome, ordem, probabilidade, sla_horas, cor }) => ({
+      id,
+      nome: `${String(nome)} invadida`,
+      ordem,
+      probabilidade,
+      sla_horas,
+      cor,
+      requisitos: [],
+    }));
+    expect((await naEmpresa('patch', '/v1/funil', x.x1, { etapas })).status).toBe(422);
+    const depois = (await naEmpresa('get', '/v1/funil', x.x2)).body as typeof f2;
+    expect(depois).toEqual(f2);
   });
 });
 

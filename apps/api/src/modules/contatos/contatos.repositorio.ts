@@ -202,7 +202,7 @@ export async function criarContato(
         nome_busca: normalizarBusca(dados.nome),
         tenant_id: tenantId,
         empresa_id: empresaId,
-        campos_faltantes: [],
+        campos_faltantes: dados.campos_faltantes ?? [],
       },
       select: CAMPOS,
     }),

@@ -11,6 +11,9 @@ import { ContatosModule } from './modules/contatos/contatos.module.js';
 import { EmpresasModule } from './modules/empresas/empresas.module.js';
 import { MembrosModule } from './modules/membros/membros.module.js';
 import { OrigensModule } from './modules/origens/origens.module.js';
+import { FunilModule } from './modules/funil/funil.module.js';
+import { NegociosModule } from './modules/negocios/negocios.module.js';
+import { TarefasModule } from './modules/tarefas/tarefas.module.js';
 
 // Registro de módulos (dono: F0). Uma linha por módulo de domínio.
 @Module({
@@ -27,6 +30,9 @@ import { OrigensModule } from './modules/origens/origens.module.js';
     ApiKeysModule,
     ContatosModule,
     OrigensModule,
+    FunilModule,
+    NegociosModule,
+    TarefasModule,
   ],
 })
 export class AppModule {}

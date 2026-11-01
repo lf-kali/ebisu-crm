@@ -21,6 +21,11 @@ import {
 } from '../../core/normalizacao/normalizacao.js';
 import { filtroDeEscopo } from '../../core/rbac/permissoes.js';
 import type { TxContext } from '../../core/tx/contexto.js';
+import {
+  perfilDoContato,
+  recalcularContato,
+  recalcularNegociosDoContato,
+} from '../completude/completude.js';
 import * as repo from './contatos.repositorio.js';
 
 // Comandos de contatos (plano docs/planos/f4-1-contatos.md). Normaliza e-mail, telefone e
@@ -136,6 +141,12 @@ async function exigirMeiosLivres(
   });
 }
 
+async function relido(ctx: TxContext, id: string): Promise<Contato> {
+  const contato = await repo.buscarContato(ctx.tx, ctx.empresaId, id);
+  if (!contato) throw new ErroDominio('nao_encontrado');
+  return contato;
+}
+
 export async function listar(ctx: TxContext, consulta: ConsultaContatos): Promise<ListaContatos> {
   const antesDe = posicao(consulta.cursor);
   const { contatos, haMais } = await repo.listarContatos(
@@ -176,7 +187,13 @@ export async function criar(ctx: TxContext, entrada: EntradaContato): Promise<Co
   await exigirReferencias(ctx, { origem_id: entrada.origem_id, responsavel_id });
   const dados = paraGravar({ ...entrada, responsavel_id }, entrada.tipo_pessoa);
   await exigirMeiosLivres(ctx, 'contato.create', dados);
-  return repo.criarContato(ctx.tx, ctx.tenantId, ctx.empresaId, dados as repo.DadosContato);
+  // A completude vai na mesma escrita (CRM-6; um registro só no audit log).
+  const perfil = await perfilDoContato(ctx.tx, ctx.empresaId, { ...dados, consentimentos: [] });
+  const criado = await repo.criarContato(ctx.tx, ctx.tenantId, ctx.empresaId, {
+    ...(dados as repo.DadosContato),
+    ...perfil,
+  });
+  return relido(ctx, criado.id);
 }
 
 export async function editar(
@@ -210,9 +227,13 @@ export async function editar(
   if (!resultado.email && !resultado.telefone && !resultado.whatsapp)
     throw invalido('email', 'O contato precisa de e-mail, telefone ou WhatsApp.');
   await exigirMeiosLivres(ctx, 'contato.update', dados, id);
-  const contato = await repo.editarContato(ctx.tx, ctx.empresaId, id, dados);
-  if (!contato) throw new ErroDominio('nao_encontrado');
-  return contato;
+  const perfil = await perfilDoContato(ctx.tx, ctx.empresaId, {
+    ...atual,
+    ...(dados as Partial<Contato>),
+  });
+  await repo.editarContato(ctx.tx, ctx.empresaId, id, { ...dados, ...perfil });
+  await recalcularNegociosDoContato(ctx.tx, ctx.empresaId, id);
+  return relido(ctx, id);
 }
 
 export async function excluir(ctx: TxContext, id: string): Promise<void> {
@@ -226,7 +247,16 @@ export async function registrarConsentimento(
 ): Promise<Consentimento> {
   if (!(await repo.buscarContato(ctx.tx, ctx.empresaId, id, escopoDe(ctx, 'contato.update'))))
     throw new ErroDominio('nao_encontrado');
-  return repo.registrarConsentimento(ctx.tx, ctx.tenantId, ctx.empresaId, id, entrada);
+  const registro = await repo.registrarConsentimento(
+    ctx.tx,
+    ctx.tenantId,
+    ctx.empresaId,
+    id,
+    entrada,
+  );
+  // O consentimento no canal preferido é requisito do funil (consentimento_transacional).
+  await recalcularContato(ctx.tx, ctx.empresaId, id);
+  return registro;
 }
 
 export async function listarConsentimentos(
