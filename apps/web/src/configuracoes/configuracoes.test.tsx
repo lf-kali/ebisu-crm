@@ -14,6 +14,7 @@ import { servidor, simulada } from '../teste/servidor';
 
 const usuario = () => userEvent.setup();
 const linhaCom = (texto: string) => screen.getByRole('row', { name: new RegExp(texto) });
+const linhaComEspera = (link: HTMLElement) => link.closest('tr');
 const dialogo = () => screen.findByRole('dialog');
 const confirmar = async (u: ReturnType<typeof usuario>, rotulo: string) =>
   u.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: rotulo }));
@@ -191,6 +192,31 @@ describe('página do membro', () => {
     await u.click(screen.getByRole('button', { name: 'Suspender' }));
     await confirmar(u, 'Suspender');
     expect(await screen.findByRole('button', { name: 'Reativar' })).toBeTruthy();
+  });
+
+  it('depois de editar o membro, a lista já mostra o cargo, os papéis e a situação novos', async () => {
+    renderizarApp('/configuracoes/membros');
+    const u = usuario();
+    // A lista carrega antes (fica no cache): a edição precisa invalidá-la.
+    expect(linhaComEspera(await screen.findByRole('link', { name: 'Bruno Lima' }))).toBeTruthy();
+    await u.click(screen.getByRole('link', { name: 'Bruno Lima' }));
+    await u.type(await screen.findByLabelText('Cargo (opcional)'), 'Técnico líder');
+    await u.click(screen.getByRole('button', { name: 'Salvar cargo' }));
+    expect(await screen.findByText('Cargo salvo.')).toBeTruthy();
+    await u.selectOptions(screen.getByLabelText('Papel 1'), 'Atendente');
+    await u.click(screen.getByRole('button', { name: 'Salvar papéis' }));
+    expect(await screen.findByText(/Papéis salvos/)).toBeTruthy();
+    await u.click(screen.getByRole('button', { name: 'Suspender' }));
+    await confirmar(u, 'Suspender');
+    expect(await screen.findByRole('button', { name: 'Reativar' })).toBeTruthy();
+
+    await u.click(screen.getByRole('link', { name: 'Membros e convites' }));
+    await waitFor(() => {
+      const linha = linhaCom('Bruno Lima').textContent;
+      expect(linha).toContain('Técnico líder');
+      expect(linha).toContain('Atendente');
+      expect(linha).toContain('Suspenso');
+    });
   });
 
   it('na própria página não há botão de suspender; tirar o próprio dono mostra a regra da API', async () => {

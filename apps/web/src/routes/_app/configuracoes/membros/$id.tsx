@@ -2,7 +2,7 @@ import { Membro, type Membro as TipoMembro, ROTAS_MEMBROS } from '@ebisu/contrac
 import { Carregando } from '@ebisu/ui/components/estados';
 import { Badge } from '@ebisu/ui/components/ui/badge';
 import { Button } from '@ebisu/ui/components/ui/button';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useAcesso } from '../../../../auth/acesso';
@@ -71,6 +71,15 @@ function ConteudoMembro() {
   );
 }
 
+/**
+ * Depois de editar: o detalhe recebe a resposta e a lista (chave com filtros e cursor) fica velha.
+ * Sem `exact`, que casaria só uma chave igual a CHAVE_MEMBROS, que não existe.
+ */
+function atualizarMembro(queryClient: QueryClient, atualizado: TipoMembro) {
+  queryClient.setQueryData([...CHAVE_MEMBROS, atualizado.id], atualizado);
+  void queryClient.invalidateQueries({ queryKey: CHAVE_MEMBROS });
+}
+
 function Cargo({ membro }: { membro: TipoMembro }) {
   const { cliente } = Route.useRouteContext();
   const queryClient = useQueryClient();
@@ -81,7 +90,7 @@ function Cargo({ membro }: { membro: TipoMembro }) {
         resposta: Membro,
         corpo: { cargo: cargo.trim() || null },
       }),
-    onSuccess: (atualizado) => queryClient.setQueryData([...CHAVE_MEMBROS, membro.id], atualizado),
+    onSuccess: (atualizado) => atualizarMembro(queryClient, atualizado),
   });
   return (
     <section aria-labelledby="titulo-cargo" className="flex flex-col gap-3">
@@ -128,8 +137,7 @@ function Situacao({ membro }: { membro: TipoMembro }) {
         corpo: { status },
       }),
     onSuccess: (atualizado) => {
-      queryClient.setQueryData([...CHAVE_MEMBROS, membro.id], atualizado);
-      void queryClient.invalidateQueries({ queryKey: CHAVE_MEMBROS, exact: true });
+      atualizarMembro(queryClient, atualizado);
     },
   });
   // Ninguém muda a própria situação (a API recusa; a tela nem oferece).
@@ -183,8 +191,7 @@ function Papeis({ membro }: { membro: TipoMembro }) {
         corpo: { atribuicoes: linhas },
       }),
     onSuccess: (atualizado) => {
-      queryClient.setQueryData([...CHAVE_MEMBROS, membro.id], atualizado);
-      void queryClient.invalidateQueries({ queryKey: CHAVE_MEMBROS, exact: true });
+      atualizarMembro(queryClient, atualizado);
     },
   });
 
