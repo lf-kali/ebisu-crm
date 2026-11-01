@@ -55,7 +55,7 @@ revogado: 410 `link_invalido`. Convidar e reenviar têm limite (30 por hora por 
 `/v1/api-keys` (`config.api_keys`, rota de domínio) cria, lista, edita e revoga as chaves da empresa.
 O token (`ebk_live_…`) só aparece na resposta do `POST`; no banco fica só o SHA-256, e a repetição
 idempotente devolve `token: null`. Os escopos de uma chave precisam ser permissões que quem cria tem
-na empresa, nunca `config.*`.
+na empresa inteira (EMPRESA ou TENANT, não PROPRIO), nunca `config.*`.
 
 A chave só autentica onde a rota pede: `@Permissao('recurso.acao', { apiKey: true })` aceita a chave
 de **servidor** (o comando roda com `membroId: null`, `apiKeyId` preenchido e a empresa da chave), e

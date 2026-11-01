@@ -27,12 +27,18 @@ const invalido = (campo: string, mensagem: string) =>
 
 /**
  * Sem escalada (decisão 5): do catálogo, nunca `config.*` (a chave não administra a conta) e só
- * permissões que quem cria ou edita tem nesta empresa.
+ * permissões que quem cria ou edita tem na empresa inteira. Na chave, todo escopo vale na empresa;
+ * uma permissão que a pessoa só tem nos próprios registros (PROPRIO) não entra.
  */
 function exigirEscoposPermitidos(ctx: TxContext, escopos: readonly string[]) {
-  const negado = escopos.find(
-    (escopo) => !noCatalogo(escopo) || escopo.startsWith('config.') || !ctx.permissoes.has(escopo),
-  );
+  const negado = escopos.find((escopo) => {
+    const alcance = ctx.permissoes.get(escopo);
+    return (
+      !noCatalogo(escopo) ||
+      escopo.startsWith('config.') ||
+      (alcance !== 'EMPRESA' && alcance !== 'TENANT')
+    );
+  });
   if (negado)
     throw invalido('escopos', `Escopo não permitido: ${negado}. Use permissões que você tem.`);
 }

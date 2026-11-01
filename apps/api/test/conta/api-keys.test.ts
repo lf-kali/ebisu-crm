@@ -197,6 +197,23 @@ describe('gestão de API keys', () => {
     expect((await gestao(g, 'post', '/v1/api-keys', servidor(['contato.read']))).status).toBe(201);
     const escalada = await gestao(g, 'post', '/v1/api-keys', servidor(['contato.delete']));
     expect(escalada.status).toBe(422);
+    // contato.update só nos próprios registros (PROPRIO): na chave valeria na empresa inteira.
+    const proprio = await novoMembro(
+      c,
+      x.tenantId,
+      { 'config.api_keys': 'EMPRESA', 'contato.update': 'PROPRIO', 'contato.read': 'TENANT' },
+      x.empresaId,
+    );
+    const p = { token: proprio.token, empresaId: x.empresaId };
+    expect((await gestao(p, 'post', '/v1/api-keys', servidor(['contato.update']))).status).toBe(
+      422,
+    );
+    expect((await gestao(p, 'post', '/v1/api-keys', servidor(['contato.read']))).status).toBe(201);
+    const paraProprio = await criarChave(x, servidor(['contato.read']));
+    const editarProprio = await gestao(p, 'patch', `/v1/api-keys/${paraProprio.id}`, {
+      escopos: ['contato.update'],
+    });
+    expect(editarProprio.status).toBe(422);
     const chave = await criarChave(x, servidor(['contato.read']));
     const editar = await gestao(g, 'patch', `/v1/api-keys/${chave.id}`, {
       escopos: ['contato.delete'],
@@ -406,6 +423,13 @@ describe('autenticação por chave', () => {
     expect(primeiro).not.toBeNull();
     await eco(chave.token!);
     expect(await uso()).toEqual(primeiro);
+    // Passado o minuto, grava de novo.
+    await c.sql(`UPDATE api_key SET ultimo_uso = ultimo_uso - interval '2 minutes' WHERE id = $1`, [
+      chave.id,
+    ]);
+    const recuado = await uso();
+    await eco(chave.token!);
+    expect((await uso()).getTime()).toBeGreaterThan(recuado.getTime());
     const auditoria = (await c.sql(`SELECT acao FROM audit_log WHERE entidade_id = $1`, [chave.id]))
       .rows;
     expect(auditoria).toEqual([{ acao: 'create' }]);
@@ -488,11 +512,22 @@ describe('limites', () => {
     // A origem confere, então o site consegue ler o 429.
     expect(r.headers['access-control-allow-origin']).toBe(SITE);
 
-    const porIp = await c.criarApp(limitadorEmMemoria());
+    // O IP estourado não gasta a cota da chave: um IP sozinho não derruba o site de todos.
+    const registros: string[] = [];
+    const memoriaIp = limitadorEmMemoria();
+    const porIp = await c.criarApp({
+      ...memoriaIp,
+      registrar: (chave, maximo, janela) => {
+        registros.push(chave);
+        return memoriaIp.registrar(chave, maximo, janela);
+      },
+    });
     const outra = await criarChave(x, navegador());
     for (let i = 0; i < 30; i++)
       expect((await publica(outra.token!, SITE, porIp)).status).toBe(201);
-    expect((await publica(outra.token!, SITE, porIp)).status).toBe(429);
+    for (let i = 0; i < 40; i++)
+      expect((await publica(outra.token!, SITE, porIp)).status).toBe(429);
+    expect(registros.filter((r) => r === `apikey:${outra.id}`)).toHaveLength(30);
   }, 60_000);
 
   it('21 falhas de chave do mesmo IP: 429, mesmo com a chave certa', async () => {

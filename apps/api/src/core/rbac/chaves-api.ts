@@ -175,13 +175,17 @@ export class ChavesApi {
     res.setHeader('Access-Control-Expose-Headers', 'Retry-After, X-Request-Id');
   }
 
+  /**
+   * Primeiro o IP; a cota da chave só conta quem está dentro do limite do IP. Assim um IP sozinho
+   * não esgota a chave do site (pública no JavaScript) para todos os visitantes.
+   */
   private async limitarPublica(req: Request, res: Response, chaveId: string): Promise<void> {
     const { publicaPorChave, publicaPorIp, janela } = LIMITES_API_KEY;
-    const espera = Math.max(
-      await this.limitador.registrar(`apikey:${chaveId}`, publicaPorChave, janela),
-      await this.limitador.registrar(`apikey-ip:${req.ip ?? 'desconhecido'}`, publicaPorIp, janela),
-    );
-    if (espera > 0) throw limiteExcedido(res, espera);
+    const ip = `apikey-ip:${req.ip ?? 'desconhecido'}`;
+    const porIp = await this.limitador.registrar(ip, publicaPorIp, janela);
+    if (porIp > 0) throw limiteExcedido(res, porIp);
+    const porChave = await this.limitador.registrar(`apikey:${chaveId}`, publicaPorChave, janela);
+    if (porChave > 0) throw limiteExcedido(res, porChave);
   }
 
   /** A empresa é a da chave; um X-Empresa-Id diferente não troca de empresa (decisão 7). */
