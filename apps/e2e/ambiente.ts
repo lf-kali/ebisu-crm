@@ -37,6 +37,18 @@ export const URL_WEB = `http://localhost:${PORTA_WEB}`;
 export const URL_API = `http://localhost:${PORTA_API}`;
 export const URL_MAILPIT = `http://localhost:${process.env.MAILPIT_UI_PORT ?? '8025'}`;
 
+/**
+ * O setup apaga e recria o banco `ebisu_e2e`: só num Postgres local, salvo pedido explícito
+ * (E2E_BANCO_REMOTO=1), para um .env apontado para um servidor compartilhado não o derrubar lá.
+ */
+const LOCAIS = new Set(['localhost', '127.0.0.1', '[::1]']);
+const hostDoBanco = new URL(obrigatoria('DATABASE_URL')).hostname;
+if (!LOCAIS.has(hostDoBanco) && process.env.E2E_BANCO_REMOTO !== '1')
+  throw new Error(
+    `DATABASE_URL aponta para ${hostDoBanco}: o E2E recria o banco ${'ebisu_e2e'} e só roda num ` +
+      'Postgres local (ou com E2E_BANCO_REMOTO=1)',
+  );
+
 /** Superusuário/migrador no banco do E2E e no banco `postgres` (para recriar o do E2E). */
 export const URL_MIGRADOR = noBanco(obrigatoria('DATABASE_URL'), BANCO_E2E);
 export const URL_ADMIN = noBanco(obrigatoria('DATABASE_URL'), 'postgres');

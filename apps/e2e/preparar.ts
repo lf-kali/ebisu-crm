@@ -107,15 +107,24 @@ export default async function preparar() {
     ),
   ];
   const encerrar = async () => {
-    for (const filho of processos)
-      if (filho.pid && filho.exitCode === null) {
-        try {
-          process.kill(-filho.pid, 'SIGTERM');
-        } catch {
-          // Já tinha saído.
-        }
+    const vivos = processos.filter((filho) => filho.pid && filho.exitCode === null);
+    const saidas = vivos.map(
+      (filho) => new Promise<void>((resolver) => filho.once('exit', () => resolver())),
+    );
+    for (const filho of vivos) {
+      try {
+        process.kill(-filho.pid!, 'SIGTERM');
+      } catch {
+        // Já tinha saído.
       }
+    }
+    // Espera saírem (as portas ficam livres para a próxima rodada), com prazo.
+    await Promise.race([Promise.all(saidas), new Promise((r) => setTimeout(r, 10_000))]);
   };
+  // Ctrl-C durante a subida: o Playwright ainda não tem o teardown, então encerra daqui.
+  const interrompido = () => void encerrar().finally(() => process.exit(130));
+  process.once('SIGINT', interrompido);
+  process.once('SIGTERM', interrompido);
   try {
     await esperarResposta(`${URL_API}/v1/saude`);
     // Pelo proxy do preview: o navegador fala só com a origem do web.
@@ -123,6 +132,9 @@ export default async function preparar() {
   } catch (erro) {
     await encerrar();
     throw erro;
+  } finally {
+    process.off('SIGINT', interrompido);
+    process.off('SIGTERM', interrompido);
   }
   return encerrar;
 }

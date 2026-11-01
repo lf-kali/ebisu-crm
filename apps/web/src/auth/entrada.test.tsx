@@ -1,8 +1,9 @@
 import { criarProblema, ROTAS_AUTH, ROTAS_CONVITES } from '@ebisu/contracts';
+import { focusManager } from '@tanstack/react-query';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { quandoTentarDeNovo } from '../componentes/entrada';
 import { MENSAGEM_SENHA_FRACA } from '../simulacao/api-simulada';
 import { SENHA_DEMO } from '../simulacao/dados';
@@ -213,6 +214,42 @@ describe('aceite do convite', () => {
     // Dá tempo de uma consulta indevida sair antes de conferir.
     await new Promise((r) => setTimeout(r, 50));
     expect(consultas).toBe(0);
+  });
+
+  it('voltar à aba não refaz a consulta; um erro posterior não leva o formulário preenchido', async () => {
+    let consultas = 0;
+    const token = 'h'.repeat(43);
+    servidor.use(
+      http.post(`*${ROTAS_CONVITES.consultar}`, () => {
+        consultas += 1;
+        return consultas > 1
+          ? HttpResponse.json(criarProblema('erro_interno'), { status: 500 })
+          : HttpResponse.json({
+              conta: { nome: 'Oficina do Bairro' },
+              email: 'hugo@novo.test',
+              acao: 'CRIAR_ACESSO',
+            });
+      }),
+    );
+    const { queryClient } = abrirConvite(token);
+    const u = usuario();
+    await u.type(await screen.findByLabelText('Seu nome'), 'Hugo');
+    // Passados mais de 30 s (o staleTime padrão do app), a aba volta ao foco.
+    const agora = Date.now();
+    const relogio = vi.spyOn(Date, 'now').mockReturnValue(agora + 60_000);
+    focusManager.setFocused(false);
+    focusManager.setFocused(true);
+    await new Promise((r) => setTimeout(r, 50));
+    relogio.mockRestore();
+    expect(consultas).toBe(1);
+
+    // Mesmo forçada (e falhando), a nova consulta não derruba o formulário.
+    await queryClient.refetchQueries({ queryKey: ['convite'] });
+    expect(consultas).toBe(2);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect((screen.getByLabelText('Seu nome') as HTMLInputElement).value).toBe('Hugo');
+    focusManager.setFocused(undefined);
   });
 
   it('senha curta para acesso novo é recusada no navegador', async () => {
