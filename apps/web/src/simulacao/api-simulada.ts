@@ -15,6 +15,7 @@ import {
   ROTAS_CONVITES,
 } from '@ebisu/contracts';
 import { http, HttpResponse } from 'msw';
+import { criarConfiguracoesSimuladas } from './configuracoes-simulada';
 import { USUARIOS, SENHA_DEMO, type UsuarioDemo } from './dados';
 
 // API simulada (MSW) do contrato de auth e do /v1/eu (packages/contracts/plataforma), usada pelo
@@ -60,7 +61,10 @@ export function criarApiSimulada({ persistir }: { persistir?: Storage } = {}) {
   let sequencia = 0;
   const contagem = { refresh: 0 };
   // Cópia mutável: o cadastro e o aceite do convite acrescentam usuários e contas.
-  const usuarios: UsuarioDemo[] = USUARIOS.map((u) => ({ ...u, contas: [...u.contas] }));
+  const usuarios: UsuarioDemo[] = USUARIOS.map((u) => ({
+    ...u,
+    contas: u.contas.map((c) => ({ ...c, empresas: [...c.empresas] })),
+  }));
   const convites = new Map<string, ConviteSimulado>();
   const novoId = () => crypto.randomUUID();
 
@@ -144,7 +148,10 @@ export function criarApiSimulada({ persistir }: { persistir?: Storage } = {}) {
   const autenticado = (request: Request) =>
     acessos.get(request.headers.get('authorization')?.replace(/^Bearer /, '') ?? '');
 
+  const configuracoes = criarConfiguracoesSimuladas({ autenticado, usuarios });
+
   const handlers = [
+    ...configuracoes.handlers,
     http.post(`*${ROTAS_AUTH.login}`, async ({ request }) => {
       const entrada = EntradaLogin.safeParse(await request.json().catch(() => undefined));
       if (!entrada.success) return problema('validacao', { campos: camposDoZod(entrada.error) });
@@ -259,6 +266,7 @@ export function criarApiSimulada({ persistir }: { persistir?: Storage } = {}) {
     /** Testes: encerra a sessão no servidor (como um logout feito em outro lugar). */
     revogarRefresh: () => gravarRefresh(null),
     temRefresh: () => refresh !== null,
+    configuracoes,
     /**
      * Testes: um convite pendente para a conta dada; devolve o token do link. A ação segue quem é
      * o e-mail (CRIAR_ACESSO para e-mail novo, SENHA_ATUAL para um usuário da demonstração).

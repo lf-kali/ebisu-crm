@@ -16,13 +16,25 @@ import type { LinkProps } from '@tanstack/react-router';
 /** Só caminhos que existem no roteador (tipado pelo routeTree gerado). */
 type CaminhoModulo = NonNullable<LinkProps['to']>;
 
-// Módulos do menu (spec §4 F13). `permissao` esconde o item sem acesso (filtro entra no PR 3).
+// Módulos do menu (spec §4 F13). `permissao` esconde o item sem acesso; com uma lista, basta uma.
 export interface ItemNavegacao {
   rotulo: string;
   caminho: CaminhoModulo;
   icone: LucideIcon;
-  permissao?: string;
+  permissao?: string | readonly string[];
 }
+
+/** O item aparece sem permissão definida ou com alguma das permissões dele. */
+export const itemPermitido = (item: ItemNavegacao, pode: (chave: string) => boolean) =>
+  item.permissao === undefined || [item.permissao].flat().some(pode);
+
+/** As permissões que abrem alguma seção de Configurações (F3). */
+export const PERMISSOES_CONFIGURACAO = [
+  'config.empresa',
+  'config.membros',
+  'config.rbac',
+  'config.api_keys',
+] as const;
 
 export const NAVEGACAO: readonly ItemNavegacao[] = [
   { rotulo: 'Painel', caminho: '/', icone: LayoutDashboard },
@@ -38,5 +50,10 @@ export const NAVEGACAO: readonly ItemNavegacao[] = [
   { rotulo: 'Bancada', caminho: '/bancada', icone: Wrench, permissao: 'os.read' },
   { rotulo: 'Estoque', caminho: '/estoque', icone: Boxes, permissao: 'estoque.read' },
   { rotulo: 'Financeiro', caminho: '/financeiro', icone: Wallet, permissao: 'financeiro.read' },
-  { rotulo: 'Configurações', caminho: '/configuracoes', icone: Settings },
+  {
+    rotulo: 'Configurações',
+    caminho: '/configuracoes',
+    icone: Settings,
+    permissao: PERMISSOES_CONFIGURACAO,
+  },
 ];

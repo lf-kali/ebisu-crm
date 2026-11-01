@@ -14,7 +14,7 @@ import { donoDaPreferencia } from '../auth/empresa';
 import { ErroDaApi } from '../componentes/erro-da-api';
 import { AppShell, estaAtivo } from '../layout/app-shell';
 import { MenuUsuario } from '../layout/menu-usuario';
-import { NAVEGACAO } from '../layout/navegacao';
+import { itemPermitido, NAVEGACAO } from '../layout/navegacao';
 import { SeletorEmpresa } from '../layout/seletor-empresa';
 
 // Layout das páginas protegidas: sem sessão, vai para o login e volta para cá depois.
@@ -92,7 +92,7 @@ function LayoutApp() {
   if (!atual) return null;
   // Menu e páginas por permissão da empresa atual. A URL direta de um módulo oculto mostra
   // "sem acesso" (a API negaria os dados de qualquer jeito).
-  const itens = NAVEGACAO.filter((item) => !item.permissao || pode(item.permissao));
+  const itens = NAVEGACAO.filter((item) => itemPermitido(item, pode));
   const modulo = NAVEGACAO.find(
     (item) => item.caminho !== '/' && estaAtivo(item.caminho, caminhoAtual),
   );
@@ -102,7 +102,7 @@ function LayoutApp() {
         titulo="Nenhuma empresa disponível"
         descricao="Seu acesso ainda não inclui nenhuma empresa desta conta. Fale com um administrador."
       />
-    ) : modulo?.permissao && !pode(modulo.permissao) ? (
+    ) : modulo && !itemPermitido(modulo, pode) ? (
       <EstadoVazio
         titulo="Sem acesso a este módulo"
         descricao="Seu papel nesta empresa não inclui este módulo. Fale com um administrador ou troque de empresa."

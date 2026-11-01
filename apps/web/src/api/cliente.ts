@@ -4,7 +4,7 @@ import { ErroApi } from './erro-api';
 // Cliente HTTP tipado (spec §5.1, §4 F12): toda resposta passa pelo schema do contrato
 // (@ebisu/contracts) e todo erro vira ErroApi com o `Problema` da API.
 
-type Metodo = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+type Metodo = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 type ValorQuery = string | number | boolean | undefined | null;
 
 export interface OpcoesRequisicao<S extends z.ZodType> {
@@ -107,6 +107,11 @@ export function criarClienteApi(config: ConfigCliente = {}) {
     ) => requisitar('GET', caminho, opcoes),
     post: <S extends z.ZodType>(caminho: string, opcoes: OpcoesRequisicao<S>) =>
       requisitar('POST', caminho, opcoes),
+    /** Substitui um conjunto inteiro (ex.: atribuições do membro). */
+    put: <S extends z.ZodType>(
+      caminho: string,
+      opcoes: Omit<OpcoesRequisicao<S>, 'chaveIdempotencia'>,
+    ) => requisitar('PUT', caminho, opcoes),
     patch: <S extends z.ZodType>(
       caminho: string,
       opcoes: Omit<OpcoesRequisicao<S>, 'chaveIdempotencia'>,

@@ -51,7 +51,8 @@ describe('menus e páginas por permissão (F12)', () => {
   it('o técnico só vê os módulos que pode usar', async () => {
     renderizarApp('/', { logado: 'bruno@demo.test' });
     await screen.findByRole('heading', { name: 'Painel' });
-    expect(modulosDoMenu()).toEqual(['Painel', 'Dispositivos', 'Bancada', 'Configurações']);
+    // Sem nenhuma permissão de configuração, o item Configurações também some (F3).
+    expect(modulosDoMenu()).toEqual(['Painel', 'Dispositivos', 'Bancada']);
   });
 
   it('quem tem tudo vê o menu completo', async () => {
@@ -86,7 +87,7 @@ describe('menus e páginas por permissão (F12)', () => {
     );
     renderizarApp('/contatos');
     expect(await screen.findByText('Nenhuma empresa disponível')).toBeTruthy();
-    expect(modulosDoMenu()).toEqual(['Painel', 'Configurações']);
+    expect(modulosDoMenu()).toEqual(['Painel']);
   });
 
   it('permissão vinda do protótipo não conta ("toString" não é permissão)', () => {
@@ -107,7 +108,7 @@ describe('menus e páginas por permissão (F12)', () => {
       ),
     );
     expect(chaves.size).toBeGreaterThan(20);
-    const doMenu = NAVEGACAO.flatMap((i) => (i.permissao ? [i.permissao] : []));
+    const doMenu = NAVEGACAO.flatMap((i) => (i.permissao ? [i.permissao].flat() : []));
     expect(doMenu.filter((p) => !chaves.has(p))).toEqual([]);
   });
 });

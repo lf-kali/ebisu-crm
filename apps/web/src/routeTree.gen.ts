@@ -18,12 +18,16 @@ import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppSplatRouteImport } from './routes/_app/$'
 import { Route as AppBancadaIndexRouteImport } from './routes/_app/bancada/index'
 import { Route as AppConfiguracoesIndexRouteImport } from './routes/_app/configuracoes/index'
+import { Route as AppConfiguracoesApiKeysRouteImport } from './routes/_app/configuracoes/api-keys'
+import { Route as AppConfiguracoesEmpresasRouteImport } from './routes/_app/configuracoes/empresas'
 import { Route as AppContatosIndexRouteImport } from './routes/_app/contatos/index'
 import { Route as AppDispositivosIndexRouteImport } from './routes/_app/dispositivos/index'
 import { Route as AppEstoqueIndexRouteImport } from './routes/_app/estoque/index'
 import { Route as AppFinanceiroIndexRouteImport } from './routes/_app/financeiro/index'
 import { Route as AppNegociosIndexRouteImport } from './routes/_app/negocios/index'
 import { Route as AppOrcamentosIndexRouteImport } from './routes/_app/orcamentos/index'
+import { Route as AppConfiguracoesMembrosIndexRouteImport } from './routes/_app/configuracoes/membros/index'
+import { Route as AppConfiguracoesMembrosIdRouteImport } from './routes/_app/configuracoes/membros/$id'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -69,6 +73,17 @@ const AppConfiguracoesIndexRoute = AppConfiguracoesIndexRouteImport.update({
   path: '/configuracoes/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppConfiguracoesApiKeysRoute = AppConfiguracoesApiKeysRouteImport.update({
+  id: '/configuracoes/api-keys',
+  path: '/configuracoes/api-keys',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppConfiguracoesEmpresasRoute =
+  AppConfiguracoesEmpresasRouteImport.update({
+    id: '/configuracoes/empresas',
+    path: '/configuracoes/empresas',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppContatosIndexRoute = AppContatosIndexRouteImport.update({
   id: '/contatos/',
   path: '/contatos/',
@@ -99,6 +114,18 @@ const AppOrcamentosIndexRoute = AppOrcamentosIndexRouteImport.update({
   path: '/orcamentos/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppConfiguracoesMembrosIndexRoute =
+  AppConfiguracoesMembrosIndexRouteImport.update({
+    id: '/configuracoes/membros/',
+    path: '/configuracoes/membros/',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppConfiguracoesMembrosIdRoute =
+  AppConfiguracoesMembrosIdRouteImport.update({
+    id: '/configuracoes/membros/$id',
+    path: '/configuracoes/membros/$id',
+    getParentRoute: () => AppRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -107,6 +134,8 @@ export interface FileRoutesByFullPath {
   '/escolher-conta': typeof EscolherContaRoute
   '/login': typeof LoginRoute
   '/$': typeof AppSplatRoute
+  '/configuracoes/api-keys': typeof AppConfiguracoesApiKeysRoute
+  '/configuracoes/empresas': typeof AppConfiguracoesEmpresasRoute
   '/bancada/': typeof AppBancadaIndexRoute
   '/configuracoes/': typeof AppConfiguracoesIndexRoute
   '/contatos/': typeof AppContatosIndexRoute
@@ -115,6 +144,8 @@ export interface FileRoutesByFullPath {
   '/financeiro/': typeof AppFinanceiroIndexRoute
   '/negocios/': typeof AppNegociosIndexRoute
   '/orcamentos/': typeof AppOrcamentosIndexRoute
+  '/configuracoes/membros/$id': typeof AppConfiguracoesMembrosIdRoute
+  '/configuracoes/membros/': typeof AppConfiguracoesMembrosIndexRoute
 }
 export interface FileRoutesByTo {
   '/cadastro': typeof CadastroRoute
@@ -123,6 +154,8 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/$': typeof AppSplatRoute
   '/': typeof AppIndexRoute
+  '/configuracoes/api-keys': typeof AppConfiguracoesApiKeysRoute
+  '/configuracoes/empresas': typeof AppConfiguracoesEmpresasRoute
   '/bancada': typeof AppBancadaIndexRoute
   '/configuracoes': typeof AppConfiguracoesIndexRoute
   '/contatos': typeof AppContatosIndexRoute
@@ -131,6 +164,8 @@ export interface FileRoutesByTo {
   '/financeiro': typeof AppFinanceiroIndexRoute
   '/negocios': typeof AppNegociosIndexRoute
   '/orcamentos': typeof AppOrcamentosIndexRoute
+  '/configuracoes/membros/$id': typeof AppConfiguracoesMembrosIdRoute
+  '/configuracoes/membros': typeof AppConfiguracoesMembrosIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -141,6 +176,8 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_app/$': typeof AppSplatRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/configuracoes/api-keys': typeof AppConfiguracoesApiKeysRoute
+  '/_app/configuracoes/empresas': typeof AppConfiguracoesEmpresasRoute
   '/_app/bancada/': typeof AppBancadaIndexRoute
   '/_app/configuracoes/': typeof AppConfiguracoesIndexRoute
   '/_app/contatos/': typeof AppContatosIndexRoute
@@ -149,6 +186,8 @@ export interface FileRoutesById {
   '/_app/financeiro/': typeof AppFinanceiroIndexRoute
   '/_app/negocios/': typeof AppNegociosIndexRoute
   '/_app/orcamentos/': typeof AppOrcamentosIndexRoute
+  '/_app/configuracoes/membros/$id': typeof AppConfiguracoesMembrosIdRoute
+  '/_app/configuracoes/membros/': typeof AppConfiguracoesMembrosIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -159,6 +198,8 @@ export interface FileRouteTypes {
     | '/escolher-conta'
     | '/login'
     | '/$'
+    | '/configuracoes/api-keys'
+    | '/configuracoes/empresas'
     | '/bancada/'
     | '/configuracoes/'
     | '/contatos/'
@@ -167,6 +208,8 @@ export interface FileRouteTypes {
     | '/financeiro/'
     | '/negocios/'
     | '/orcamentos/'
+    | '/configuracoes/membros/$id'
+    | '/configuracoes/membros/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/cadastro'
@@ -175,6 +218,8 @@ export interface FileRouteTypes {
     | '/login'
     | '/$'
     | '/'
+    | '/configuracoes/api-keys'
+    | '/configuracoes/empresas'
     | '/bancada'
     | '/configuracoes'
     | '/contatos'
@@ -183,6 +228,8 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/negocios'
     | '/orcamentos'
+    | '/configuracoes/membros/$id'
+    | '/configuracoes/membros'
   id:
     | '__root__'
     | '/_app'
@@ -192,6 +239,8 @@ export interface FileRouteTypes {
     | '/login'
     | '/_app/$'
     | '/_app/'
+    | '/_app/configuracoes/api-keys'
+    | '/_app/configuracoes/empresas'
     | '/_app/bancada/'
     | '/_app/configuracoes/'
     | '/_app/contatos/'
@@ -200,6 +249,8 @@ export interface FileRouteTypes {
     | '/_app/financeiro/'
     | '/_app/negocios/'
     | '/_app/orcamentos/'
+    | '/_app/configuracoes/membros/$id'
+    | '/_app/configuracoes/membros/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -275,6 +326,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppConfiguracoesIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/configuracoes/api-keys': {
+      id: '/_app/configuracoes/api-keys'
+      path: '/configuracoes/api-keys'
+      fullPath: '/configuracoes/api-keys'
+      preLoaderRoute: typeof AppConfiguracoesApiKeysRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/configuracoes/empresas': {
+      id: '/_app/configuracoes/empresas'
+      path: '/configuracoes/empresas'
+      fullPath: '/configuracoes/empresas'
+      preLoaderRoute: typeof AppConfiguracoesEmpresasRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/contatos/': {
       id: '/_app/contatos/'
       path: '/contatos'
@@ -317,12 +382,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrcamentosIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/configuracoes/membros/': {
+      id: '/_app/configuracoes/membros/'
+      path: '/configuracoes/membros'
+      fullPath: '/configuracoes/membros/'
+      preLoaderRoute: typeof AppConfiguracoesMembrosIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/configuracoes/membros/$id': {
+      id: '/_app/configuracoes/membros/$id'
+      path: '/configuracoes/membros/$id'
+      fullPath: '/configuracoes/membros/$id'
+      preLoaderRoute: typeof AppConfiguracoesMembrosIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
   AppSplatRoute: typeof AppSplatRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppConfiguracoesApiKeysRoute: typeof AppConfiguracoesApiKeysRoute
+  AppConfiguracoesEmpresasRoute: typeof AppConfiguracoesEmpresasRoute
   AppBancadaIndexRoute: typeof AppBancadaIndexRoute
   AppConfiguracoesIndexRoute: typeof AppConfiguracoesIndexRoute
   AppContatosIndexRoute: typeof AppContatosIndexRoute
@@ -331,11 +412,15 @@ interface AppRouteChildren {
   AppFinanceiroIndexRoute: typeof AppFinanceiroIndexRoute
   AppNegociosIndexRoute: typeof AppNegociosIndexRoute
   AppOrcamentosIndexRoute: typeof AppOrcamentosIndexRoute
+  AppConfiguracoesMembrosIdRoute: typeof AppConfiguracoesMembrosIdRoute
+  AppConfiguracoesMembrosIndexRoute: typeof AppConfiguracoesMembrosIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppSplatRoute: AppSplatRoute,
   AppIndexRoute: AppIndexRoute,
+  AppConfiguracoesApiKeysRoute: AppConfiguracoesApiKeysRoute,
+  AppConfiguracoesEmpresasRoute: AppConfiguracoesEmpresasRoute,
   AppBancadaIndexRoute: AppBancadaIndexRoute,
   AppConfiguracoesIndexRoute: AppConfiguracoesIndexRoute,
   AppContatosIndexRoute: AppContatosIndexRoute,
@@ -344,6 +429,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppFinanceiroIndexRoute: AppFinanceiroIndexRoute,
   AppNegociosIndexRoute: AppNegociosIndexRoute,
   AppOrcamentosIndexRoute: AppOrcamentosIndexRoute,
+  AppConfiguracoesMembrosIdRoute: AppConfiguracoesMembrosIdRoute,
+  AppConfiguracoesMembrosIndexRoute: AppConfiguracoesMembrosIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

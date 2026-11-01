@@ -5,8 +5,10 @@ import { reiniciarSimulacao, servidor } from './servidor';
 
 // Os testes montam o app inteiro (rotas carregadas sob demanda, sessão, /v1/eu). No CI, com os
 // arquivos de teste em paralelo, a primeira página de um arquivo passou de 1 s (padrão do
-// Testing Library) e os findBy* estouraram; 3 s cobrem a carga a frio sem esconder travamentos.
-configure({ asyncUtilTimeout: 3000 });
+// Testing Library) e, depois das telas de Configurações (F3), de 3 s (até 6,4 s no runner). 10 s
+// cobrem a carga a frio e ficam abaixo do testTimeout (20 s, vite.config.ts): um travamento real
+// ainda falha.
+configure({ asyncUtilTimeout: 10_000 });
 
 beforeAll(() => servidor.listen({ onUnhandledFrame: 'error' }));
 beforeEach(() => {
