@@ -39,6 +39,9 @@ export default defineConfig(({ command, mode }) => {
     test: {
       environment: 'jsdom',
       setupFiles: ['./src/teste/setup.ts'],
+      // Os testes montam o app inteiro (roteador, MSW, axe, userEvent). No runner do CI, com os
+      // arquivos em paralelo, passos comuns passam dos 5 s padrão; 20 s ainda pega um travamento.
+      testTimeout: 20_000,
     },
   };
 });
