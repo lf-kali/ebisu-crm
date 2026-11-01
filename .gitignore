@@ -9,3 +9,7 @@ coverage/
 *.log
 # Temporários do gerador de rotas do TanStack Router
 .tanstack/
+
+# Saídas do Playwright (apps/e2e)
+playwright-report/
+test-results/

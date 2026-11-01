@@ -1,0 +1,17 @@
+{
+  "name": "@ebisu/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Testes de ponta a ponta (Playwright) contra API, worker e web reais",
+  "scripts": {
+    "e2e": "playwright test",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@types/pg": "^8.23.1",
+    "ioredis": "^6.0.0",
+    "pg": "^8.23.1"
+  }
+}

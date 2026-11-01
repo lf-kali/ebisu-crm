@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "e2e": "turbo run build --filter=@ebisu/api --filter=@ebisu/worker --filter=@ebisu/web && pnpm --filter @ebisu/e2e e2e",
     "db:invariantes": "./scripts/db-invariantes.sh",
     "db:migrate": "pnpm --filter @ebisu/db migrate:deploy",
     "db:papeis": "pnpm --filter @ebisu/db papeis",

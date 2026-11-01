@@ -2,7 +2,7 @@ import { EntradaLogin } from '@ebisu/contracts';
 import { Alert, AlertDescription } from '@ebisu/ui/components/ui/alert';
 import { Button } from '@ebisu/ui/components/ui/button';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, Link, redirect, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { ErroApi } from '../api/erro-api';
@@ -83,6 +83,15 @@ function Login() {
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? 'Entrando…' : 'Entrar'}
         </Button>
+        <p className="text-center text-sm text-muted-foreground">
+          Ainda não tem conta?{' '}
+          <Link
+            to="/cadastro"
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            Criar conta
+          </Link>
+        </p>
       </form>
     </TelaDeEntrada>
   );
