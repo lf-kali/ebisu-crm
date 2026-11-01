@@ -664,6 +664,532 @@
           "tenant_id"
         ]
       },
+      "ListaContatos": {
+        "type": "object",
+        "properties": {
+          "dados": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Contato"
+            }
+          },
+          "proximo_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "dados",
+          "proximo_cursor"
+        ]
+      },
+      "Contato": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "empresa_id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "tipo_pessoa": {
+            "$ref": "#/components/schemas/TipoPessoa"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "documento": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "telefone_e164": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "whatsapp_e164": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "canal_preferido": {
+            "$ref": "#/components/schemas/CanalComunicacao"
+          },
+          "data_nascimento": {
+            "$ref": "#/components/schemas/Data"
+          },
+          "endereco": {
+            "$ref": "#/components/schemas/Endereco"
+          },
+          "origem_id": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "responsavel_id": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "observacoes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ciclo_vida": {
+            "$ref": "#/components/schemas/CicloVida"
+          },
+          "score_total": {
+            "type": "integer"
+          },
+          "temperatura": {
+            "type": "string",
+            "enum": [
+              "FRIO",
+              "MORNO",
+              "QUENTE"
+            ]
+          },
+          "quadrante": {
+            "type": "string",
+            "enum": [
+              "PRONTO_PARA_COMPRAR",
+              "CULTIVAR",
+              "PROSPECTAR",
+              "TRABALHAR_DEPOIS"
+            ]
+          },
+          "completude_perfil": {
+            "type": "integer"
+          },
+          "campos_faltantes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ultima_interacao_em": {
+            "$ref": "#/components/schemas/DataHora"
+          },
+          "consentimentos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SituacaoConsentimento"
+            }
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/DataHora"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/DataHora"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "tipo_pessoa",
+          "nome",
+          "documento",
+          "email",
+          "telefone_e164",
+          "whatsapp_e164",
+          "canal_preferido",
+          "data_nascimento",
+          "endereco",
+          "origem_id",
+          "responsavel_id",
+          "observacoes",
+          "ciclo_vida",
+          "score_total",
+          "temperatura",
+          "quadrante",
+          "completude_perfil",
+          "campos_faltantes",
+          "ultima_interacao_em",
+          "consentimentos",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "TipoPessoa": {
+        "type": "string",
+        "enum": [
+          "PF",
+          "PJ"
+        ]
+      },
+      "CanalComunicacao": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "enum": [
+          "WHATSAPP",
+          "EMAIL",
+          "SMS",
+          null
+        ]
+      },
+      "Data": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "format": "date",
+        "description": "Data YYYY-MM-DD",
+        "example": "2026-10-27"
+      },
+      "Endereco": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "cep": {
+            "type": "string",
+            "pattern": "^\\d{5}-?\\d{3}$"
+          },
+          "logradouro": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "numero": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "complemento": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "bairro": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "cidade": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "uf": {
+            "type": "string",
+            "pattern": "^[A-Za-z]{2}$"
+          }
+        }
+      },
+      "CicloVida": {
+        "type": "string",
+        "enum": [
+          "LEAD",
+          "LEAD_QUALIFICADO",
+          "OPORTUNIDADE",
+          "CLIENTE",
+          "RECORRENTE",
+          "INATIVO"
+        ],
+        "description": "Derivado dos negócios, orçamentos e OS (CRM-2)"
+      },
+      "SituacaoConsentimento": {
+        "type": "object",
+        "properties": {
+          "canal": {
+            "$ref": "#/components/schemas/CanalComunicacao"
+          },
+          "finalidade": {
+            "type": "string",
+            "enum": [
+              "TRANSACIONAL",
+              "MARKETING"
+            ]
+          },
+          "concedido": {
+            "type": "boolean"
+          },
+          "coletado_em": {
+            "$ref": "#/components/schemas/DataHora"
+          }
+        },
+        "required": [
+          "canal",
+          "finalidade",
+          "concedido",
+          "coletado_em"
+        ],
+        "description": "O registro mais recente por canal e finalidade"
+      },
+      "EntradaContato": {
+        "type": "object",
+        "properties": {
+          "tipo_pessoa": {
+            "$ref": "#/components/schemas/TipoPessoa"
+          },
+          "nome": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "documento": {
+            "type": "string",
+            "maxLength": 20,
+            "description": "CPF (PF) ou CNPJ (PJ), com ou sem máscara; a API confere os dígitos"
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 254
+          },
+          "telefone": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 30,
+            "description": "Como digitado, ex.: (11) 98765-4321 ou +351 912 345 678"
+          },
+          "whatsapp": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 30,
+            "description": "Como digitado, ex.: (11) 98765-4321 ou +351 912 345 678"
+          },
+          "canal_preferido": {
+            "$ref": "#/components/schemas/CanalComunicacao"
+          },
+          "data_nascimento": {
+            "$ref": "#/components/schemas/Data"
+          },
+          "endereco": {
+            "$ref": "#/components/schemas/Endereco"
+          },
+          "origem_id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "responsavel_id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "observacoes": {
+            "type": "string",
+            "maxLength": 5000
+          }
+        },
+        "required": [
+          "nome"
+        ],
+        "additionalProperties": false
+      },
+      "EdicaoContato": {
+        "type": "object",
+        "properties": {
+          "tipo_pessoa": {
+            "$ref": "#/components/schemas/TipoPessoa"
+          },
+          "nome": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "documento": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 20,
+            "description": "CPF (PF) ou CNPJ (PJ), com ou sem máscara; a API confere os dígitos"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 254
+          },
+          "telefone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 8,
+            "maxLength": 30,
+            "description": "Como digitado, ex.: (11) 98765-4321 ou +351 912 345 678"
+          },
+          "whatsapp": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 8,
+            "maxLength": 30,
+            "description": "Como digitado, ex.: (11) 98765-4321 ou +351 912 345 678"
+          },
+          "canal_preferido": {
+            "$ref": "#/components/schemas/CanalComunicacao"
+          },
+          "data_nascimento": {
+            "$ref": "#/components/schemas/Data"
+          },
+          "endereco": {
+            "$ref": "#/components/schemas/Endereco"
+          },
+          "origem_id": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "responsavel_id": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "observacoes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 5000
+          }
+        },
+        "additionalProperties": false
+      },
+      "ListaConsentimentos": {
+        "type": "object",
+        "properties": {
+          "dados": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Consentimento"
+            }
+          }
+        },
+        "required": [
+          "dados"
+        ],
+        "description": "Histórico, do mais recente ao mais antigo"
+      },
+      "Consentimento": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "canal": {
+            "$ref": "#/components/schemas/CanalComunicacao"
+          },
+          "finalidade": {
+            "$ref": "#/components/schemas/FinalidadeConsentimento"
+          },
+          "concedido": {
+            "type": "boolean"
+          },
+          "base_legal": {
+            "type": "string"
+          },
+          "evidencia": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {}
+          },
+          "coletado_em": {
+            "$ref": "#/components/schemas/DataHora"
+          }
+        },
+        "required": [
+          "id",
+          "canal",
+          "finalidade",
+          "concedido",
+          "base_legal",
+          "evidencia",
+          "coletado_em"
+        ]
+      },
+      "FinalidadeConsentimento": {
+        "type": "string",
+        "enum": [
+          "TRANSACIONAL",
+          "MARKETING"
+        ]
+      },
+      "EntradaConsentimento": {
+        "type": "object",
+        "properties": {
+          "canal": {
+            "$ref": "#/components/schemas/CanalComunicacao"
+          },
+          "finalidade": {
+            "$ref": "#/components/schemas/FinalidadeConsentimento"
+          },
+          "concedido": {
+            "type": "boolean"
+          },
+          "base_legal": {
+            "$ref": "#/components/schemas/BaseLegal"
+          },
+          "evidencia": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 2000
+            },
+            "description": "Ex.: texto exibido, url, canal da coleta"
+          }
+        },
+        "required": [
+          "canal",
+          "finalidade",
+          "concedido",
+          "base_legal"
+        ]
+      },
+      "BaseLegal": {
+        "type": "string",
+        "enum": [
+          "consentimento",
+          "execucao_contrato",
+          "legitimo_interesse"
+        ]
+      },
       "ListaEmpresas": {
         "type": "object",
         "properties": {
@@ -1199,6 +1725,152 @@
           "atribuicoes"
         ],
         "description": "Substitui todas as atribuições do membro. OWNER só em todas as empresas"
+      },
+      "ListaMotivosPerda": {
+        "type": "object",
+        "properties": {
+          "dados": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MotivoPerda"
+            }
+          }
+        },
+        "required": [
+          "dados"
+        ]
+      },
+      "MotivoPerda": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "ativo": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "nome",
+          "ativo"
+        ]
+      },
+      "EntradaMotivoPerda": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "nome"
+        ]
+      },
+      "EdicaoMotivoPerda": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "ativo": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ListaOrigens": {
+        "type": "object",
+        "properties": {
+          "dados": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Origem"
+            }
+          }
+        },
+        "required": [
+          "dados"
+        ]
+      },
+      "Origem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "tipo": {
+            "$ref": "#/components/schemas/TipoOrigem"
+          },
+          "ativo": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "nome",
+          "tipo",
+          "ativo"
+        ]
+      },
+      "TipoOrigem": {
+        "type": "string",
+        "enum": [
+          "FORMULARIO_SITE",
+          "ORCAMENTO_ONLINE",
+          "WHATSAPP",
+          "INSTAGRAM",
+          "FACEBOOK",
+          "GOOGLE_ADS",
+          "INDICACAO",
+          "BALCAO",
+          "TELEFONE",
+          "IMPORTACAO",
+          "MANUAL",
+          "OUTRO"
+        ]
+      },
+      "EntradaOrigem": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "tipo": {
+            "$ref": "#/components/schemas/TipoOrigem"
+          }
+        },
+        "required": [
+          "nome",
+          "tipo"
+        ]
+      },
+      "EdicaoOrigem": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "tipo": {
+            "$ref": "#/components/schemas/TipoOrigem"
+          },
+          "ativo": {
+            "type": "boolean"
+          }
+        }
       },
       "ListaPapeis": {
         "type": "object",
@@ -1985,6 +2657,718 @@
             }
           },
           "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/contatos": {
+      "get": {
+        "summary": "Lista os contatos da empresa, dos mais recentes aos mais antigos",
+        "description": "`q` busca por nome (sem diferenciar acento), trecho do e-mail ou dígitos do telefone.\n\nPermissão: `contato.read`.",
+        "tags": [
+          "crm"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 100,
+              "description": "Nome (sem diferenciar acento), trecho do e-mail ou dígitos do telefone"
+            },
+            "required": false,
+            "description": "Nome (sem diferenciar acento), trecho do e-mail ou dígitos do telefone",
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": false,
+            "description": "Identificador UUID",
+            "name": "filtro[origem_id]",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": false,
+            "description": "Identificador UUID",
+            "name": "filtro[responsavel_id]",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/CicloVida"
+            },
+            "required": false,
+            "description": "Derivado dos negócios, orçamentos e OS (CRM-2)",
+            "name": "filtro[ciclo_vida]",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Empresa em que a operação acontece"
+            },
+            "required": true,
+            "description": "Empresa em que a operação acontece",
+            "name": "X-Empresa-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaContatos"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Cria um contato",
+        "description": "E-mail, telefone ou WhatsApp que já existe num contato da empresa dá 409 `duplicado` com `id_existente` e o `campo` que repetiu (CRM-1). Telefones entram como digitados e saem em E.164.\n\nPermissão: `contato.create`.",
+        "tags": [
+          "crm"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Empresa em que a operação acontece"
+            },
+            "required": true,
+            "description": "Empresa em que a operação acontece",
+            "name": "X-Empresa-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Repetir com a mesma chave devolve a mesma resposta (validade de 24 h)"
+            },
+            "required": true,
+            "description": "Repetir com a mesma chave devolve a mesma resposta (validade de 24 h)",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntradaContato"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Contato"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/contatos/{id}": {
+      "delete": {
+        "summary": "Exclui um contato (soft delete)",
+        "description": "Exclusão LGPD é a anonimização, em outra rota.\n\nPermissão: `contato.delete`.",
+        "tags": [
+          "crm"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "description": "Identificador UUID",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Empresa em que a operação acontece"
+            },
+            "required": true,
+            "description": "Empresa em que a operação acontece",
+            "name": "X-Empresa-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Sucesso, sem conteúdo"
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Lê um contato",
+        "description": "Permissão: `contato.read`.",
+        "tags": [
+          "crm"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "description": "Identificador UUID",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Empresa em que a operação acontece"
+            },
+            "required": true,
+            "description": "Empresa em que a operação acontece",
+            "name": "X-Empresa-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Contato"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Edita um contato",
+        "description": "`null` remove um campo opcional; o contato não fica sem meio de contato.\n\nPermissão: `contato.update`.",
+        "tags": [
+          "crm"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "description": "Identificador UUID",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Empresa em que a operação acontece"
+            },
+            "required": true,
+            "description": "Empresa em que a operação acontece",
+            "name": "X-Empresa-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EdicaoContato"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Contato"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/contatos/{id}/consentimentos": {
+      "get": {
+        "summary": "Histórico de consentimentos do contato",
+        "description": "Permissão: `contato.read`.",
+        "tags": [
+          "crm"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "description": "Identificador UUID",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Empresa em que a operação acontece"
+            },
+            "required": true,
+            "description": "Empresa em que a operação acontece",
+            "name": "X-Empresa-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaConsentimentos"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Registra um consentimento (ou a revogação)",
+        "description": "Só acrescenta: revogar é um registro novo com `concedido: false`.\n\nPermissão: `contato.update`.",
+        "tags": [
+          "crm"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "description": "Identificador UUID",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Empresa em que a operação acontece"
+            },
+            "required": true,
+            "description": "Empresa em que a operação acontece",
+            "name": "X-Empresa-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Repetir com a mesma chave devolve a mesma resposta (validade de 24 h)"
+            },
+            "required": true,
+            "description": "Repetir com a mesma chave devolve a mesma resposta (validade de 24 h)",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntradaConsentimento"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Consentimento"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "422": {
             "description": "Erro no formato RFC 9457",
             "content": {
               "application/problem+json": {
@@ -3033,6 +4417,902 @@
             }
           },
           "403": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/motivos-perda": {
+      "get": {
+        "summary": "Lista os motivos de perda da empresa",
+        "description": "Permissão: `contato.read`.",
+        "tags": [
+          "crm"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Empresa em que a operação acontece"
+            },
+            "required": true,
+            "description": "Empresa em que a operação acontece",
+            "name": "X-Empresa-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaMotivosPerda"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Cria um motivo de perda",
+        "description": "Permissão: `config.crm`.",
+        "tags": [
+          "crm"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Empresa em que a operação acontece"
+            },
+            "required": true,
+            "description": "Empresa em que a operação acontece",
+            "name": "X-Empresa-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Repetir com a mesma chave devolve a mesma resposta (validade de 24 h)"
+            },
+            "required": true,
+            "description": "Repetir com a mesma chave devolve a mesma resposta (validade de 24 h)",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntradaMotivoPerda"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MotivoPerda"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/motivos-perda/{id}": {
+      "delete": {
+        "summary": "Desativa um motivo de perda",
+        "description": "Os negócios perdidos com ele continuam apontando.\n\nPermissão: `config.crm`.",
+        "tags": [
+          "crm"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "description": "Identificador UUID",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Empresa em que a operação acontece"
+            },
+            "required": true,
+            "description": "Empresa em que a operação acontece",
+            "name": "X-Empresa-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Sucesso, sem conteúdo"
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Lê um motivo de perda",
+        "description": "Permissão: `contato.read`.",
+        "tags": [
+          "crm"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "description": "Identificador UUID",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Empresa em que a operação acontece"
+            },
+            "required": true,
+            "description": "Empresa em que a operação acontece",
+            "name": "X-Empresa-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MotivoPerda"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Edita um motivo de perda (inclusive reativar)",
+        "description": "Permissão: `config.crm`.",
+        "tags": [
+          "crm"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "description": "Identificador UUID",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Empresa em que a operação acontece"
+            },
+            "required": true,
+            "description": "Empresa em que a operação acontece",
+            "name": "X-Empresa-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EdicaoMotivoPerda"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MotivoPerda"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/origens": {
+      "get": {
+        "summary": "Lista as origens de lead da empresa",
+        "description": "Permissão: `contato.read`.",
+        "tags": [
+          "crm"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Empresa em que a operação acontece"
+            },
+            "required": true,
+            "description": "Empresa em que a operação acontece",
+            "name": "X-Empresa-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaOrigens"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Cria uma origem de lead",
+        "description": "Permissão: `config.crm`.",
+        "tags": [
+          "crm"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Empresa em que a operação acontece"
+            },
+            "required": true,
+            "description": "Empresa em que a operação acontece",
+            "name": "X-Empresa-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Repetir com a mesma chave devolve a mesma resposta (validade de 24 h)"
+            },
+            "required": true,
+            "description": "Repetir com a mesma chave devolve a mesma resposta (validade de 24 h)",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntradaOrigem"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Origem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/origens/{id}": {
+      "delete": {
+        "summary": "Desativa uma origem de lead",
+        "description": "Os contatos que apontam para ela continuam apontando.\n\nPermissão: `config.crm`.",
+        "tags": [
+          "crm"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "description": "Identificador UUID",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Empresa em que a operação acontece"
+            },
+            "required": true,
+            "description": "Empresa em que a operação acontece",
+            "name": "X-Empresa-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Sucesso, sem conteúdo"
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Lê uma origem de lead",
+        "description": "Permissão: `contato.read`.",
+        "tags": [
+          "crm"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "description": "Identificador UUID",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Empresa em que a operação acontece"
+            },
+            "required": true,
+            "description": "Empresa em que a operação acontece",
+            "name": "X-Empresa-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Origem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Edita uma origem de lead (inclusive reativar)",
+        "description": "Permissão: `config.crm`.",
+        "tags": [
+          "crm"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "description": "Identificador UUID",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Empresa em que a operação acontece"
+            },
+            "required": true,
+            "description": "Empresa em que a operação acontece",
+            "name": "X-Empresa-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EdicaoOrigem"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Origem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "422": {
             "description": "Erro no formato RFC 9457",
             "content": {
               "application/problem+json": {

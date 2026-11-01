@@ -7,8 +7,10 @@ import { SaudeModule } from './core/saude/saude.module.js';
 import { TxModule } from './core/tx/executar.js';
 import { ApiKeysModule } from './modules/api-keys/api-keys.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
+import { ContatosModule } from './modules/contatos/contatos.module.js';
 import { EmpresasModule } from './modules/empresas/empresas.module.js';
 import { MembrosModule } from './modules/membros/membros.module.js';
+import { OrigensModule } from './modules/origens/origens.module.js';
 
 // Registro de módulos (dono: F0). Uma linha por módulo de domínio.
 @Module({
@@ -23,6 +25,8 @@ import { MembrosModule } from './modules/membros/membros.module.js';
     EmpresasModule,
     MembrosModule,
     ApiKeysModule,
+    ContatosModule,
+    OrigensModule,
   ],
 })
 export class AppModule {}
