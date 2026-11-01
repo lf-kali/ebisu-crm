@@ -8,6 +8,8 @@ export class ErroApi extends Error {
   constructor(
     readonly problema: Problema,
     readonly status: number,
+    /** Segundos do `Retry-After` de um 429, quando a API manda. */
+    readonly esperaSegundos: number | null = null,
   ) {
     super(problema.title);
     this.name = 'ErroApi';
@@ -22,9 +24,10 @@ export class ErroApi extends Error {
     return Object.fromEntries((this.problema.campos ?? []).map((c) => [c.campo, c.mensagem]));
   }
 
-  static deResposta(status: number, corpo: unknown): ErroApi {
+  static deResposta(status: number, corpo: unknown, retryAfter?: string | null): ErroApi {
     const problema = Problema.safeParse(corpo);
-    if (problema.success) return new ErroApi(problema.data, status);
+    const espera = retryAfter && /^\d+$/.test(retryAfter) ? Number(retryAfter) : null;
+    if (problema.success) return new ErroApi(problema.data, status, espera);
     // Resposta de erro fora do envelope (ex.: proxy, HTML): trata como falha do servidor.
     return new ErroApi(criarProblema('erro_interno'), status);
   }

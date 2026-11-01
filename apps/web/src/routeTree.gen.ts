@@ -10,6 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
+import { Route as CadastroRouteImport } from './routes/cadastro'
+import { Route as ConviteRouteImport } from './routes/convite'
 import { Route as EscolherContaRouteImport } from './routes/escolher-conta'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
@@ -25,6 +27,16 @@ import { Route as AppOrcamentosIndexRouteImport } from './routes/_app/orcamentos
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CadastroRoute = CadastroRouteImport.update({
+  id: '/cadastro',
+  path: '/cadastro',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConviteRoute = ConviteRouteImport.update({
+  id: '/convite',
+  path: '/convite',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EscolherContaRoute = EscolherContaRouteImport.update({
@@ -90,6 +102,8 @@ const AppOrcamentosIndexRoute = AppOrcamentosIndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
+  '/cadastro': typeof CadastroRoute
+  '/convite': typeof ConviteRoute
   '/escolher-conta': typeof EscolherContaRoute
   '/login': typeof LoginRoute
   '/$': typeof AppSplatRoute
@@ -103,6 +117,8 @@ export interface FileRoutesByFullPath {
   '/orcamentos/': typeof AppOrcamentosIndexRoute
 }
 export interface FileRoutesByTo {
+  '/cadastro': typeof CadastroRoute
+  '/convite': typeof ConviteRoute
   '/escolher-conta': typeof EscolherContaRoute
   '/login': typeof LoginRoute
   '/$': typeof AppSplatRoute
@@ -119,6 +135,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
+  '/cadastro': typeof CadastroRoute
+  '/convite': typeof ConviteRoute
   '/escolher-conta': typeof EscolherContaRoute
   '/login': typeof LoginRoute
   '/_app/$': typeof AppSplatRoute
@@ -136,6 +154,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/cadastro'
+    | '/convite'
     | '/escolher-conta'
     | '/login'
     | '/$'
@@ -149,6 +169,8 @@ export interface FileRouteTypes {
     | '/orcamentos/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/cadastro'
+    | '/convite'
     | '/escolher-conta'
     | '/login'
     | '/$'
@@ -164,6 +186,8 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_app'
+    | '/cadastro'
+    | '/convite'
     | '/escolher-conta'
     | '/login'
     | '/_app/$'
@@ -180,6 +204,8 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
+  CadastroRoute: typeof CadastroRoute
+  ConviteRoute: typeof ConviteRoute
   EscolherContaRoute: typeof EscolherContaRoute
   LoginRoute: typeof LoginRoute
 }
@@ -191,6 +217,20 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cadastro': {
+      id: '/cadastro'
+      path: '/cadastro'
+      fullPath: '/cadastro'
+      preLoaderRoute: typeof CadastroRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/convite': {
+      id: '/convite'
+      path: '/convite'
+      fullPath: '/convite'
+      preLoaderRoute: typeof ConviteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/escolher-conta': {
@@ -310,6 +350,8 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
+  CadastroRoute: CadastroRoute,
+  ConviteRoute: ConviteRoute,
   EscolherContaRoute: EscolherContaRoute,
   LoginRoute: LoginRoute,
 }

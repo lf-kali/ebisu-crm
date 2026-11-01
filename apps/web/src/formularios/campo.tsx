@@ -7,22 +7,34 @@ import { ErroApi } from '../api/erro-api';
 interface PropsCampo extends ComponentProps<typeof Input> {
   rotulo: string;
   erro?: string;
+  /** Orientação sempre visível abaixo do campo (ex.: a regra da senha). */
+  dica?: string;
 }
 
-/** Rótulo + campo + mensagem de erro ligada por aria-describedby (o leitor de tela lê o erro). */
-export function Campo({ rotulo, erro, id, ...props }: PropsCampo) {
+/**
+ * Rótulo + campo + dica e mensagem de erro ligadas por aria-describedby (o leitor de tela lê as
+ * duas).
+ */
+export function Campo({ rotulo, erro, dica, id, ...props }: PropsCampo) {
   const gerado = useId();
   const idCampo = id ?? gerado;
   const idErro = `${idCampo}-erro`;
+  const idDica = `${idCampo}-dica`;
+  const descricao = [dica ? idDica : null, erro ? idErro : null].filter(Boolean).join(' ');
   return (
     <div className="flex flex-col gap-2">
       <Label htmlFor={idCampo}>{rotulo}</Label>
       <Input
         id={idCampo}
         aria-invalid={erro ? true : undefined}
-        aria-describedby={erro ? idErro : undefined}
+        aria-describedby={descricao || undefined}
         {...props}
       />
+      {dica ? (
+        <p id={idDica} className="text-sm text-muted-foreground">
+          {dica}
+        </p>
+      ) : null}
       {erro ? (
         <p id={idErro} className="text-sm text-destructive">
           {erro}

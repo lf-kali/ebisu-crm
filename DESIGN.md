@@ -104,8 +104,10 @@ shadcn, barradas pelo teste:
   de um módulo oculto mostra o estado vazio "Sem acesso a este módulo" dentro do layout. Ações
   usam `SePermitido` (escondidas, não desabilitadas). Membro sem empresa vê "Nenhuma empresa
   disponível".
-- **Telas de entrada** (`TelaDeEntrada`: login, escolha de conta): fora do AppShell, cartão de até
-  384 px centralizado sobre `bg-muted`, com `h1` e descrição curta.
+- **Telas de entrada** (`TelaDeEntrada`: login, escolha de conta, cadastro, aceite do convite): fora
+  do AppShell, cartão de até 384 px centralizado sobre `bg-muted`, com `h1` e descrição curta. Login
+  e cadastro apontam um para o outro; o cadastro agrupa os campos em `fieldset` ("Você", "Sua
+  empresa").
 
 ## Componentes
 
@@ -115,7 +117,8 @@ Base shadcn/ui (estilo `new-york`) em `packages/ui/src/components/ui/`: `alert`,
 `cn` para `@ebisu/ui/lib/utils`.
 
 Formulários (`apps/web/src/formularios/`): React Hook Form com o schema Zod do contrato. Cada
-campo usa `Campo` (rótulo visível, `aria-invalid` e a mensagem ligada por `aria-describedby`);
+campo usa `Campo` (rótulo visível, `aria-invalid`, e a dica e a mensagem de erro ligadas por
+`aria-describedby`; a regra da senha é uma dica sempre visível);
 mensagens do Zod em pt-BR, com "Campo obrigatório." para campo vazio. Erros por campo de um 422
 vão para o campo (`aplicarErrosDaApi`); o resto aparece no topo do formulário.
 
@@ -136,7 +139,8 @@ anunciada (`aria-live`). Enquanto a próxima página carrega, a anterior continu
 
 - Meta: Lighthouse acessibilidade ≥ 90 nas páginas base (spec §4 F12). Medido em 2026-10-28
   (Lighthouse 13.5.0, celular e desktop): login, escolha de conta, Painel, Contatos, Bancada e
-  Estoque com 100.
+  Estoque com 100. Em 2026-10-31 (Lighthouse 12.8.2, celular e desktop): cadastro e aceite do
+  convite (estado sem token) com 100.
 - Testes de componente rodam o axe-core (`apps/web/src/teste/axe.ts`); contraste não é avaliável
   no jsdom, por isso a tabela acima.
 - Foco sempre visível (`ring` do `primary`). Ícones decorativos com `aria-hidden`; botão só com

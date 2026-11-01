@@ -1,4 +1,12 @@
-import { type EntradaLogin, RespostaSessao, type ResumoConta, ROTAS_AUTH } from '@ebisu/contracts';
+import {
+  type EntradaAceite,
+  type EntradaLogin,
+  type EntradaRegistro,
+  RespostaSessao,
+  type ResumoConta,
+  ROTAS_AUTH,
+  ROTAS_CONVITES,
+} from '@ebisu/contracts';
 import type { ClienteApi } from '../api/cliente';
 import { ErroApi } from '../api/erro-api';
 
@@ -75,6 +83,18 @@ export function criarSessao({ cliente, agora = Date.now, travar = travaPadrao }:
     return renovando;
   }
 
+  /**
+   * Abre uma sessão nova pelo corpo dado (login, cadastro ou aceite do convite). A geração muda
+   * antes da chamada: um refresh da identidade anterior que chegue depois é descartado.
+   */
+  async function abrir(rota: string, corpo: unknown): Promise<Sessao> {
+    geracao += 1;
+    const resposta = await cliente.post(rota, { resposta: RespostaSessao, corpo });
+    const sessao = daResposta(resposta);
+    definir(sessao);
+    return sessao;
+  }
+
   return {
     obter: () => atual,
     assinar(ouvinte: () => void) {
@@ -87,16 +107,11 @@ export function criarSessao({ cliente, agora = Date.now, travar = travaPadrao }:
       return renovar();
     },
     renovar,
-    async entrar(credenciais: EntradaLogin): Promise<Sessao> {
-      geracao += 1;
-      const resposta = await cliente.post(ROTAS_AUTH.login, {
-        resposta: RespostaSessao,
-        corpo: credenciais,
-      });
-      const sessao = daResposta(resposta);
-      definir(sessao);
-      return sessao;
-    },
+    entrar: (credenciais: EntradaLogin) => abrir(ROTAS_AUTH.login, credenciais),
+    /** Cadastro (F3): cria a conta e já entra nela, como o login. */
+    registrar: (entrada: EntradaRegistro) => abrir(ROTAS_AUTH.registrar, entrada),
+    /** Aceite do convite (F3): a sessão abre na conta que convidou. */
+    aceitarConvite: (entrada: EntradaAceite) => abrir(ROTAS_CONVITES.aceitar, entrada),
     async trocarConta(tenantId: string): Promise<Sessao> {
       geracao += 1;
       const resposta = await cliente.post(ROTAS_AUTH.trocarConta, {

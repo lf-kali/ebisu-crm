@@ -92,6 +92,14 @@ no `.env` se quiser. O bucket é criado pelo serviço `seaweedfs-init` alguns se
 `docker compose down -v` apaga a infraestrutura e os dados locais. Usuário, senha e banco do
 Postgres só valem na criação do volume: para trocá-los, rode `down -v` antes.
 
+### Testes de ponta a ponta
+
+`pnpm e2e` compila API, worker e web e roda o Playwright (`apps/e2e`) com o docker compose de pé
+(Postgres, Redis e Mailpit). Ele não mexe no ambiente do `pnpm dev`: usa o banco `ebisu_e2e`
+(recriado a cada rodada), o banco lógico 15 do Redis, uma chave de token própria e as portas 3101
+(API) e 5181 (web). Na primeira vez, instale o navegador:
+`pnpm --filter @ebisu/e2e exec playwright install chromium`.
+
 ## Comandos
 
 | Comando                             | O que faz                                                                         |
@@ -102,6 +110,7 @@ Postgres só valem na criação do volume: para trocá-los, rode `down -v` antes
 | `pnpm lint`                         | ESLint                                                                            |
 | `pnpm format` / `pnpm format:check` | Prettier                                                                          |
 | `pnpm db:invariantes`               | Recria `ebisu_test`, aplica as migrações e roda os testes de invariantes do banco |
+| `pnpm e2e`                          | Playwright de ponta a ponta contra API, worker e web reais (veja abaixo)          |
 
 O client do Prisma só é gerado pelo `build` de `packages/db` (o Turborepo roda o `build` antes do
 `typecheck`, do `test` e do `dev` desse pacote). Para rodar um pacote só, use o Turborepo, por

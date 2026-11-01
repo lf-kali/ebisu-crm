@@ -91,7 +91,8 @@ export function criarClienteApi(config: ConfigCliente = {}) {
         return requisitar(metodo, caminho, { ...opcoes, chaveIdempotencia: chave }, true);
       }
     }
-    if (!resposta.ok) throw ErroApi.deResposta(resposta.status, corpo);
+    if (!resposta.ok)
+      throw ErroApi.deResposta(resposta.status, corpo, resposta.headers.get('retry-after'));
     if (opcoes.resposta === null) return undefined as never;
     const validado = opcoes.resposta.safeParse(corpo);
     // Sucesso fora do contrato é bug de integração: trata como falha do servidor.
