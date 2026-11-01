@@ -1103,7 +1103,7 @@
         "required": [
           "dados"
         ],
-        "description": "Histórico, do mais recente ao mais antigo"
+        "description": "Histórico, do mais recente ao mais antigo: os 200 registros mais recentes"
       },
       "Consentimento": {
         "type": "object",

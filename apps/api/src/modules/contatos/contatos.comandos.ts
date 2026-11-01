@@ -80,7 +80,7 @@ function paraGravar(
     ...(tel !== undefined ? { telefone_e164: telefone('telefone', tel) } : {}),
     ...(whatsapp !== undefined ? { whatsapp_e164: telefone('whatsapp', whatsapp) } : {}),
     ...(doc !== undefined ? { documento: documento(doc, tipo) } : {}),
-    ...(endereco !== undefined ? { endereco: endereco ?? undefined } : {}),
+    ...(endereco !== undefined ? { endereco } : {}),
     ...(data_nascimento !== undefined
       ? { data_nascimento: data_nascimento === null ? null : new Date(data_nascimento) }
       : {}),
@@ -115,18 +115,25 @@ function responsavelPermitido(
   return ctx.membroId;
 }
 
-/** 409 com o contato que já usa o meio de contato (CRM-1). */
+/**
+ * 409 com o contato que já usa o meio de contato (CRM-1). Com PROPRIO, o id só vai quando o contato
+ * é da própria pessoa: o de outro responsável ela não pode abrir, e o id seria só um oráculo.
+ */
 async function exigirMeiosLivres(
   ctx: TxContext,
+  chave: string,
   dados: Partial<repo.DadosContato>,
   excetoId?: string,
 ) {
   const usado = await repo.meioJaUsado(ctx.tx, ctx.empresaId, dados, excetoId);
-  if (usado)
-    throw new ErroDominio('duplicado', {
-      detail: `Já existe um contato com este ${usado.campo === 'email' ? 'e-mail' : usado.campo === 'telefone' ? 'telefone' : 'WhatsApp'}.`,
-      extras: { id_existente: usado.id, campo: usado.campo },
-    });
+  if (!usado) return;
+  const podeVer = ctx.permissoes.get(chave) !== 'PROPRIO' || usado.responsavel_id === ctx.membroId;
+  const meio =
+    usado.campo === 'email' ? 'e-mail' : usado.campo === 'telefone' ? 'telefone' : 'WhatsApp';
+  throw new ErroDominio('duplicado', {
+    detail: `Já existe um contato com este ${meio}.`,
+    extras: { campo: usado.campo, ...(podeVer ? { id_existente: usado.id } : {}) },
+  });
 }
 
 export async function listar(ctx: TxContext, consulta: ConsultaContatos): Promise<ListaContatos> {
@@ -168,7 +175,7 @@ export async function criar(ctx: TxContext, entrada: EntradaContato): Promise<Co
   const responsavel_id = responsavelPermitido(ctx, 'contato.create', entrada.responsavel_id);
   await exigirReferencias(ctx, { origem_id: entrada.origem_id, responsavel_id });
   const dados = paraGravar({ ...entrada, responsavel_id }, entrada.tipo_pessoa);
-  await exigirMeiosLivres(ctx, dados);
+  await exigirMeiosLivres(ctx, 'contato.create', dados);
   return repo.criarContato(ctx.tx, ctx.tenantId, ctx.empresaId, dados as repo.DadosContato);
 }
 
@@ -202,7 +209,7 @@ export async function editar(
   };
   if (!resultado.email && !resultado.telefone && !resultado.whatsapp)
     throw invalido('email', 'O contato precisa de e-mail, telefone ou WhatsApp.');
-  await exigirMeiosLivres(ctx, dados, id);
+  await exigirMeiosLivres(ctx, 'contato.update', dados, id);
   const contato = await repo.editarContato(ctx.tx, ctx.empresaId, id, dados);
   if (!contato) throw new ErroDominio('nao_encontrado');
   return contato;

@@ -65,8 +65,17 @@ const paraContrato = ({ consentimentos, ...linha }: Linha): Contato => ({
 /** Dados gravados (já normalizados pelo comando). */
 export type DadosContato = Omit<
   Prisma.ContatoUncheckedCreateInput,
-  'id' | 'tenant_id' | 'empresa_id' | 'created_at' | 'updated_at'
->;
+  'id' | 'tenant_id' | 'empresa_id' | 'created_at' | 'updated_at' | 'endereco'
+> & {
+  /** `null` remove (vira o NULL do banco; o Prisma ignoraria um `undefined`). */
+  endereco?: Contato['endereco'];
+};
+
+/** O endereço como o Prisma grava: JSON, ou o NULL do banco quando é para remover. */
+const comEndereco = <T extends { endereco?: Contato['endereco'] }>({ endereco, ...resto }: T) => ({
+  ...resto,
+  ...(endereco === undefined ? {} : { endereco: endereco === null ? Prisma.DbNull : endereco }),
+});
 
 /** `%`, `_` e `\` são curingas do LIKE: na busca, valem como texto. */
 const literal = (texto: string) => texto.replace(/[\\%_]/g, (c) => `\\${c}`);
@@ -102,9 +111,13 @@ export async function listarContatos(
     where: {
       empresa_id: empresaId,
       ...VISIVEL,
-      ...escopo,
-      ...Object.fromEntries(Object.entries(iguais).filter(([, v]) => v !== undefined)),
-      ...(q ? filtroDeBusca(q) : {}),
+      // Em AND: um filtro do cliente com a mesma chave (ex.: responsavel_id) não pode substituir o
+      // escopo PROPRIO, que vem do servidor (SEG-4).
+      AND: [
+        escopo,
+        Object.fromEntries(Object.entries(iguais).filter(([, v]) => v !== undefined)),
+        q ? filtroDeBusca(q) : {},
+      ],
       ...(antesDe ? { id: { lt: antesDe } } : {}),
     },
     orderBy: { id: 'desc' },
@@ -137,7 +150,11 @@ export async function meioJaUsado(
     whatsapp_e164?: string | null;
   },
   excetoId?: string,
-): Promise<{ campo: 'email' | 'telefone' | 'whatsapp'; id: string } | null> {
+): Promise<{
+  campo: 'email' | 'telefone' | 'whatsapp';
+  id: string;
+  responsavel_id: string | null;
+} | null> {
   const pares = [
     ['email', 'email_normalizado', meios.email_normalizado],
     ['telefone', 'telefone_e164', meios.telefone_e164],
@@ -152,9 +169,9 @@ export async function meioJaUsado(
         [coluna]: valor,
         ...(excetoId ? { id: { not: excetoId } } : {}),
       },
-      select: { id: true },
+      select: { id: true, responsavel_id: true },
     });
-    if (existente) return { campo, id: existente.id };
+    if (existente) return { campo, ...existente };
   }
   return null;
 }
@@ -181,7 +198,7 @@ export async function criarContato(
   const linha = await comDedupe(
     tx.contato.create({
       data: {
-        ...dados,
+        ...comEndereco(dados),
         nome_busca: normalizarBusca(dados.nome),
         tenant_id: tenantId,
         empresa_id: empresaId,
@@ -203,8 +220,10 @@ export async function editarContato(
     tx.contato.updateMany({
       where: { id, empresa_id: empresaId, ...VISIVEL },
       // A busca acompanha o nome (decisão 5).
-      data:
-        dados.nome === undefined ? dados : { ...dados, nome_busca: normalizarBusca(dados.nome) },
+      data: {
+        ...comEndereco(dados),
+        ...(dados.nome === undefined ? {} : { nome_busca: normalizarBusca(dados.nome) }),
+      },
     }),
   );
   return buscarContato(tx, empresaId, id);

@@ -41,7 +41,8 @@ export const Consentimento = z
   .meta({ id: 'Consentimento' });
 export type Consentimento = z.infer<typeof Consentimento>;
 
-export const ListaConsentimentos = z
-  .object({ dados: z.array(Consentimento) })
-  .meta({ id: 'ListaConsentimentos', description: 'Histórico, do mais recente ao mais antigo' });
+export const ListaConsentimentos = z.object({ dados: z.array(Consentimento) }).meta({
+  id: 'ListaConsentimentos',
+  description: 'Histórico, do mais recente ao mais antigo: os 200 registros mais recentes',
+});
 export type ListaConsentimentos = z.infer<typeof ListaConsentimentos>;

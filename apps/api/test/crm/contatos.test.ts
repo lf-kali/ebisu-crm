@@ -107,6 +107,13 @@ describe('contatos', () => {
       documento: null,
     });
 
+    // `null` remove o endereço (JSON), como os demais campos opcionais.
+    const semEndereco = await pedir(x, 'patch', `/v1/contatos/${criado.id}`, { endereco: null });
+    expect(semEndereco.status).toBe(200);
+    expect(semEndereco.body.endereco).toBeNull();
+    const [banco] = (await c.sql(`SELECT endereco FROM contato WHERE id = $1`, [criado.id])).rows;
+    expect(banco!.endereco).toBeNull();
+
     expect((await pedir(x, 'delete', `/v1/contatos/${criado.id}`)).status).toBe(204);
     expect((await pedir(x, 'get', `/v1/contatos/${criado.id}`)).status).toBe(404);
     const [excluido] = (await c.sql(`SELECT deleted_at FROM contato WHERE id = $1`, [criado.id]))
@@ -256,7 +263,12 @@ describe('contatos', () => {
       x.empresaId,
     );
     const v = { token: vendedor.token, empresaId: x.empresaId };
-    const doDono = await criar(x, { nome: 'Do dono', email: 'dono@p.test' });
+    // Com o dono como responsável: é o que o filtro por responsável abaixo tentaria alcançar.
+    const doDono = await criar(x, {
+      nome: 'Do dono',
+      email: 'dono@p.test',
+      responsavel_id: x.donoId,
+    });
     const r = await pedir(v, 'post', '/v1/contatos', { nome: 'Meu', email: 'meu@p.test' });
     expect(r.status).toBe(201);
     expect(r.body.responsavel_id).toBe(vendedor.membroId);
@@ -274,6 +286,18 @@ describe('contatos', () => {
       responsavel_id: x.donoId,
     });
     expect(passar.status).toBe(403);
+    // Filtrar pelo responsável não substitui o escopo: o contato do dono continua fora.
+    const filtrado = ListaContatos.parse(
+      (await pedir(v, 'get', `/v1/contatos?filtro[responsavel_id]=${x.donoId}`)).body,
+    );
+    expect(filtrado.dados).toEqual([]);
+    // Dedupe: o 409 diz o campo, mas só traz o id quando o contato é dele.
+    const deOutro = await pedir(v, 'post', '/v1/contatos', { nome: 'Cópia', email: 'dono@p.test' });
+    expect(deOutro.status).toBe(409);
+    expect(deOutro.body.campo).toBe('email');
+    expect(deOutro.body).not.toHaveProperty('id_existente');
+    const meu = await pedir(v, 'post', '/v1/contatos', { nome: 'Cópia', email: 'meu@p.test' });
+    expect(meu.body).toMatchObject({ campo: 'email', id_existente: r.body.id });
   });
 
   it('POST idempotente e auditoria só com os nomes das colunas', async () => {
