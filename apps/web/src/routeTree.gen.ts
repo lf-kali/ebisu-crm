@@ -21,6 +21,7 @@ import { Route as AppConfiguracoesIndexRouteImport } from './routes/_app/configu
 import { Route as AppConfiguracoesApiKeysRouteImport } from './routes/_app/configuracoes/api-keys'
 import { Route as AppConfiguracoesEmpresasRouteImport } from './routes/_app/configuracoes/empresas'
 import { Route as AppContatosIndexRouteImport } from './routes/_app/contatos/index'
+import { Route as AppContatosNovoRouteImport } from './routes/_app/contatos/novo'
 import { Route as AppDispositivosIndexRouteImport } from './routes/_app/dispositivos/index'
 import { Route as AppEstoqueIndexRouteImport } from './routes/_app/estoque/index'
 import { Route as AppFinanceiroIndexRouteImport } from './routes/_app/financeiro/index'
@@ -28,6 +29,8 @@ import { Route as AppNegociosIndexRouteImport } from './routes/_app/negocios/ind
 import { Route as AppOrcamentosIndexRouteImport } from './routes/_app/orcamentos/index'
 import { Route as AppConfiguracoesMembrosIndexRouteImport } from './routes/_app/configuracoes/membros/index'
 import { Route as AppConfiguracoesMembrosIdRouteImport } from './routes/_app/configuracoes/membros/$id'
+import { Route as AppContatosIdIndexRouteImport } from './routes/_app/contatos/$id/index'
+import { Route as AppContatosIdEditarRouteImport } from './routes/_app/contatos/$id/editar'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -89,6 +92,11 @@ const AppContatosIndexRoute = AppContatosIndexRouteImport.update({
   path: '/contatos/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppContatosNovoRoute = AppContatosNovoRouteImport.update({
+  id: '/contatos/novo',
+  path: '/contatos/novo',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDispositivosIndexRoute = AppDispositivosIndexRouteImport.update({
   id: '/dispositivos/',
   path: '/dispositivos/',
@@ -126,6 +134,16 @@ const AppConfiguracoesMembrosIdRoute =
     path: '/configuracoes/membros/$id',
     getParentRoute: () => AppRoute,
   } as any)
+const AppContatosIdIndexRoute = AppContatosIdIndexRouteImport.update({
+  id: '/contatos/$id/',
+  path: '/contatos/$id/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppContatosIdEditarRoute = AppContatosIdEditarRouteImport.update({
+  id: '/contatos/$id/editar',
+  path: '/contatos/$id/editar',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -136,6 +154,7 @@ export interface FileRoutesByFullPath {
   '/$': typeof AppSplatRoute
   '/configuracoes/api-keys': typeof AppConfiguracoesApiKeysRoute
   '/configuracoes/empresas': typeof AppConfiguracoesEmpresasRoute
+  '/contatos/novo': typeof AppContatosNovoRoute
   '/bancada/': typeof AppBancadaIndexRoute
   '/configuracoes/': typeof AppConfiguracoesIndexRoute
   '/contatos/': typeof AppContatosIndexRoute
@@ -145,7 +164,9 @@ export interface FileRoutesByFullPath {
   '/negocios/': typeof AppNegociosIndexRoute
   '/orcamentos/': typeof AppOrcamentosIndexRoute
   '/configuracoes/membros/$id': typeof AppConfiguracoesMembrosIdRoute
+  '/contatos/$id/editar': typeof AppContatosIdEditarRoute
   '/configuracoes/membros/': typeof AppConfiguracoesMembrosIndexRoute
+  '/contatos/$id/': typeof AppContatosIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/cadastro': typeof CadastroRoute
@@ -156,6 +177,7 @@ export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/configuracoes/api-keys': typeof AppConfiguracoesApiKeysRoute
   '/configuracoes/empresas': typeof AppConfiguracoesEmpresasRoute
+  '/contatos/novo': typeof AppContatosNovoRoute
   '/bancada': typeof AppBancadaIndexRoute
   '/configuracoes': typeof AppConfiguracoesIndexRoute
   '/contatos': typeof AppContatosIndexRoute
@@ -165,7 +187,9 @@ export interface FileRoutesByTo {
   '/negocios': typeof AppNegociosIndexRoute
   '/orcamentos': typeof AppOrcamentosIndexRoute
   '/configuracoes/membros/$id': typeof AppConfiguracoesMembrosIdRoute
+  '/contatos/$id/editar': typeof AppContatosIdEditarRoute
   '/configuracoes/membros': typeof AppConfiguracoesMembrosIndexRoute
+  '/contatos/$id': typeof AppContatosIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -178,6 +202,7 @@ export interface FileRoutesById {
   '/_app/': typeof AppIndexRoute
   '/_app/configuracoes/api-keys': typeof AppConfiguracoesApiKeysRoute
   '/_app/configuracoes/empresas': typeof AppConfiguracoesEmpresasRoute
+  '/_app/contatos/novo': typeof AppContatosNovoRoute
   '/_app/bancada/': typeof AppBancadaIndexRoute
   '/_app/configuracoes/': typeof AppConfiguracoesIndexRoute
   '/_app/contatos/': typeof AppContatosIndexRoute
@@ -187,7 +212,9 @@ export interface FileRoutesById {
   '/_app/negocios/': typeof AppNegociosIndexRoute
   '/_app/orcamentos/': typeof AppOrcamentosIndexRoute
   '/_app/configuracoes/membros/$id': typeof AppConfiguracoesMembrosIdRoute
+  '/_app/contatos/$id/editar': typeof AppContatosIdEditarRoute
   '/_app/configuracoes/membros/': typeof AppConfiguracoesMembrosIndexRoute
+  '/_app/contatos/$id/': typeof AppContatosIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -200,6 +227,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/configuracoes/api-keys'
     | '/configuracoes/empresas'
+    | '/contatos/novo'
     | '/bancada/'
     | '/configuracoes/'
     | '/contatos/'
@@ -209,7 +237,9 @@ export interface FileRouteTypes {
     | '/negocios/'
     | '/orcamentos/'
     | '/configuracoes/membros/$id'
+    | '/contatos/$id/editar'
     | '/configuracoes/membros/'
+    | '/contatos/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/cadastro'
@@ -220,6 +250,7 @@ export interface FileRouteTypes {
     | '/'
     | '/configuracoes/api-keys'
     | '/configuracoes/empresas'
+    | '/contatos/novo'
     | '/bancada'
     | '/configuracoes'
     | '/contatos'
@@ -229,7 +260,9 @@ export interface FileRouteTypes {
     | '/negocios'
     | '/orcamentos'
     | '/configuracoes/membros/$id'
+    | '/contatos/$id/editar'
     | '/configuracoes/membros'
+    | '/contatos/$id'
   id:
     | '__root__'
     | '/_app'
@@ -241,6 +274,7 @@ export interface FileRouteTypes {
     | '/_app/'
     | '/_app/configuracoes/api-keys'
     | '/_app/configuracoes/empresas'
+    | '/_app/contatos/novo'
     | '/_app/bancada/'
     | '/_app/configuracoes/'
     | '/_app/contatos/'
@@ -250,7 +284,9 @@ export interface FileRouteTypes {
     | '/_app/negocios/'
     | '/_app/orcamentos/'
     | '/_app/configuracoes/membros/$id'
+    | '/_app/contatos/$id/editar'
     | '/_app/configuracoes/membros/'
+    | '/_app/contatos/$id/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -347,6 +383,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppContatosIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/contatos/novo': {
+      id: '/_app/contatos/novo'
+      path: '/contatos/novo'
+      fullPath: '/contatos/novo'
+      preLoaderRoute: typeof AppContatosNovoRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dispositivos/': {
       id: '/_app/dispositivos/'
       path: '/dispositivos'
@@ -396,6 +439,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppConfiguracoesMembrosIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/contatos/$id/': {
+      id: '/_app/contatos/$id/'
+      path: '/contatos/$id'
+      fullPath: '/contatos/$id/'
+      preLoaderRoute: typeof AppContatosIdIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/contatos/$id/editar': {
+      id: '/_app/contatos/$id/editar'
+      path: '/contatos/$id/editar'
+      fullPath: '/contatos/$id/editar'
+      preLoaderRoute: typeof AppContatosIdEditarRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -404,6 +461,7 @@ interface AppRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
   AppConfiguracoesApiKeysRoute: typeof AppConfiguracoesApiKeysRoute
   AppConfiguracoesEmpresasRoute: typeof AppConfiguracoesEmpresasRoute
+  AppContatosNovoRoute: typeof AppContatosNovoRoute
   AppBancadaIndexRoute: typeof AppBancadaIndexRoute
   AppConfiguracoesIndexRoute: typeof AppConfiguracoesIndexRoute
   AppContatosIndexRoute: typeof AppContatosIndexRoute
@@ -413,7 +471,9 @@ interface AppRouteChildren {
   AppNegociosIndexRoute: typeof AppNegociosIndexRoute
   AppOrcamentosIndexRoute: typeof AppOrcamentosIndexRoute
   AppConfiguracoesMembrosIdRoute: typeof AppConfiguracoesMembrosIdRoute
+  AppContatosIdEditarRoute: typeof AppContatosIdEditarRoute
   AppConfiguracoesMembrosIndexRoute: typeof AppConfiguracoesMembrosIndexRoute
+  AppContatosIdIndexRoute: typeof AppContatosIdIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -421,6 +481,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppIndexRoute: AppIndexRoute,
   AppConfiguracoesApiKeysRoute: AppConfiguracoesApiKeysRoute,
   AppConfiguracoesEmpresasRoute: AppConfiguracoesEmpresasRoute,
+  AppContatosNovoRoute: AppContatosNovoRoute,
   AppBancadaIndexRoute: AppBancadaIndexRoute,
   AppConfiguracoesIndexRoute: AppConfiguracoesIndexRoute,
   AppContatosIndexRoute: AppContatosIndexRoute,
@@ -430,7 +491,9 @@ const AppRouteChildren: AppRouteChildren = {
   AppNegociosIndexRoute: AppNegociosIndexRoute,
   AppOrcamentosIndexRoute: AppOrcamentosIndexRoute,
   AppConfiguracoesMembrosIdRoute: AppConfiguracoesMembrosIdRoute,
+  AppContatosIdEditarRoute: AppContatosIdEditarRoute,
   AppConfiguracoesMembrosIndexRoute: AppConfiguracoesMembrosIndexRoute,
+  AppContatosIdIndexRoute: AppContatosIdIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

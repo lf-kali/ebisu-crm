@@ -16,6 +16,7 @@ import {
 } from '@ebisu/contracts';
 import { http, HttpResponse } from 'msw';
 import { criarConfiguracoesSimuladas } from './configuracoes-simulada';
+import { criarContatosSimulados } from './contatos-simulada';
 import { USUARIOS, SENHA_DEMO, type UsuarioDemo } from './dados';
 
 // API simulada (MSW) do contrato de auth e do /v1/eu (packages/contracts/plataforma), usada pelo
@@ -149,8 +150,11 @@ export function criarApiSimulada({ persistir }: { persistir?: Storage } = {}) {
     acessos.get(request.headers.get('authorization')?.replace(/^Bearer /, '') ?? '');
 
   const configuracoes = criarConfiguracoesSimuladas({ autenticado, usuarios });
+  const contatos = criarContatosSimulados({ autenticado, usuarios });
 
   const handlers = [
+    // Contatos antes das Configurações: GET /v1/membros/opcoes vem antes de /v1/membros/:id.
+    ...contatos.handlers,
     ...configuracoes.handlers,
     http.post(`*${ROTAS_AUTH.login}`, async ({ request }) => {
       const entrada = EntradaLogin.safeParse(await request.json().catch(() => undefined));
@@ -267,6 +271,16 @@ export function criarApiSimulada({ persistir }: { persistir?: Storage } = {}) {
     revogarRefresh: () => gravarRefresh(null),
     temRefresh: () => refresh !== null,
     configuracoes,
+    contatos,
+    /**
+     * Testes: troca as permissões de quem tem este e-mail em todas as empresas da conta dada (a
+     * primeira, por padrão). Vale a partir do próximo /v1/eu.
+     */
+    definirPermissoes(email: string, permissoes: EmpresaDoMembro['permissoes'], tenantId?: string) {
+      const u = usuarios.find((x) => x.email === email)!;
+      const vinculo = tenantId ? vinculoDaConta(u, tenantId)! : u.contas[0]!;
+      vinculo.empresas = vinculo.empresas.map((e) => ({ ...e, permissoes }));
+    },
     /**
      * Testes: um convite pendente para a conta dada; devolve o token do link. A ação segue quem é
      * o e-mail (CRIAR_ACESSO para e-mail novo, SENHA_ATUAL para um usuário da demonstração).

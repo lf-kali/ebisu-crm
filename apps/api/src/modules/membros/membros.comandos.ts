@@ -9,7 +9,7 @@ import {
 } from '@ebisu/contracts';
 import { z } from 'zod';
 import { ErroDominio } from '../../core/erros/erro-dominio.js';
-import type { TxContextDaConta } from '../../core/tx/contexto.js';
+import type { TxContext, TxContextDaConta } from '../../core/tx/contexto.js';
 import {
   buscarMembro,
   contarDonosAtivos,
@@ -19,6 +19,7 @@ import {
   type LinhaMembro,
   listarMembros,
   listarPapeis,
+  membrosDaEmpresa,
   PAPEL_DONO,
   papeisDaConta,
   temPapelDeDono,
@@ -169,3 +170,6 @@ export async function atribuir(
 }
 
 export const papeis = (ctx: TxContextDaConta) => listarPapeis(ctx.tx);
+
+/** Responsáveis possíveis na empresa do contexto (rota de domínio, `contato.read`). */
+export const opcoes = (ctx: TxContext) => membrosDaEmpresa(ctx.tx, ctx.empresaId);

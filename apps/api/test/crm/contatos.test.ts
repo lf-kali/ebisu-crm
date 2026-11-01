@@ -243,6 +243,16 @@ describe('contatos', () => {
     expect(r.status).toBe(422);
   });
 
+  it('PATCH do nome regrava a busca: acha pelo nome novo e não pelo antigo', async () => {
+    const x = await conta('Conta Renomear');
+    const k = await criar(x, { nome: 'Cláudia Ramos', email: 'cr@r.test' });
+    expect(await buscar(x, 'q=claudia')).toEqual(['Cláudia Ramos']);
+    const r = await pedir(x, 'patch', `/v1/contatos/${k.id}`, { nome: 'Débora Lins' });
+    expect(r.status).toBe(200);
+    expect(await buscar(x, 'q=debora')).toEqual(['Débora Lins']);
+    expect(await buscar(x, 'q=claudia')).toEqual([]);
+  });
+
   it('lista paginada do mais recente ao mais antigo', async () => {
     const x = await conta('Conta Páginas');
     for (const n of [1, 2, 3]) await criar(x, { nome: `C${n}`, email: `c${n}@p.test` });
@@ -314,6 +324,48 @@ describe('contatos', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]!.diff).toContain('email_normalizado');
     expect(rows[0]!.diff).not.toContain('idem@loja.test');
+  });
+});
+
+describe('opções de responsável', () => {
+  it('só id e nome dos ativos com acesso à empresa, em ordem de nome; pede contato.read', async () => {
+    const x = await conta('Conta Opções');
+    const vendedor = await novoMembro(c, x.tenantId, { 'contato.read': 'PROPRIO' }, x.empresaId);
+    const suspenso = await novoMembro(c, x.tenantId, { 'contato.read': 'EMPRESA' }, x.empresaId);
+    const semContato = await novoMembro(c, x.tenantId, { 'os.read': 'EMPRESA' }, x.empresaId);
+    await c.sql(`UPDATE usuario SET nome = 'Ana Vendedora' WHERE email = $1`, [vendedor.email]);
+    await c.sql(`UPDATE membro SET status = 'SUSPENSO' WHERE id = $1`, [suspenso.membroId]);
+
+    // PROPRIO também vê: precisa escolher (ou ver) o responsável.
+    const v = { token: vendedor.token, empresaId: x.empresaId };
+    const r = await pedir(v, 'get', '/v1/membros/opcoes');
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    const ids = (r.body.dados as Array<{ id: string; nome: string }>).map((o) => o.id);
+    expect(ids).toContain(vendedor.membroId);
+    expect(ids).toContain(x.donoId);
+    expect(ids).toContain(semContato.membroId);
+    expect(ids).not.toContain(suspenso.membroId);
+    expect(r.body.dados[0]).toEqual({ id: vendedor.membroId, nome: 'Ana Vendedora' });
+    for (const opcao of r.body.dados) expect(Object.keys(opcao).sort()).toEqual(['id', 'nome']);
+    expect(JSON.stringify(r.body)).not.toContain('@');
+
+    const s = { token: semContato.token, empresaId: x.empresaId };
+    expect((await pedir(s, 'get', '/v1/membros/opcoes')).status).toBe(403);
+  });
+
+  it('API key não lista os responsáveis, nem com contato.read (rota sem a marca de chave)', async () => {
+    const x = await conta('Conta Opções Chave');
+    const criada = await pedir(x, 'post', '/v1/api-keys', {
+      tipo: 'SERVIDOR',
+      nome: 'n8n',
+      escopos: ['contato.read'],
+    });
+    expect(criada.status, JSON.stringify(criada.body)).toBe(201);
+    const r = await request(c.app.getHttpServer())
+      .get('/v1/membros/opcoes')
+      .set('X-Api-Key', criada.body.token as string)
+      .set('X-Empresa-Id', x.empresaId);
+    expect(r.status).toBe(401);
   });
 });
 

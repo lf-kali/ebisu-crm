@@ -42,6 +42,25 @@ export async function listarMembros(
   return { membros: linhas.slice(0, limite), haMais: linhas.length > limite };
 }
 
+/**
+ * Teto das opções de responsável (decisão 6 do plano f4-web-1-contatos). O nome mora em `usuario`
+ * (outro papel do banco), então o corte é pelos mais antigos e a ordem de nome vem depois, no
+ * serviço.
+ */
+export const LIMITE_OPCOES = 500;
+
+/** Membros ativos com acesso à empresa (atribuição nela ou em todas): só id e usuário. */
+export const membrosDaEmpresa = (tx: Prisma.TransactionClient, empresaId: string) =>
+  tx.membro.findMany({
+    where: {
+      status: 'ATIVO',
+      atribuicoes: { some: { OR: [{ empresa_id: empresaId }, { empresa_id: null }] } },
+    },
+    orderBy: { id: 'asc' },
+    take: LIMITE_OPCOES,
+    select: { id: true, usuario_id: true },
+  });
+
 export const buscarMembro = (tx: Prisma.TransactionClient, id: string) =>
   tx.membro.findUnique({ where: { id }, select: CAMPOS });
 

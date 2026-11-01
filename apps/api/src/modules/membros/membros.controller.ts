@@ -6,6 +6,7 @@ import {
   ListaConvites,
   EntradaAtribuicoes,
   ListaMembros,
+  ListaOpcoesResponsavel,
   ListaPapeis,
   Membro,
   ParametrosPaginacao,
@@ -14,9 +15,9 @@ import {
 import type { Response } from 'express';
 import { z } from 'zod';
 import { Consulta, Contrato, Corpo, Parametros } from '../../core/contrato/contrato.js';
-import { ContextoConta } from '../../core/rbac/guarda-contexto.js';
-import { PermissaoNaConta } from '../../core/rbac/marcas.js';
-import type { ContextoDaConta } from '../../core/tx/contexto.js';
+import { Contexto, ContextoConta } from '../../core/rbac/guarda-contexto.js';
+import { Permissao, PermissaoNaConta } from '../../core/rbac/marcas.js';
+import type { ContextoDaConta, ContextoDaRequisicao } from '../../core/tx/contexto.js';
 import { LimiteExcedido, MembrosService } from './membros.service.js';
 
 /** 429 dos limites de convite: o cabeçalho Retry-After vai na resposta. */
@@ -107,6 +108,30 @@ export class ConvitesController {
   })
   async revogar(@ContextoConta() contexto: ContextoDaConta, @Parametros() { id }: PorId) {
     await this.membros.revogarConvite(contexto, id);
+  }
+}
+
+/**
+ * Responsáveis possíveis (plano docs/planos/f4-web-1-contatos.md, decisão 6). Rota de domínio, com
+ * X-Empresa-Id e `contato.read`: quem não administra membros escolhe o responsável de um contato.
+ * Registrado antes do MembrosController, como os convites (/membros/opcoes antes de /:id).
+ */
+@Controller('membros/opcoes')
+export class OpcoesMembrosController {
+  constructor(private readonly membros: MembrosService) {}
+
+  @Get()
+  @Permissao('contato.read')
+  @Contrato({
+    resumo: 'Lista os responsáveis possíveis na empresa',
+    descricao:
+      'Só id e nome dos membros ativos com acesso à empresa (atribuição nela ou em todas), sem ' +
+      'e-mail, cargo nem papéis.',
+    tags: ['membros'],
+    resposta: ListaOpcoesResponsavel,
+  })
+  listar(@Contexto() contexto: ContextoDaRequisicao) {
+    return this.membros.opcoes(contexto);
   }
 }
 

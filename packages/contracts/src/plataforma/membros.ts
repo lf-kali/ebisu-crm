@@ -84,4 +84,23 @@ export type Papel = z.infer<typeof Papel>;
 export const ListaPapeis = z.object({ dados: z.array(Papel) }).meta({ id: 'ListaPapeis' });
 export type ListaPapeis = z.infer<typeof ListaPapeis>;
 
-export const ROTAS_MEMBROS = { membros: '/v1/membros', papeis: '/v1/papeis' } as const;
+/**
+ * Responsáveis possíveis na empresa atual (plano docs/planos/f4-web-1-contatos.md, decisão 6): só
+ * id e nome dos membros ativos com acesso a ela, para os selects das telas de domínio.
+ */
+export const OpcaoResponsavel = z
+  .object({ id: Uuid, nome: z.string() })
+  .meta({ id: 'OpcaoResponsavel' });
+export type OpcaoResponsavel = z.infer<typeof OpcaoResponsavel>;
+
+export const ListaOpcoesResponsavel = z.object({ dados: z.array(OpcaoResponsavel) }).meta({
+  id: 'ListaOpcoesResponsavel',
+  description: 'Em ordem de nome; acima de 500 membros, só os 500 mais antigos',
+});
+export type ListaOpcoesResponsavel = z.infer<typeof ListaOpcoesResponsavel>;
+
+export const ROTAS_MEMBROS = {
+  membros: '/v1/membros',
+  opcoes: '/v1/membros/opcoes',
+  papeis: '/v1/papeis',
+} as const;
