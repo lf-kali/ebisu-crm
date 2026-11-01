@@ -41,7 +41,7 @@ export interface Cenario {
 }
 
 /** Nunca limita: os testes fazem muitos logins seguidos do mesmo IP. */
-const semLimite: Limitador = { registrar: async () => 0 };
+const semLimite: Limitador = { registrar: async () => 0, consultar: async () => 0 };
 
 export async function criarCenario(): Promise<Cenario> {
   const banco = await criarBancoDeTeste();

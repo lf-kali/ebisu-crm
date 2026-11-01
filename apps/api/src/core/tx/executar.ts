@@ -32,6 +32,13 @@ export class ExecutorDeComandos {
     contexto: C,
     comando: (ctx: ComTransacao<C>, entrada: Entrada) => Promise<Saida>,
     entrada: Entrada,
+    opcoes: {
+      /**
+       * O que fica salvo para a repetição idempotente, quando a resposta tem um segredo que não
+       * pode ir para o banco (ex.: o token da API key, plano f3-5, decisão 6).
+       */
+      paraGuardar?: (saida: Saida) => Saida;
+    } = {},
   ): Promise<Saida> {
     const { idempotencia, ...resto } = contexto;
     // Autor da transação: o trigger auditar() grava no audit_log (plano f3-3b, SEG-8).
@@ -49,9 +56,10 @@ export class ExecutorDeComandos {
         // A chave fica travada até o fim desta transação; a resposta é gravada nela (plano f3-3a).
         const salva = await travarERecuperar(tx, contexto.tenantId, idempotencia);
         if (salva) return salva.resposta as Saida;
-        const resposta = comoJson(await comando({ ...resto, tx }, entrada));
-        await gravarResposta(tx, contexto.tenantId, idempotencia, resposta);
-        return resposta as Saida;
+        const resposta = comoJson(await comando({ ...resto, tx }, entrada)) as Saida;
+        const guardada = opcoes.paraGuardar ? comoJson(opcoes.paraGuardar(resposta)) : resposta;
+        await gravarResposta(tx, contexto.tenantId, idempotencia, guardada);
+        return resposta;
       },
       { ator },
     );

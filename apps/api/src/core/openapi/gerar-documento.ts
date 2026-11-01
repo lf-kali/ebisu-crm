@@ -6,7 +6,7 @@ import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { ModulesContainer } from '@nestjs/core';
 import { z } from 'zod';
 import { CHAVE_CONTRATO, type DefinicaoContrato } from '../contrato/contrato.js';
-import { type Acesso, marcasDe } from '../rbac/marcas.js';
+import { type Acesso, marcasDe, PREFIXO_ROTAS_PUBLICAS } from '../rbac/marcas.js';
 
 // Gera o OpenAPI (D-A02) a partir das rotas registradas no Nest e dos seus @Contrato:
 // uma única fonte para validação e documentação.
@@ -122,12 +122,23 @@ const CabecalhosIdempotente = CabecalhoEmpresa.extend(CabecalhoIdempotencia.shap
 /** Cabeçalhos da rota pela marca: as de domínio levam a empresa; os POST, a chave. */
 function cabecalhosDa(acesso: Acesso, idempotente: boolean) {
   if (acesso.tipo === 'permissao') return idempotente ? CabecalhosIdempotente : CabecalhoEmpresa;
-  if (acesso.tipo === 'conta' && idempotente) return CabecalhoIdempotencia;
+  if ((acesso.tipo === 'conta' || acesso.tipo === 'publica_api_key') && idempotente)
+    return CabecalhoIdempotencia;
   return undefined;
 }
 
 function descricaoDoAcesso(acesso: Acesso): string | undefined {
+  if (acesso.tipo === 'permissao' && acesso.apiKey)
+    return (
+      `Permissão: \`${acesso.chave}\`. Também aceita X-Api-Key de servidor com esse escopo ` +
+      '(a empresa é a da chave; X-Empresa-Id é opcional e, se vier, precisa ser a mesma).'
+    );
   if (acesso.tipo === 'permissao') return `Permissão: \`${acesso.chave}\`.`;
+  if (acesso.tipo === 'publica_api_key')
+    return (
+      `Escopo: \`${acesso.chave}\`, com X-Api-Key de navegador e um Origin cadastrado nela ` +
+      '(CORS). Sem login.'
+    );
   if (acesso.tipo === 'conta')
     return `Permissão: \`${acesso.chave}\` em todas as empresas (escopo TENANT). Sem X-Empresa-Id.`;
   return undefined;
@@ -139,7 +150,17 @@ const ERROS_DO_ACESSO: Record<Acesso['tipo'], string[]> = {
   autenticado: ['401'],
   permissao: ['401', '403', '422'],
   conta: ['401', '403'],
+  publica_api_key: ['401', '403', '429'],
 };
+
+/** Quem a rota aceita: Bearer, X-Api-Key ou um dos dois (alternativas no OpenAPI). */
+function segurancaDa(acesso: Acesso, bearer: string, apiKey: string) {
+  if (acesso.tipo === 'publica') return {};
+  if (acesso.tipo === 'publica_api_key') return { security: [{ [apiKey]: [] }] };
+  if (acesso.tipo === 'permissao' && acesso.apiKey)
+    return { security: [{ [bearer]: [] }, { [apiKey]: [] }] };
+  return { security: [{ [bearer]: [] }] };
+}
 
 export function gerarDocumento(app: INestApplication) {
   const registro = new OpenAPIRegistry();
@@ -147,6 +168,12 @@ export function gerarDocumento(app: INestApplication) {
     type: 'http',
     scheme: 'bearer',
     bearerFormat: 'JWT',
+  });
+  const apiKey = registro.registerComponent('securitySchemes', 'apiKey', {
+    type: 'apiKey',
+    in: 'header',
+    name: 'X-Api-Key',
+    description: 'API key (ebk_live_…), só nas rotas que a aceitam',
   });
   for (const { metodo, caminho, handler, contrato, marcas } of listarRotas(app)) {
     if (!contrato)
@@ -156,10 +183,13 @@ export function gerarDocumento(app: INestApplication) {
       throw new Error(
         `Rota sem marca de acesso única: ${metodo.toUpperCase()} ${caminho} (${handler})`,
       );
+    // O CORS da chave de navegador só existe sob /v1/publico/ (plano f3-5, decisão 9).
+    if (acesso.tipo === 'publica_api_key' && !caminho.startsWith(PREFIXO_ROTAS_PUBLICAS))
+      throw new Error(`@ApiKeyPublica fora de ${PREFIXO_ROTAS_PUBLICAS}: ${caminho} (${handler})`);
     const status = contrato.status ?? 200;
     const descricao = [contrato.descricao, descricaoDoAcesso(acesso)].filter(Boolean).join('\n\n');
     const idempotente =
-      (acesso.tipo === 'permissao' || acesso.tipo === 'conta') && metodo === 'post';
+      acesso.tipo !== 'publica' && acesso.tipo !== 'autenticado' && metodo === 'post';
     const erros = [
       ...new Set([...ERROS_DO_ACESSO[acesso.tipo], ...(idempotente ? ['409', '422'] : [])]),
     ];
@@ -170,7 +200,7 @@ export function gerarDocumento(app: INestApplication) {
       summary: contrato.resumo,
       ...(descricao ? { description: descricao } : {}),
       ...(contrato.tags ? { tags: contrato.tags } : {}),
-      ...(acesso.tipo === 'publica' ? {} : { security: [{ [bearer.name]: [] }] }),
+      ...segurancaDa(acesso, bearer.name, apiKey.name),
       request: {
         ...(cabecalhos ? { headers: cabecalhos } : {}),
         ...(contrato.params ? { params: contrato.params } : {}),

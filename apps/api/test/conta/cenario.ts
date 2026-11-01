@@ -23,9 +23,12 @@ export interface CenarioConta {
 }
 
 /** Nunca limita: os testes cadastram muitas contas do mesmo IP. */
-const semLimite: Limitador = { registrar: async () => 0 };
+const semLimite: Limitador = { registrar: async () => 0, consultar: async () => 0 };
 
-export async function criarCenarioConta(): Promise<CenarioConta> {
+/** Controllers extras (rotas só de teste) entram em todos os apps do cenário. */
+export async function criarCenarioConta(
+  controllers: Array<new (...args: never[]) => unknown> = [],
+): Promise<CenarioConta> {
   const banco = await criarBancoDeTeste();
   const migrador = new PrismaClient({ datasourceUrl: banco.urlAdmin });
   try {
@@ -37,6 +40,7 @@ export async function criarCenarioConta(): Promise<CenarioConta> {
   const apps: INestApplication[] = [];
   const criarApp = async (limitador: Limitador) => {
     const novo = await criarAppDeTeste({
+      controllers,
       config: {
         DATABASE_URL_AUTH: banco.urlDoPapel('ebisu_auth'),
         DATABASE_URL_APP: banco.urlDoPapel('ebisu_app'),

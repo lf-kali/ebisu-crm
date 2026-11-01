@@ -16,62 +16,104 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT"
+      },
+      "apiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Api-Key",
+        "description": "API key (ebk_live_…), só nas rotas que a aceitam"
       }
     },
     "schemas": {
-      "RespostaSessao": {
+      "ListaApiKeys": {
         "type": "object",
         "properties": {
-          "access_token": {
-            "type": "string",
-            "minLength": 1
-          },
-          "token_type": {
-            "type": "string",
-            "enum": [
-              "Bearer"
-            ]
-          },
-          "expira_em": {
-            "type": "integer",
-            "exclusiveMinimum": 0,
-            "description": "Validade do access token em segundos (900 = 15 min, D-T05)"
-          },
-          "conta": {
-            "type": "object",
-            "properties": {
-              "tenant_id": {
-                "$ref": "#/components/schemas/Uuid"
-              },
-              "nome": {
-                "type": "string"
-              },
-              "slug": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "tenant_id",
-              "nome",
-              "slug"
-            ],
-            "description": "Conta desta sessão"
-          },
-          "contas": {
+          "dados": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ResumoConta"
-            },
-            "minItems": 1,
-            "description": "Todas as contas ativas do usuário, incluindo a da sessão"
+              "$ref": "#/components/schemas/ApiKey"
+            }
+          },
+          "proximo_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
-          "access_token",
-          "token_type",
+          "dados",
+          "proximo_cursor"
+        ]
+      },
+      "ApiKey": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "tipo": {
+            "$ref": "#/components/schemas/TipoApiKey"
+          },
+          "prefixo": {
+            "type": "string",
+            "description": "Início da chave, para reconhecê-la",
+            "example": "ebk_live_Ab12Cd34"
+          },
+          "escopos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "origens_cors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expira_em": {
+            "$ref": "#/components/schemas/DataHora"
+          },
+          "revogada_em": {
+            "$ref": "#/components/schemas/DataHora"
+          },
+          "ultimo_uso": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Atualizado no máximo uma vez por minuto",
+            "example": "2026-10-27T14:00:00-03:00"
+          },
+          "criado_por": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Membro que criou a chave"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/DataHora"
+          }
+        },
+        "required": [
+          "id",
+          "nome",
+          "tipo",
+          "prefixo",
+          "escopos",
+          "origens_cors",
           "expira_em",
-          "conta",
-          "contas"
+          "revogada_em",
+          "ultimo_uso",
+          "criado_por",
+          "created_at"
         ]
       },
       "Uuid": {
@@ -79,25 +121,22 @@
         "format": "uuid",
         "description": "Identificador UUID"
       },
-      "ResumoConta": {
-        "type": "object",
-        "properties": {
-          "tenant_id": {
-            "$ref": "#/components/schemas/Uuid"
-          },
-          "nome": {
-            "type": "string"
-          },
-          "slug": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "tenant_id",
-          "nome",
-          "slug"
+      "TipoApiKey": {
+        "type": "string",
+        "enum": [
+          "SERVIDOR",
+          "NAVEGADOR"
         ],
-        "description": "Conta (tenant) da qual o usuário é membro ativo"
+        "description": "SERVIDOR: vale nas rotas que aceitam chave e é recusada vinda de navegador (com Origin). NAVEGADOR: vale só em /v1/publico/*, a partir das origens cadastradas, com o escopo lead.create"
+      },
+      "DataHora": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "format": "date-time",
+        "description": "ISO 8601 com fuso",
+        "example": "2026-10-27T14:00:00-03:00"
       },
       "Problema": {
         "type": "object",
@@ -185,6 +224,277 @@
           "code",
           "mensagem"
         ]
+      },
+      "ApiKeyCriada": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "tipo": {
+            "$ref": "#/components/schemas/TipoApiKey"
+          },
+          "prefixo": {
+            "type": "string",
+            "description": "Início da chave, para reconhecê-la",
+            "example": "ebk_live_Ab12Cd34"
+          },
+          "escopos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "origens_cors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expira_em": {
+            "$ref": "#/components/schemas/DataHora"
+          },
+          "revogada_em": {
+            "$ref": "#/components/schemas/DataHora"
+          },
+          "ultimo_uso": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Atualizado no máximo uma vez por minuto",
+            "example": "2026-10-27T14:00:00-03:00"
+          },
+          "criado_por": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Membro que criou a chave"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/DataHora"
+          },
+          "token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A chave completa, para o cabeçalho X-Api-Key. Só aparece aqui, uma vez; a repetição com a mesma Idempotency-Key devolve null"
+          }
+        },
+        "required": [
+          "id",
+          "nome",
+          "tipo",
+          "prefixo",
+          "escopos",
+          "origens_cors",
+          "expira_em",
+          "revogada_em",
+          "ultimo_uso",
+          "criado_por",
+          "created_at",
+          "token"
+        ]
+      },
+      "EntradaApiKey": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "tipo": {
+                "type": "string",
+                "enum": [
+                  "SERVIDOR"
+                ]
+              },
+              "nome": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "escopos": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z_]+\\.[a-z_]+$"
+                },
+                "minItems": 1,
+                "maxItems": 50,
+                "description": "Permissões do catálogo que quem cria tem na empresa; nunca config.*"
+              },
+              "expira_em": {
+                "$ref": "#/components/schemas/DataHora"
+              }
+            },
+            "required": [
+              "tipo",
+              "nome",
+              "escopos"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "tipo": {
+                "type": "string",
+                "enum": [
+                  "NAVEGADOR"
+                ]
+              },
+              "nome": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "escopos": {
+                "type": "array",
+                "prefixItems": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "lead.create"
+                    ]
+                  }
+                ],
+                "default": [
+                  "lead.create"
+                ]
+              },
+              "origens_cors": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/OrigemCors"
+                },
+                "minItems": 1,
+                "maxItems": 10
+              },
+              "expira_em": {
+                "$ref": "#/components/schemas/DataHora"
+              }
+            },
+            "required": [
+              "tipo",
+              "nome",
+              "origens_cors"
+            ]
+          }
+        ]
+      },
+      "OrigemCors": {
+        "type": "string",
+        "maxLength": 253,
+        "example": "https://www.assistencia.com.br"
+      },
+      "EdicaoApiKey": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "escopos": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z_]+\\.[a-z_]+$"
+            },
+            "minItems": 1,
+            "maxItems": 50,
+            "description": "Só na chave de servidor"
+          },
+          "origens_cors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrigemCors"
+            },
+            "minItems": 1,
+            "maxItems": 10,
+            "description": "Só na chave de navegador"
+          }
+        }
+      },
+      "RespostaSessao": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "minLength": 1
+          },
+          "token_type": {
+            "type": "string",
+            "enum": [
+              "Bearer"
+            ]
+          },
+          "expira_em": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Validade do access token em segundos (900 = 15 min, D-T05)"
+          },
+          "conta": {
+            "type": "object",
+            "properties": {
+              "tenant_id": {
+                "$ref": "#/components/schemas/Uuid"
+              },
+              "nome": {
+                "type": "string"
+              },
+              "slug": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "tenant_id",
+              "nome",
+              "slug"
+            ],
+            "description": "Conta desta sessão"
+          },
+          "contas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResumoConta"
+            },
+            "minItems": 1,
+            "description": "Todas as contas ativas do usuário, incluindo a da sessão"
+          }
+        },
+        "required": [
+          "access_token",
+          "token_type",
+          "expira_em",
+          "conta",
+          "contas"
+        ]
+      },
+      "ResumoConta": {
+        "type": "object",
+        "properties": {
+          "tenant_id": {
+            "$ref": "#/components/schemas/Uuid"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "nome",
+          "slug"
+        ],
+        "description": "Conta (tenant) da qual o usuário é membro ativo"
       },
       "EntradaAceite": {
         "type": "object",
@@ -409,12 +719,6 @@
           "ativo",
           "created_at"
         ]
-      },
-      "DataHora": {
-        "type": "string",
-        "format": "date-time",
-        "description": "ISO 8601 com fuso",
-        "example": "2026-10-27T14:00:00-03:00"
       },
       "EntradaEmpresa": {
         "type": "object",
@@ -966,6 +1270,475 @@
     "parameters": {}
   },
   "paths": {
+    "/v1/api-keys": {
+      "get": {
+        "summary": "Lista as API keys da empresa, revogadas incluídas",
+        "description": "Permissão: `config.api_keys`.",
+        "tags": [
+          "api-keys"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Empresa em que a operação acontece"
+            },
+            "required": true,
+            "description": "Empresa em que a operação acontece",
+            "name": "X-Empresa-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaApiKeys"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Cria uma API key",
+        "description": "O token (campo `token`) só aparece nesta resposta. Repetir com a mesma Idempotency-Key devolve a chave com `token: null`: quem perdeu o token revoga a chave e cria outra. Escopos: permissões que você tem nesta empresa, nunca config.*.\n\nPermissão: `config.api_keys`.",
+        "tags": [
+          "api-keys"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Empresa em que a operação acontece"
+            },
+            "required": true,
+            "description": "Empresa em que a operação acontece",
+            "name": "X-Empresa-Id",
+            "in": "header"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Repetir com a mesma chave devolve a mesma resposta (validade de 24 h)"
+            },
+            "required": true,
+            "description": "Repetir com a mesma chave devolve a mesma resposta (validade de 24 h)",
+            "name": "Idempotency-Key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntradaApiKey"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeyCriada"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/api-keys/{id}": {
+      "delete": {
+        "summary": "Revoga uma API key",
+        "description": "A chave para de valer na hora e continua na lista, com `revogada_em`.\n\nPermissão: `config.api_keys`.",
+        "tags": [
+          "api-keys"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "description": "Identificador UUID",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Empresa em que a operação acontece"
+            },
+            "required": true,
+            "description": "Empresa em que a operação acontece",
+            "name": "X-Empresa-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Sucesso, sem conteúdo"
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Lê uma API key",
+        "description": "Permissão: `config.api_keys`.",
+        "tags": [
+          "api-keys"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "description": "Identificador UUID",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Empresa em que a operação acontece"
+            },
+            "required": true,
+            "description": "Empresa em que a operação acontece",
+            "name": "X-Empresa-Id",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKey"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Edita uma API key",
+        "description": "O tipo não muda. Chave revogada não pode ser editada (409 transicao_invalida).\n\nPermissão: `config.api_keys`.",
+        "tags": [
+          "api-keys"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Uuid"
+            },
+            "required": true,
+            "description": "Identificador UUID",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Empresa em que a operação acontece"
+            },
+            "required": true,
+            "description": "Empresa em que a operação acontece",
+            "name": "X-Empresa-Id",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EdicaoApiKey"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKey"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Erro no formato RFC 9457",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/auth/convites/aceitar": {
       "post": {
         "summary": "Aceita um convite e entra na conta",

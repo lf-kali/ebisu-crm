@@ -20,6 +20,7 @@ import { ErroDominio } from '../erros/erro-dominio.js';
 import { idempotenciaDa } from '../idempotencia/idempotencia.js';
 import { requestIdDa } from '../requisicao/request-id.js';
 import type { ContextoDaConta, ContextoDaRequisicao } from '../tx/contexto.js';
+import { type AcessoPorChave, CABECALHO_API_KEY, ChavesApi } from './chaves-api.js';
 import { type Acesso, marcasDe } from './marcas.js';
 import { permissoesPorEmpresa } from './permissoes.js';
 
@@ -30,6 +31,7 @@ import { permissoesPorEmpresa } from './permissoes.js';
 export const CABECALHO_EMPRESA = 'x-empresa-id';
 
 export interface RequisicaoAutenticada extends Request {
+  /** Quem entrou com Bearer (não existe quando a rota foi autenticada por API key). */
   identidade: Identidade;
   contexto?: ContextoDaRequisicao | ContextoDaConta;
 }
@@ -43,7 +45,7 @@ function acessoDa(contexto: ExecutionContext): Acesso {
   if (marcas.length !== 1 || !acesso) {
     throw new Error(
       `Rota precisa de exatamente uma marca de acesso ` +
-        `(@Publica, @SoAutenticado, @Permissao ou @PermissaoNaConta): ` +
+        `(@Publica, @SoAutenticado, @Permissao, @PermissaoNaConta ou @ApiKeyPublica): ` +
         `${contexto.getClass().name}.${contexto.getHandler().name} tem ${marcas.length}`,
     );
   }
@@ -63,12 +65,23 @@ function empresaDoCabecalho(req: Request): string {
   });
 }
 
+/**
+ * A rota autentica por API key (plano f3-5, decisão 1): a pública da chave de navegador sempre; a
+ * de domínio só se aceita chave e a requisição trouxe `X-Api-Key`. Nas demais, o cabeçalho é
+ * ignorado e vale o Bearer.
+ */
+function porChave(acesso: Acesso, req: Request): boolean {
+  if (acesso.tipo === 'publica_api_key') return true;
+  return acesso.tipo === 'permissao' && acesso.apiKey && req.get(CABECALHO_API_KEY) !== undefined;
+}
+
 @Injectable()
 export class GuardaContexto implements CanActivate {
   constructor(
     @Inject(TOKENS_DE_ACESSO) private readonly tokens: TokensDeAcesso,
     @Inject(PRISMA_AUTH) private readonly auth: PrismaClient,
     @Inject(PRISMA_APP) private readonly app: PrismaClient,
+    private readonly chaves: ChavesApi,
   ) {}
 
   async canActivate(contexto: ExecutionContext): Promise<boolean> {
@@ -76,6 +89,16 @@ export class GuardaContexto implements CanActivate {
     if (acesso.tipo === 'publica') return true;
 
     const req = contexto.switchToHttp().getRequest<RequisicaoAutenticada>();
+    if (porChave(acesso, req)) {
+      const res = contexto.switchToHttp().getResponse<Response>();
+      req.contexto = await this.chaves.autenticar(
+        req,
+        res,
+        acesso as AcessoPorChave,
+        requestIdDa(res) ?? randomUUID(),
+      );
+      return true;
+    }
     const [tipo, token] = (req.headers.authorization ?? '').split(' ');
     const identidade = tipo === 'Bearer' && token ? await this.tokens.verificar(token) : null;
     if (!identidade) throw naoAutenticado();

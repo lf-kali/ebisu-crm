@@ -274,23 +274,30 @@ model AtribuicaoPapel {
 
 /// Chaves para integrações máquina-a-máquina (formulários do site, n8n…).
 model ApiKey {
-  id           String    @id @default(uuid(7)) @db.Uuid
-  tenant_id    String    @db.Uuid
-  empresa_id   String    @db.Uuid
+  id           String     @id @default(uuid(7)) @db.Uuid
+  tenant_id    String     @db.Uuid
+  empresa_id   String     @db.Uuid
   nome         String
-  prefixo      String    @unique /// exibido: ebk_live_ab12…
+  prefixo      String     @unique /// exibido: ebk_live_ab12…
   hash         String
-  escopos      String[] /// ex.: ["lead.create", "lead.update"]
-  origens_cors String[] /// domínios autorizados a usar /public/*
+  tipo         TipoApiKey
+  escopos      String[]   @default([]) /// ex.: ["lead.create", "lead.update"]
+  origens_cors String[]   @default([]) /// origens autorizadas (só NAVEGADOR) a usar /v1/publico/*
   ultimo_uso   DateTime?
   expira_em    DateTime?
   revogada_em  DateTime?
-  criado_por   String?   @db.Uuid
-  created_at   DateTime  @default(now())
+  criado_por   String?    @db.Uuid
+  created_at   DateTime   @default(now())
 
   empresa Empresa @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
 
   @@map("api_key")
+}
+
+/// SERVIDOR: rotas marcadas, sem Origin. NAVEGADOR: só /v1/publico/*, com Origin cadastrado.
+enum TipoApiKey {
+  SERVIDOR
+  NAVEGADOR
 }
 
 enum TipoDocumentoSequencia {
