@@ -18,6 +18,7 @@ let banco: BancoDeTeste;
 let admin: Awaited<ReturnType<BancoDeTeste['conectar']>>;
 let db: PrismaClient;
 const tenant = randomUUID();
+const outraConta = randomUUID();
 
 beforeAll(async () => {
   banco = await criarBancoDeTeste();
@@ -26,6 +27,10 @@ beforeAll(async () => {
   await admin.query(
     `INSERT INTO tenant (id, nome, slug, updated_at) VALUES ($1, 'Oficina Teste', 'oficina', now())`,
     [tenant],
+  );
+  await admin.query(
+    `INSERT INTO tenant (id, nome, slug, updated_at) VALUES ($1, 'Loja Vizinha', 'vizinha', now())`,
+    [outraConta],
   );
 }, 180_000);
 
@@ -41,18 +46,18 @@ beforeEach(async () => {
 });
 
 /** Convite pendente com um e-mail no outbox; devolve os ids. */
-async function convite(email = `pessoa.${randomUUID().slice(0, 8)}@teste.local`) {
+async function convite(email = `pessoa.${randomUUID().slice(0, 8)}@teste.local`, conta = tenant) {
   const conviteId = randomUUID();
   const emailId = randomUUID();
   await admin.query(
     `INSERT INTO convite (id, tenant_id, email, atribuicoes, expira_em, updated_at)
      VALUES ($1, $2, $3, '[]', now() + interval '7 days', now())`,
-    [conviteId, tenant, email],
+    [conviteId, conta, email],
   );
   await admin.query(
     `INSERT INTO email_saida (id, tenant_id, tipo, convite_id, updated_at)
      VALUES ($1, $2, 'CONVITE', $3, now())`,
-    [emailId, tenant, conviteId],
+    [emailId, conta, conviteId],
   );
   return { conviteId, emailId, email };
 }
@@ -101,6 +106,30 @@ describe('envio do outbox', () => {
     const enviado = await linha(emailId);
     expect(enviado).toMatchObject({ status: 'ENVIADO', tentativas: 1, erro: null });
     expect(JSON.stringify(enviado)).not.toContain(token);
+  });
+
+  it('duas contas no mesmo lote: cada token e cada nome vão para o convite da sua conta', async () => {
+    const daConta = await convite('a@teste.local');
+    const daVizinha = await convite('b@teste.local', outraConta);
+    const { remetente, enviados } = remetenteFalso();
+    expect(await processarEmails(db, remetente, { webUrl: WEB_URL })).toBe(2);
+
+    const para = (email: string) => enviados.find((m) => m.para === email)!;
+    expect(para('a@teste.local').assunto).toContain('Oficina Teste');
+    expect(para('b@teste.local').assunto).toContain('Loja Vizinha');
+    const { rows } = await admin.query(
+      `SELECT id, tenant_id, token_hash FROM convite WHERE id = ANY($1::uuid[])`,
+      [[daConta.conviteId, daVizinha.conviteId]],
+    );
+    const hash = (id: string) => rows.find((r) => r.id === id)!;
+    expect(hash(daConta.conviteId)).toMatchObject({
+      tenant_id: tenant,
+      token_hash: hashDoTokenConvite(tokenDo(para('a@teste.local'))),
+    });
+    expect(hash(daVizinha.conviteId)).toMatchObject({
+      tenant_id: outraConta,
+      token_hash: hashDoTokenConvite(tokenDo(para('b@teste.local'))),
+    });
   });
 
   it('nada a enviar: não chama o remetente', async () => {
