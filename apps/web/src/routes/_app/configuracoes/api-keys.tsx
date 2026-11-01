@@ -341,7 +341,7 @@ function DialogoToken({
   token: string | null;
   aoFechar: () => void;
 }) {
-  const [copiado, setCopiado] = useState(false);
+  const [copia, setCopia] = useState<'ok' | 'falhou' | null>(null);
   const id = useId();
   return (
     <Dialog open onOpenChange={(aberto) => (aberto ? null : aoFechar())}>
@@ -368,17 +368,20 @@ function DialogoToken({
                 type="button"
                 variant="outline"
                 onClick={() =>
-                  void navigator.clipboard
-                    ?.writeText(token)
-                    .then(() => setCopiado(true))
-                    .catch(() => setCopiado(false))
+                  void Promise.resolve(navigator.clipboard?.writeText(token))
+                    .then(() => setCopia(navigator.clipboard ? 'ok' : 'falhou'))
+                    .catch(() => setCopia('falhou'))
                 }
               >
                 Copiar
               </Button>
             </div>
             <p role="status" className="text-sm text-muted-foreground">
-              {copiado ? 'Copiada.' : ''}
+              {copia === 'ok'
+                ? 'Copiada.'
+                : copia === 'falhou'
+                  ? 'Não foi possível copiar. Selecione o campo e copie à mão.'
+                  : ''}
             </p>
           </div>
         ) : (

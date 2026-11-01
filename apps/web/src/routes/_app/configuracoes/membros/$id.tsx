@@ -26,6 +26,11 @@ export const Route = createFileRoute('/_app/configuracoes/membros/$id')({
 });
 
 const SECAO = { permissao: 'config.membros', daConta: true } as const;
+const SITUACAO: Record<TipoMembro['status'], string> = {
+  ATIVO: 'Ativo',
+  SUSPENSO: 'Suspenso',
+  CONVIDADO: 'Convidado',
+};
 
 function PaginaMembro() {
   return (
@@ -57,9 +62,7 @@ function ConteudoMembro() {
         descricao={usuario.email}
         voltar={voltar}
         acoes={
-          <Badge variant={status === 'ATIVO' ? 'secondary' : 'outline'}>
-            {status === 'ATIVO' ? 'Ativo' : 'Suspenso'}
-          </Badge>
+          <Badge variant={status === 'ATIVO' ? 'secondary' : 'outline'}>{SITUACAO[status]}</Badge>
         }
       />
       <div className="flex max-w-2xl flex-col gap-8">
@@ -142,6 +145,8 @@ function Situacao({ membro }: { membro: TipoMembro }) {
   });
   // Ninguém muda a própria situação (a API recusa; a tela nem oferece).
   if (eu?.membro.id === membro.id) return null;
+  // Convidado ainda não entrou: não há acesso para suspender (a API recusaria com 409).
+  if (membro.status === 'CONVIDADO') return null;
   const suspenso = membro.status === 'SUSPENSO';
   return (
     <section aria-labelledby="titulo-situacao" className="flex flex-col gap-3">

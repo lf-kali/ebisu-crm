@@ -2,7 +2,7 @@ import { criarProblema, ROTAS_EMPRESAS } from '@ebisu/contracts';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { CONTAS, USUARIOS } from '../simulacao/dados';
 import { podeVerSecao, SECOES } from './secoes';
 import { renderizarApp } from '../teste/app';
@@ -219,6 +219,18 @@ describe('página do membro', () => {
     });
   });
 
+  it('membro convidado aparece como Convidado, sem botão de suspender', async () => {
+    const bruno = simulada.configuracoes
+      .conta(CONTAS.ebisu.tenant_id)
+      .membros.find((m) => m.id === idDe('bruno@demo.test'))!;
+    bruno.status = 'CONVIDADO';
+    renderizarApp(`/configuracoes/membros/${bruno.id}`);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Bruno Lima' })).toBeTruthy();
+    expect(screen.getByText('Convidado')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Suspender' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reativar' })).toBeNull();
+  });
+
   it('na própria página não há botão de suspender; tirar o próprio dono mostra a regra da API', async () => {
     renderizarApp(`/configuracoes/membros/${idDe('ana@demo.test')}`);
     expect(await screen.findByRole('heading', { level: 1, name: 'Ana Souza' })).toBeTruthy();
@@ -304,6 +316,38 @@ describe('API keys', () => {
     const janela = await dialogo();
     await u.type(within(janela).getByLabelText('Nome'), 'x');
     await u.click(within(janela).getByRole('button', { name: 'Criar chave' }));
-    expect(await within(janela).findByRole('alert')).toBeTruthy();
+    // O 422 da API vem sem detail: a tela mostra a mensagem do campo, não só "campos inválidos".
+    expect((await within(janela).findByRole('alert')).textContent).toBe('Escopo não permitido');
+  });
+
+  it('origem de site inválida: a mensagem do campo aparece no diálogo', async () => {
+    renderizarApp('/configuracoes/api-keys');
+    const u = usuario();
+    await u.click(await screen.findByRole('button', { name: 'Nova chave' }));
+    const janela = await dialogo();
+    await u.selectOptions(within(janela).getByLabelText('Tipo'), 'NAVEGADOR');
+    await u.type(within(janela).getByLabelText('Nome'), 'Site');
+    await u.type(
+      within(janela).getByLabelText('Endereços do site (um por linha)'),
+      'http://exemplo.com',
+    );
+    await u.click(within(janela).getByRole('button', { name: 'Criar chave' }));
+    expect((await within(janela).findByRole('alert')).textContent).toMatch(/Origem inválida/);
+  });
+
+  it('copiar o token avisa quando dá certo e quando falha', async () => {
+    renderizarApp('/configuracoes/api-keys');
+    const u = usuario();
+    await u.click(await screen.findByRole('button', { name: 'Nova chave' }));
+    const janela = await dialogo();
+    await u.type(within(janela).getByLabelText('Nome'), 'copia');
+    await u.click(within(janela).getByRole('checkbox', { name: 'contato.read' }));
+    await u.click(within(janela).getByRole('button', { name: 'Criar chave' }));
+    await u.click(await screen.findByRole('button', { name: 'Copiar' }));
+    expect(await screen.findByText('Copiada.')).toBeTruthy();
+    vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValueOnce(new Error('negado'));
+    await u.click(screen.getByRole('button', { name: 'Copiar' }));
+    expect(await screen.findByText(/Não foi possível copiar/)).toBeTruthy();
+    expect(screen.queryByText('Copiada.')).toBeNull();
   });
 });

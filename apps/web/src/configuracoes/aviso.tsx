@@ -5,17 +5,31 @@ import { ErroDaApi } from '../componentes/erro-da-api';
 
 /**
  * Erro de uma ação (salvar, revogar, convidar): o `detail` da API quando há (é a regra que a
- * pessoa precisa ler, ex.: "a conta precisa de um dono ativo"), senão o título do catálogo.
+ * pessoa precisa ler, ex.: "a conta precisa de um dono ativo"); num 422 sem `detail`, as mensagens
+ * dos campos (ex.: "Origem inválida…"), que dizem o que corrigir; senão o título do catálogo.
  */
 export function AvisoDeErro({ erro }: { erro: unknown }) {
   if (!erro) return null;
   if (erro instanceof ErroApi && erro.status === 429) return <LimiteExcedido erro={erro} />;
-  if (erro instanceof ErroApi && erro.status >= 400 && erro.status < 500)
+  if (erro instanceof ErroApi && erro.status >= 400 && erro.status < 500) {
+    const { detail, title, campos = [] } = erro.problema;
+    const mensagens = [...new Set(campos.map((c) => c.mensagem))];
     return (
       <Alert variant="destructive">
-        <AlertDescription>{erro.problema.detail ?? erro.problema.title}</AlertDescription>
+        <AlertDescription>
+          {detail ?? (mensagens.length ? null : title)}
+          {!detail && mensagens.length === 1 ? mensagens[0] : null}
+          {!detail && mensagens.length > 1 ? (
+            <ul className="list-disc pl-4">
+              {mensagens.map((mensagem) => (
+                <li key={mensagem}>{mensagem}</li>
+              ))}
+            </ul>
+          ) : null}
+        </AlertDescription>
       </Alert>
     );
+  }
   return <ErroDaApi erro={erro} />;
 }
 
