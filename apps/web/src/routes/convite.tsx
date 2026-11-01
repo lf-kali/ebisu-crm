@@ -53,9 +53,16 @@ function Convite() {
     enabled: token !== null,
     retry: false,
     gcTime: 0,
+    // Uma consulta só: refazê-la gastaria o limite por IP e, se falhasse, levaria o formulário
+    // preenchido (o token só existe em memória; não há como abrir de novo sem o e-mail).
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   if (!token) return <SemConvite titulo="Abra de novo o link do e-mail" />;
+  // Já consultado: um erro posterior (ex.: refetch forçado) não troca o formulário pelo erro.
+  if (consulta.data) return <Aceite token={token} convite={consulta.data} />;
   if (consulta.isPending)
     return (
       <TelaDeEntrada titulo="Convite">
@@ -69,7 +76,7 @@ function Convite() {
         <ErroDaApi erro={consulta.error} />
       </TelaDeEntrada>
     );
-  return <Aceite token={token} convite={consulta.data} />;
+  return null;
 }
 
 function SemConvite({ titulo }: { titulo: string }) {
