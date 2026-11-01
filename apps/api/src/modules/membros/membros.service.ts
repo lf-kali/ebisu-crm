@@ -4,6 +4,7 @@ import type {
   EntradaAtribuicoes,
   EntradaConvite,
   ListaMembros,
+  ListaOpcoesResponsavel,
   Membro,
   ParametrosPaginacao,
 } from '@ebisu/contracts';
@@ -11,7 +12,11 @@ import type { PrismaClient } from '@ebisu/db';
 import { PRISMA_AUTH } from '../../core/banco/banco.module.js';
 import { ErroDominio } from '../../core/erros/erro-dominio.js';
 import { LIMITADOR, type Limitador } from '../../core/limite/limitador.js';
-import type { ContextoDaConta, TxContextDaConta } from '../../core/tx/contexto.js';
+import type {
+  ContextoDaConta,
+  ContextoDaRequisicao,
+  TxContextDaConta,
+} from '../../core/tx/contexto.js';
 import { ExecutorDeComandos } from '../../core/tx/executar.js';
 import * as convites from './convites.comandos.js';
 import * as comandos from './membros.comandos.js';
@@ -164,6 +169,20 @@ export class MembrosService {
 
   revogarConvite(ctx: ContextoDaConta, id: string) {
     return this.executor.executarComando(ctx, convites.revogar, id);
+  }
+
+  /** Só id e nome, em ordem de nome (decisão 6 do plano f4-web-1-contatos). */
+  async opcoes(ctx: ContextoDaRequisicao): Promise<ListaOpcoesResponsavel> {
+    const membros = await this.executor.executarComando(ctx, comandos.opcoes, undefined);
+    const usuarios = await dadosDosUsuarios(
+      this.auth,
+      membros.map((m) => m.usuario_id),
+    );
+    const dados = membros.flatMap(({ id, usuario_id }) => {
+      const usuario = usuarios.get(usuario_id);
+      return usuario ? [{ id, nome: usuario.nome }] : [];
+    });
+    return { dados: dados.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')) };
   }
 
   async papeis(ctx: ContextoDaConta) {

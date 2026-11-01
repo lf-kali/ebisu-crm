@@ -155,13 +155,24 @@ Telas de **Configurações** (`/configuracoes`): índice com um cartão por seç
 seção, o cabeçalho com o link de volta, o título e as ações à direita. Seção sem permissão mostra o
 estado vazio "Sem acesso a esta seção" (a API nega de qualquer jeito).
 
+Telas de **Contatos** (`/contatos`): a lista tem busca (espera 300 ms, ao menos 2 caracteres) e
+filtros de origem, responsável e ciclo de vida numa grade acima da tabela, todos guardados na URL;
+o nome é o link para a ficha. O formulário (`/contatos/novo` e `/contatos/$id/editar`) agrupa os
+campos em `fieldset` com `legend` (identificação, meios de contato, endereço, atendimento), em duas
+colunas a partir de `sm`. O 409 de duplicado marca o campo e mostra um `Alert` com o link "Abrir
+contato existente" quando a API dá o id. A ficha usa uma lista de definição (`dl`) para os dados e,
+nos consentimentos, uma tabela canal × finalidade com o selo "Concedido" (`secondary`), "Revogado"
+(`outline`) ou "Sem registro", e o histórico abaixo. Telefones do Brasil aparecem como
+`(11) 98765-4321`.
+
 ## Acessibilidade
 
 - Meta: Lighthouse acessibilidade ≥ 90 nas páginas base (spec §4 F12). Medido em 2026-10-28
   (Lighthouse 13.5.0, celular e desktop): login, escolha de conta, Painel, Contatos, Bancada e
   Estoque com 100. Em 2026-10-31 (Lighthouse 12.8.2, celular e desktop): cadastro e aceite do
   convite (estado sem token) com 100. Em 2026-11-01 (Lighthouse 12.8.2, celular e desktop, logado):
-  Configurações, Empresas, Membros e convites e API keys com 100.
+  Configurações, Empresas, Membros e convites e API keys com 100. No mesmo dia e com a mesma
+  versão: lista de contatos, novo contato e ficha do contato com 100.
 - Testes de componente rodam o axe-core (`apps/web/src/teste/axe.ts`); contraste não é avaliável
   no jsdom, por isso a tabela acima.
 - Foco sempre visível (`ring` do `primary`). Ícones decorativos com `aria-hidden`; botão só com

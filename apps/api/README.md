@@ -139,6 +139,11 @@ fecham a corrida. Campos derivados (ciclo de vida, scores, completude) são recu
 busca `?q=` usa `nome_busca` (sem acento, gravado pelo repositório a partir do nome), o e-mail e os
 dígitos do telefone. Consentimentos só são acrescentados; revogar é um registro novo.
 
+`GET /v1/membros/opcoes` (com `X-Empresa-Id` e `contato.read`) devolve os responsáveis possíveis
+para os selects das telas: só `id` e `nome` dos membros ativos com acesso à empresa, em ordem de
+nome e até 500. Quem não administra membros (`config.membros`) escolhe o responsável por ela, sem
+ver e-mail, cargo nem papéis.
+
 ## Sequência de documentos
 
 `proximoNumero(ctx, tipo)` (`core/sequencias`) devolve o número do orçamento (`ORC-2610-0001`), da

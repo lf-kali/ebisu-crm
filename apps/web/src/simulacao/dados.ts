@@ -21,6 +21,7 @@ const TODAS: EmpresaDoMembro['permissoes'] = Object.fromEntries(
 /** A dona da demonstração também administra a conta (Configurações, F3). */
 const DONO: EmpresaDoMembro['permissoes'] = {
   ...TODAS,
+  'contato.delete': 'TENANT',
   'config.empresa': 'TENANT',
   'config.membros': 'TENANT',
   'config.rbac': 'TENANT',

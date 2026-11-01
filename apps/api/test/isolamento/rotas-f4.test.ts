@@ -1,16 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { RespostaEu } from '@ebisu/contracts';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect } from 'vitest';
-import { type CenarioConta, contaNova, criarCenarioConta } from '../conta/cenario.js';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { type CenarioConta, contaNova, criarCenarioConta, novoMembro } from '../conta/cenario.js';
 import { type PedidoNaEmpresa, testarIsolamento } from './suite.js';
 
 // Isolamento das rotas da F4 (plano docs/planos/f4-1-contatos.md, decisão 8): contatos, origens e
-// motivos de perda na matriz por empresa. Conta X (empresas x1 e x2) e conta Y (y1); quem age é o
+// motivos de perda na matriz por empresa, mais as opções de responsável (plano
+// docs/planos/f4-web-1-contatos.md, decisão 6). Conta X (empresas x1 e x2) e conta Y (y1); quem age é o
 // dono de X. Os ids só existem depois do beforeAll: a matriz lê os campos na hora do teste.
 
 let c: CenarioConta;
-const x = { token: '', x1: '', x2: '' };
+const x = { token: '', tenantId: '', x1: '', x2: '', donoY: '' };
 const contatos = { a1: '', a2: '', b1: '' };
 const origens = { a1: '', a2: '', b1: '' };
 const motivos = { a1: '', a2: '', b1: '' };
@@ -37,9 +38,9 @@ async function criado(r: request.Test): Promise<string> {
 }
 
 async function conta(nome: string) {
-  const { token } = await contaNova(c.app, { conta: { nome } });
+  const { token, tenantId } = await contaNova(c.app, { conta: { nome } });
   const eu = RespostaEu.parse((await pedir(token, 'get', '/v1/eu')).body);
-  return { token, empresaId: eu.empresas[0]!.id };
+  return { token, tenantId, empresaId: eu.empresas[0]!.id, membroId: eu.membro.id };
 }
 
 /** Um contato, uma origem e um motivo na empresa dada. */
@@ -70,7 +71,13 @@ beforeAll(async () => {
       nome_fantasia: 'X Filial',
     }),
   );
-  Object.assign(x, { token: dx.token, x1: dx.empresaId, x2 });
+  Object.assign(x, {
+    token: dx.token,
+    tenantId: dx.tenantId,
+    x1: dx.empresaId,
+    x2,
+    donoY: dy.membroId,
+  });
   const [a1, a2, b1] = [
     await semear(dx.token, dx.empresaId, 'a1'),
     await semear(dx.token, x2, 'a2'),
@@ -114,5 +121,27 @@ describe('motivos de perda (por empresa)', () => {
     ids: motivos,
     edicao: { nome: 'Invadido' },
     linha: (id) => linha(`SELECT empresa_id, nome, ativo FROM motivo_perda WHERE id = $1`, id),
+  });
+});
+
+describe('opções de responsável (por empresa)', () => {
+  const opcoes = async (empresa: string) => {
+    const r = await pedir(x.token, 'get', '/v1/membros/opcoes', empresa);
+    expect(r.status).toBe(200);
+    return (r.body as { dados: Array<{ id: string }> }).dados.map((o) => o.id);
+  };
+
+  it('quem só tem acesso a outra empresa não aparece; membro de outra conta nunca', async () => {
+    const soX2 = await novoMembro(c, x.tenantId, { 'contato.read': 'EMPRESA' }, x.x2);
+    expect(await opcoes(x.x2)).toContain(soX2.membroId);
+    expect(await opcoes(x.x1)).not.toContain(soX2.membroId);
+    expect(await opcoes(x.x1)).not.toContain(x.donoY);
+  });
+
+  it('empresa de outra conta no cabeçalho: sem acesso', async () => {
+    const outra = (await c.sql(`SELECT empresa_id FROM contato WHERE id = $1`, [contatos.b1]))
+      .rows[0]!.empresa_id as string;
+    const r = await pedir(x.token, 'get', '/v1/membros/opcoes', outra);
+    expect(r.status).toBe(403);
   });
 });

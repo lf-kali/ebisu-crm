@@ -50,8 +50,9 @@ describe('rotas dos módulos', () => {
     async (caminho, rotulo) => {
       renderizarApp(caminho);
       expect(await screen.findByRole('heading', { level: 1, name: rotulo })).toBeTruthy();
-      // Configurações já tem tela (F3); os demais módulos chegam com as frentes seguintes.
-      if (caminho !== '/configuracoes') expect(screen.getByText('Em construção')).toBeTruthy();
+      // Configurações (F3) e Contatos (F4) já têm tela; os demais chegam com as frentes seguintes.
+      if (!['/configuracoes', '/contatos'].includes(caminho))
+        expect(screen.getByText('Em construção')).toBeTruthy();
     },
   );
 
