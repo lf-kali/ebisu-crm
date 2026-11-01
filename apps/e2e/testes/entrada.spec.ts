@@ -1,11 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { expect, type Page, test } from '@playwright/test';
-import { URL_API } from '../ambiente';
 import { esperarEmail, linkDoConvite } from '../mailpit';
 
-// Caminho feliz da entrada pública (plano docs/planos/f3-web-1-cadastro-convite.md): cadastrar
-// pela UI, convidar (pela API, até as telas de Configurações), receber o e-mail no Mailpit e
-// aceitar pelo link.
+// Caminhos felizes da F3 pela UI (planos docs/planos/f3-web-1-cadastro-convite.md e
+// f3-web-2-configuracoes.md): cadastrar, convidar pela tela de membros, receber o e-mail no Mailpit
+// e aceitar pelo link; criar uma API key, ver o token uma vez e revogá-la.
 
 const SENHA = 'cavalo-bateria-grampo-42';
 const sufixo = randomUUID().slice(0, 8);
@@ -25,44 +24,22 @@ async function cadastrar(page: Page) {
   await expect(page.getByRole('heading', { name: 'Painel' })).toBeVisible();
 }
 
-/** Convida pela API, como o dono (login próprio, sem mexer na sessão do navegador). */
-async function convidar(email: string) {
-  const json = async <T>(resposta: Response): Promise<T> => {
-    if (!resposta.ok) throw new Error(`${resposta.status}: ${await resposta.text()}`);
-    return (await resposta.json()) as T;
-  };
-  const sessao = await json<{ access_token: string }>(
-    await fetch(`${URL_API}/v1/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: dono.email, senha: SENHA }),
-    }),
-  );
-  const auth = { Authorization: `Bearer ${sessao.access_token}` };
-  const eu = await json<{ empresas: Array<{ id: string }> }>(
-    await fetch(`${URL_API}/v1/eu`, { headers: auth }),
-  );
-  const papeis = await json<{ dados: Array<{ id: string; chave: string }> }>(
-    await fetch(`${URL_API}/v1/papeis`, { headers: auth }),
-  );
-  const atendente = papeis.dados.find((p) => p.chave === 'ATENDENTE')!;
-  await json(
-    await fetch(`${URL_API}/v1/membros/convites`, {
-      method: 'POST',
-      headers: { ...auth, 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
-      body: JSON.stringify({
-        email,
-        atribuicoes: [{ papel_id: atendente.id, empresa_id: eu.empresas[0]!.id }],
-      }),
-    }),
-  );
+/** Convida pela tela de membros, como o dono. */
+async function convidar(page: Page, email: string) {
+  await page.getByRole('link', { name: 'Configurações' }).click();
+  await page.getByRole('link', { name: /Membros e convites/ }).click();
+  await page.getByRole('button', { name: 'Convidar' }).click();
+  const janela = page.getByRole('dialog');
+  await janela.getByLabel('E-mail').fill(email);
+  await janela.getByRole('button', { name: 'Enviar convite' }).click();
+  await expect(page.getByRole('cell', { name: email, exact: true })).toBeVisible();
 }
 
 test('cadastrar, convidar e aceitar o convite pelo link do e-mail', async ({ page, browser }) => {
   await cadastrar(page);
   await expect(page.getByRole('button', { name: new RegExp(dono.nome) })).toBeVisible();
 
-  await convidar(convidado.email);
+  await convidar(page, convidado.email);
   const link = linkDoConvite(await esperarEmail(convidado.email));
 
   // Outra pessoa, outro navegador: sem nada da sessão do dono.
@@ -84,4 +61,28 @@ test('cadastrar, convidar e aceitar o convite pelo link do e-mail', async ({ pag
   await repetido.goto(link);
   await expect(repetido.getByText('Este convite não vale mais')).toBeVisible();
   await depois.close();
+});
+
+test('criar uma API key de servidor, ver o token uma vez e revogar', async ({ page }) => {
+  dono.email = `marina.chave.${sufixo}@e2e.test`;
+  await cadastrar(page);
+  await page.getByRole('link', { name: 'Configurações' }).click();
+  await page.getByRole('link', { name: /API keys/ }).click();
+  await page.getByRole('button', { name: 'Nova chave' }).click();
+  const janela = page.getByRole('dialog');
+  await janela.getByLabel('Nome', { exact: true }).fill('n8n');
+  await janela.getByRole('checkbox', { name: 'contato.read' }).check();
+  await janela.getByRole('button', { name: 'Criar chave' }).click();
+
+  const campo = page.getByLabel('Chave (cabeçalho X-Api-Key)');
+  await expect(campo).toHaveValue(/^ebk_live_[A-Za-z0-9_-]{43}$/);
+  const token = await campo.inputValue();
+  await page.getByRole('button', { name: 'Já copiei' }).click();
+  const linha = page.getByRole('row', { name: /n8n/ });
+  await expect(linha).toContainText(token.slice(0, 17));
+  await expect(page.getByText(token)).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Revogar n8n' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Revogar' }).click();
+  await expect(linha.getByText('Revogada')).toBeVisible();
 });

@@ -111,9 +111,9 @@ shadcn, barradas pelo teste:
 
 ## Componentes
 
-Base shadcn/ui (estilo `new-york`) em `packages/ui/src/components/ui/`: `alert`, `avatar`,
-`badge`, `button`, `card`, `dropdown-menu`, `input`, `label`, `separator`, `sheet`, `skeleton`,
-`table`, `tooltip`. Componentes novos entram pela CLI do shadcn no `packages/ui` e corrigindo o import do
+Base shadcn/ui (estilo `new-york`) em `packages/ui/src/components/ui/`: `alert`, `alert-dialog`,
+`avatar`, `badge`, `button`, `card`, `dialog`, `dropdown-menu`, `input`, `label`, `separator`,
+`sheet`, `skeleton`, `table`, `tooltip`. Componentes novos entram pela CLI do shadcn no `packages/ui` e corrigindo o import do
 `cn` para `@ebisu/ui/lib/utils`.
 
 Formulários (`apps/web/src/formularios/`): React Hook Form com o schema Zod do contrato. Cada
@@ -135,12 +135,33 @@ de tela, cabeçalhos com `scope="col"`, paginação "Anterior"/"Próxima" num `n
 anunciada (`aria-live`). Enquanto a próxima página carrega, a anterior continua na tela
 (`aria-busy`) e "Próxima" fica desativada. Erro numa página seguinte oferece voltar à anterior.
 
+Diálogos e confirmações:
+
+- **`Dialog`** para formulários curtos (criar e editar empresa, convidar, criar API key): título,
+  descrição, campos e rodapé com "Cancelar" e a ação. O botão de fechar diz "Fechar" ao leitor de
+  tela.
+- **`AlertDialog`** (componente `Confirmar` em `apps/web/src/configuracoes/`) antes de toda ação
+  destrutiva ou difícil de desfazer: desativar, suspender, revogar. A ação vem em `destructive`.
+- **Segredo mostrado uma vez** (token da API key): diálogo próprio com o valor num campo só de
+  leitura, "Copiar" e o aviso de que não aparece de novo; fechar descarta o valor.
+
+Listas de opção são `<select>` nativo com o visual do `Input` (`Selecao`, em
+`apps/web/src/formularios/`), e caixas de seleção são `<input type="checkbox">` com
+`accent-primary`: acessíveis sem trabalho extra. O **editor de papéis** (`EditorPapeis`) é uma
+lista de linhas "papel × empresa (ou todas as empresas)", com adicionar e remover; o papel de dono
+trava a empresa em "todas".
+
+Telas de **Configurações** (`/configuracoes`): índice com um cartão por seção visível e, em cada
+seção, o cabeçalho com o link de volta, o título e as ações à direita. Seção sem permissão mostra o
+estado vazio "Sem acesso a esta seção" (a API nega de qualquer jeito).
+
 ## Acessibilidade
 
 - Meta: Lighthouse acessibilidade ≥ 90 nas páginas base (spec §4 F12). Medido em 2026-10-28
   (Lighthouse 13.5.0, celular e desktop): login, escolha de conta, Painel, Contatos, Bancada e
   Estoque com 100. Em 2026-10-31 (Lighthouse 12.8.2, celular e desktop): cadastro e aceite do
-  convite (estado sem token) com 100.
+  convite (estado sem token) com 100. Em 2026-11-01 (Lighthouse 12.8.2, celular e desktop, logado):
+  Configurações, Empresas, Membros e convites e API keys com 100.
 - Testes de componente rodam o axe-core (`apps/web/src/teste/axe.ts`); contraste não é avaliável
   no jsdom, por isso a tabela acima.
 - Foco sempre visível (`ring` do `primary`). Ícones decorativos com `aria-hidden`; botão só com

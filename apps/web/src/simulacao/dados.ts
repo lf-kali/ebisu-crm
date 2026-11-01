@@ -18,6 +18,17 @@ const TODAS: EmpresaDoMembro['permissoes'] = Object.fromEntries(
     .map((chave) => [chave, 'TENANT' as const]),
 );
 
+/** A dona da demonstração também administra a conta (Configurações, F3). */
+const DONO: EmpresaDoMembro['permissoes'] = {
+  ...TODAS,
+  'config.empresa': 'TENANT',
+  'config.membros': 'TENANT',
+  'config.rbac': 'TENANT',
+  'config.api_keys': 'TENANT',
+  // Só nos próprios registros: não pode ir para uma API key (a chave vale na empresa inteira).
+  'tarefa.update': 'PROPRIO',
+};
+
 const empresa = (
   n: number,
   nome: string,
@@ -47,7 +58,7 @@ export const USUARIOS: readonly UsuarioDemo[] = [
       {
         conta: CONTAS.ebisu,
         membroId: id(20),
-        empresas: [empresa(1, 'Ebisu Centro', TODAS), empresa(2, 'Ebisu Shopping', TODAS)],
+        empresas: [empresa(1, 'Ebisu Centro', DONO), empresa(2, 'Ebisu Shopping', DONO)],
       },
       {
         conta: CONTAS.oficina,
