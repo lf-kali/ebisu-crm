@@ -154,7 +154,8 @@ Requisito CAMPO só aceita as chaves de `CHAVES_CAMPO` e REGRA as de `CHAVES_REG
 `POST /v1/negocios/{id}/mover` só avança com os requisitos obrigatórios da etapa atual, e das
 etapas puladas, atendidos (CRM-3; senão 409 `requisitos_pendentes` com a lista). Voltar não exige.
 Ganho fica para a conversão do orçamento (F6). `/perder` exige motivo ativo (CRM-4) e cancela as
-tarefas abertas; `/nutrir` leva à etapa Nutrição até `nba_adiada_ate`, e mover reativa. PATCH e
+tarefas abertas; `/nutrir` leva à etapa Nutrição até `nba_adiada_ate`, e mover reativa: para a primeira etapa
+aberta, livre; adiante, com os requisitos desde a primeira etapa. PATCH e
 comandos conferem `versao_registro` (409 `conflito_versao`). Entrar numa etapa cria as tarefas dos
 requisitos TAREFA, sem repetir; sair da segunda etapa aberta promove o contato LEAD a
 LEAD_QUALIFICADO (CRM-2).

@@ -456,6 +456,41 @@ describe('negócios', () => {
     ).toEqual(['CANCELADA', 'PENDENTE']);
   });
 
+  it('reativar da nutrição adiante confere os requisitos desde a primeira etapa e qualifica o contato', async () => {
+    const x = await conta('Conta Reativar Qualifica');
+    const etapas = (await funil(x)).etapas;
+    const diagnostico = etapas[2]!;
+    const semRequisitos = await criarContato(x);
+    const n1 = await criarNegocio(x, semRequisitos.id);
+    const nutrido1 = await ok(
+      pedir(x, 'post', `/v1/negocios/${n1.id}/nutrir`, {
+        nba_adiada_ate: '2099-01-01T00:00:00Z',
+        versao_registro: 0,
+      }),
+      NegocioDetalhado,
+    );
+    // Reativar adiante confere os requisitos desde a primeira etapa: nutrir não pula o CRM-3.
+    const pulo = await mover(x, nutrido1, diagnostico.id);
+    expect([pulo.status, pulo.body.code]).toEqual([409, 'requisitos_pendentes']);
+    expect(
+      (await ok(pedir(x, 'get', `/v1/contatos/${semRequisitos.id}`), Contato)).ciclo_vida,
+    ).toBe('LEAD');
+
+    const k = await criarContato(x);
+    const n2 = await qualificar(x, k.id, await criarNegocio(x, k.id));
+    const nutrido2 = await ok(
+      pedir(x, 'post', `/v1/negocios/${n2.id}/nutrir`, {
+        nba_adiada_ate: '2099-01-01T00:00:00Z',
+        versao_registro: n2.versao_registro,
+      }),
+      NegocioDetalhado,
+    );
+    await ok(mover(x, nutrido2, diagnostico.id), NegocioDetalhado);
+    expect((await ok(pedir(x, 'get', `/v1/contatos/${k.id}`), Contato)).ciclo_vida).toBe(
+      'LEAD_QUALIFICADO',
+    );
+  });
+
   it('PROPRIO: só vê e mantém os seus; cria como responsável; contato precisa ser dele', async () => {
     const x = await conta('Conta Negócio Próprio');
     const vendedor = await novoMembro(
@@ -631,6 +666,35 @@ describe('completude', () => {
     expect((await ok(pedir(x, 'get', `/v1/negocios/${n.id}`), NegocioDetalhado)).completude).toBe(
       100,
     );
+  });
+
+  it('requisito CAMPO de valor (Decimal) e de data contam como preenchidos', async () => {
+    const x = await conta('Conta Completude Valor');
+    const etapas = paraEdicao(await funil(x));
+    etapas[0]!.requisitos = [
+      { tipo: 'CAMPO', chave: 'negocio.valor_estimado', descricao: 'Valor', obrigatorio: true },
+      {
+        tipo: 'CAMPO',
+        chave: 'negocio.previsao_fechamento',
+        descricao: 'Previsão',
+        obrigatorio: true,
+      },
+    ];
+    await ok(pedir(x, 'patch', '/v1/funil', { etapas }), Funil);
+    const k = await criarContato(x);
+    const vazio = await criarNegocio(x, k.id);
+    expect(vazio.completude).toBe(0);
+    const n = await criarNegocio(x, k.id, {
+      valor_estimado: '150.00',
+      previsao_fechamento: '2026-12-01',
+    });
+    expect(n.requisitos.map((r) => [r.chave, r.atendido])).toEqual([
+      ['negocio.valor_estimado', true],
+      ['negocio.previsao_fechamento', true],
+    ]);
+    expect(n.completude).toBe(100);
+    const lido = await ok(pedir(x, 'get', `/v1/negocios/${n.id}`), NegocioDetalhado);
+    expect(lido.requisitos.every((r) => r.atendido)).toBe(true);
   });
 
   it('criar contato e negócio grava um registro só no audit log (a completude vai junto)', async () => {

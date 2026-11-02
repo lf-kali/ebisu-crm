@@ -51,10 +51,14 @@ export const ehDoContato = (r: Pick<RequisitoAvaliado, 'tipo' | 'chave'>) =>
   (r.tipo === 'CAMPO' && r.chave.startsWith('contato.')) ||
   (r.tipo === 'REGRA' && REGRAS_DO_CONTATO.has(r.chave));
 
+/**
+ * Valor preenchido. Objeto simples (o endereço em JSON) precisa de algum texto; Date, Decimal e
+ * outros objetos com classe própria contam como preenchidos.
+ */
 const preenchido = (valor: unknown) => {
   if (valor === null || valor === undefined) return false;
   if (typeof valor === 'string') return valor.trim() !== '';
-  if (typeof valor === 'object' && !(valor instanceof Date))
+  if (typeof valor === 'object' && Object.getPrototypeOf(valor) === Object.prototype)
     return Object.values(valor).some((v) => typeof v === 'string' && v.trim() !== '');
   return true;
 };

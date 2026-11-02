@@ -246,18 +246,27 @@ export async function editar(
 }
 
 /**
- * Requisitos obrigatórios não atendidos para sair da etapa atual até o destino: avançar várias
- * etapas de uma vez não pula os requisitos das intermediárias (CRM-3).
+ * De onde o avanço é contado: a etapa atual ou, ao reativar da nutrição, a primeira etapa ABERTA
+ * (decisão 5). Assim nutrir e reativar não pula requisitos (CRM-3).
+ */
+function origemDoAvanco(negocio: Negocio, lista: repo.EtapaDoFunil[]) {
+  if (negocio.status === 'NUTRICAO') return etapaDoTipo(lista, 'ABERTA');
+  return lista.find((e) => e.id === negocio.etapa_id)!;
+}
+
+/**
+ * Requisitos obrigatórios não atendidos para sair da origem até o destino: avançar várias etapas
+ * de uma vez não pula os requisitos das intermediárias (CRM-3).
  */
 function pendentesAte(
   ctx: TxContext,
   negocio: Negocio,
   lista: repo.EtapaDoFunil[],
+  origem: repo.EtapaDoFunil,
   destino: repo.EtapaDoFunil,
 ) {
-  const atual = lista.find((e) => e.id === negocio.etapa_id)!;
   const etapasASair = lista.filter(
-    (e) => e.tipo === 'ABERTA' && e.ordem >= atual.ordem && e.ordem < destino.ordem,
+    (e) => e.tipo === 'ABERTA' && e.ordem >= origem.ordem && e.ordem < destino.ordem,
   );
   return pendentesParaSair(
     ctx.tx,
@@ -272,11 +281,11 @@ async function qualificarSePassou(
   ctx: TxContext,
   negocio: Negocio,
   lista: repo.EtapaDoFunil[],
+  origem: repo.EtapaDoFunil,
   destino: repo.EtapaDoFunil,
 ) {
   const qualificacao = lista.filter((e) => e.tipo === 'ABERTA')[1];
-  const atual = lista.find((e) => e.id === negocio.etapa_id)!;
-  if (qualificacao && atual.ordem <= qualificacao.ordem && destino.ordem > qualificacao.ordem)
+  if (qualificacao && origem.ordem <= qualificacao.ordem && destino.ordem > qualificacao.ordem)
     await repo.qualificarContato(ctx.tx, ctx.empresaId, negocio.contato_id);
 }
 
@@ -299,13 +308,12 @@ export async function mover(
   const lista = await etapas(ctx);
   const destino = exigirDestinoAberto(lista.find((e) => e.id === entrada.etapa_id));
   if (destino.id === negocio.etapa_id) throw transicao('O negócio já está nesta etapa.');
-  const atual = lista.find((e) => e.id === negocio.etapa_id)!;
-  const avancando = negocio.status === 'ABERTO' && destino.ordem > atual.ordem;
-  if (avancando) {
-    const pendentes = await pendentesAte(ctx, negocio, lista, destino);
+  const origem = origemDoAvanco(negocio, lista);
+  if (destino.ordem > origem.ordem) {
+    const pendentes = await pendentesAte(ctx, negocio, lista, origem, destino);
     if (pendentes.length > 0)
       throw new ErroDominio('requisitos_pendentes', { extras: { requisitos: pendentes } });
-    await qualificarSePassou(ctx, negocio, lista, destino);
+    await qualificarSePassou(ctx, negocio, lista, origem, destino);
   }
   // Da nutrição, mover para uma etapa aberta reativa o negócio (decisão 8).
   const reativado = { nba_adiada_ate: null };
