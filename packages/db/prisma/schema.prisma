@@ -835,21 +835,23 @@ enum DirecaoAtividade {
 /// Timeline única de interações (contato, negócio e OS). Também é fonte de
 /// eventos de engajamento para o scoring.
 model Atividade {
-  id         String           @id @default(uuid(7)) @db.Uuid
-  tenant_id  String           @db.Uuid
-  empresa_id String           @db.Uuid
-  contato_id String?          @db.Uuid
-  negocio_id String?          @db.Uuid
-  os_id      String?          @db.Uuid
-  tipo       TipoAtividade
-  direcao    DirecaoAtividade @default(INTERNA)
-  assunto    String?
-  conteudo   String?
-  resultado  String? /// atendeu, não atendeu, pediu retorno…
-  minutos    Int? /// NOTA_TECNICA: tempo gasto
-  membro_id  String?          @db.Uuid
-  metadados  Json?
-  ocorreu_em DateTime         @default(now())
+  id            String           @id @default(uuid(7)) @db.Uuid
+  tenant_id     String           @db.Uuid
+  empresa_id    String           @db.Uuid
+  contato_id    String?          @db.Uuid
+  negocio_id    String?          @db.Uuid
+  os_id         String?          @db.Uuid
+  tipo          TipoAtividade
+  direcao       DirecaoAtividade @default(INTERNA)
+  assunto       String?
+  conteudo      String?
+  resultado     String? /// atendeu, não atendeu, pediu retorno…
+  minutos       Int? /// NOTA_TECNICA: tempo gasto
+  membro_id     String?          @db.Uuid
+  metadados     Json?
+  ocorreu_em    DateTime         @default(now())
+  /// Quando foi registrada: o prazo do autor para corrigir conta daqui (F4 PR 2b).
+  registrada_em DateTime         @default(now())
 
   empresa Empresa       @relation(fields: [tenant_id, empresa_id], references: [tenant_id, id])
   contato Contato?      @relation(fields: [empresa_id, contato_id], references: [empresa_id, id], onDelete: Restrict)
