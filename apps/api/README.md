@@ -144,6 +144,27 @@ para os selects das telas: só `id` e `nome` dos membros ativos com acesso à em
 nome e até 500. Quem não administra membros (`config.membros`) escolhe o responsável por ela, sem
 ver e-mail, cargo nem papéis.
 
+## Funil, negócios e tarefas (CRM)
+
+`/v1/funil` lê (`negocio.read`) e edita (`config.crm`) o funil padrão da empresa: o PATCH traz
+todas as etapas pelo id (não se criam nem se apagam etapas) e troca os requisitos de cada uma.
+Requisito CAMPO só aceita as chaves de `CHAVES_CAMPO` e REGRA as de `CHAVES_REGRA`
+(`@ebisu/contracts`); TAREFA exige `titulo_tarefa`.
+
+`POST /v1/negocios/{id}/mover` só avança com os requisitos obrigatórios da etapa atual, e das
+etapas puladas, atendidos (CRM-3; senão 409 `requisitos_pendentes` com a lista). Voltar não exige.
+Ganho fica para a conversão do orçamento (F6). `/perder` exige motivo ativo (CRM-4) e cancela as
+tarefas abertas; `/nutrir` leva à etapa Nutrição até `nba_adiada_ate`, e mover reativa: para a primeira etapa
+aberta, livre; adiante, com os requisitos desde a primeira etapa. PATCH e
+comandos conferem `versao_registro` (409 `conflito_versao`). Entrar numa etapa cria as tarefas dos
+requisitos TAREFA, sem repetir; sair da segunda etapa aberta promove o contato LEAD a
+LEAD_QUALIFICADO (CRM-2).
+
+A completude (`negocio.completude`, `contato.completude_perfil` e `contato.campos_faltantes`) vem
+só de `modules/completude` (CRM-6): o comando grava o valor calculado na mesma escrita do dado,
+para o audit log ter um registro por mudança. Cascatas (consentimento, contato → negócios, tarefa
+de requisito concluída, edição do funil) recalculam com escrita própria.
+
 ## Sequência de documentos
 
 `proximoNumero(ctx, tipo)` (`core/sequencias`) devolve o número do orçamento (`ORC-2610-0001`), da
