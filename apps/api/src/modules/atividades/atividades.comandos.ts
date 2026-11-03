@@ -73,12 +73,14 @@ async function vinculos(
       throw invalido('contato_id', 'O contato não é o do negócio.');
     contatoId = negocio.contato_id;
   }
+  // O contato herdado do negócio também precisa estar visível: quem vê o negócio e não o
+  // contato não escreve na timeline dele.
   if (
-    entrada.contato_id &&
+    contatoId &&
     !(await contatoVisivel(
       ctx.tx,
       ctx.empresaId,
-      entrada.contato_id,
+      contatoId,
       filtroDeEscopo(ctx, 'contato.read', 'responsavel_id'),
     ))
   )
@@ -100,8 +102,13 @@ async function corrigivel(ctx: TxContext, id: string, chave: string): Promise<At
   return atividade;
 }
 
-async function aposMudar(ctx: TxContext, contatoId: string | null) {
-  if (contatoId) await repo.recalcularUltimaInteracao(ctx.tx, ctx.empresaId, contatoId);
+/** Só conversas (ENTRADA ou SAIDA) mexem na última interação; a nota interna não (decisão 6). */
+async function aposMudar(
+  ctx: TxContext,
+  { contato_id, direcao }: Pick<Atividade, 'contato_id' | 'direcao'>,
+) {
+  if (contato_id && direcao !== 'INTERNA')
+    await repo.recalcularUltimaInteracao(ctx.tx, ctx.empresaId, contato_id);
 }
 
 export async function listar(
@@ -157,7 +164,7 @@ export async function criar(ctx: TxContext, entrada: EntradaAtividade): Promise<
     membro_id: ctx.membroId,
     ocorreu_em,
   });
-  await aposMudar(ctx, ligacao.contato_id);
+  await aposMudar(ctx, atividade);
   return atividade;
 }
 
@@ -173,12 +180,12 @@ export async function editar(
     ...resto,
     ...(ocorreu_em !== undefined ? { ocorreu_em: quando(ocorreu_em) } : {}),
   });
-  await aposMudar(ctx, atual.contato_id);
+  await aposMudar(ctx, atual);
   return (await repo.buscarAtividade(ctx.tx, ctx.empresaId, id))!;
 }
 
 export async function apagar(ctx: TxContext, id: string): Promise<void> {
   const atual = await corrigivel(ctx, id, 'atividade.delete');
   await repo.apagarAtividade(ctx.tx, ctx.empresaId, id);
-  await aposMudar(ctx, atual.contato_id);
+  await aposMudar(ctx, atual);
 }

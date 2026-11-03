@@ -3940,7 +3940,7 @@
     "/v1/atividades/{id}": {
       "delete": {
         "summary": "Apaga uma atividade",
-        "description": "Com escopo PROPRIO, só a própria atividade e nas primeiras 24 horas do registro; com EMPRESA ou TENANT, qualquer uma, a qualquer tempo. Fora do prazo, ou atividade do sistema, dá 409 `transicao_invalida`. O audit log guarda o registro apagado.\n\nPermissão: `atividade.delete`.",
+        "description": "Com escopo PROPRIO, só a própria atividade e nas primeiras 24 horas do registro; com EMPRESA ou TENANT, qualquer uma, a qualquer tempo. Fora do prazo, ou atividade do sistema, dá 409 `transicao_invalida`. O audit log registra a exclusão (quem, quando e as colunas, sem os valores).\n\nPermissão: `atividade.delete`.",
         "tags": [
           "crm"
         ],

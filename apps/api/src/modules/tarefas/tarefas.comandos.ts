@@ -78,12 +78,14 @@ async function vinculos(ctx: TxContext, entrada: Pick<EntradaTarefa, 'negocio_id
       throw invalido('contato_id', 'O contato não é o do negócio.');
     contatoId = negocio.contato_id;
   }
+  // O contato herdado do negócio também precisa estar visível: quem vê o negócio e não o
+  // contato não escreve na timeline dele.
   if (
-    entrada.contato_id &&
+    contatoId &&
     !(await repo.contatoVisivel(
       ctx.tx,
       ctx.empresaId,
-      entrada.contato_id,
+      contatoId,
       filtroDeEscopo(ctx, 'contato.read', 'responsavel_id'),
     ))
   )

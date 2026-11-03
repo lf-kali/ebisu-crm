@@ -86,7 +86,7 @@ export class AtividadesController {
   @Permissao('atividade.delete')
   @Contrato({
     resumo: 'Apaga uma atividade',
-    descricao: `${CORRIGIR} O audit log guarda o registro apagado.`,
+    descricao: `${CORRIGIR} O audit log registra a exclusão (quem, quando e as colunas, sem os valores).`,
     tags: ['crm'],
     params: PorId,
     resposta: null,

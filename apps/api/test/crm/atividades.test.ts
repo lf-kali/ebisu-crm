@@ -146,6 +146,39 @@ describe('registrar', () => {
   });
 });
 
+describe('contato herdado do negócio', () => {
+  it('quem vê o negócio mas não o contato dele não registra atividade nem tarefa nele (422)', async () => {
+    const x = await conta('Conta Contato Herdado');
+    const vendedor = await novoMembro(
+      c,
+      x.tenantId,
+      {
+        'contato.read': 'PROPRIO',
+        'negocio.read': 'EMPRESA',
+        'atividade.create': 'EMPRESA',
+        'tarefa.create': 'EMPRESA',
+      },
+      x.empresaId,
+    );
+    const v = { token: vendedor.token, empresaId: x.empresaId };
+    const doDono = await contato(x, { responsavel_id: x.donoId });
+    const n = await ok(
+      pedir(x, 'post', '/v1/negocios', { contato_id: doDono.id, titulo: 'Do dono' }),
+      NegocioDetalhado,
+      201,
+    );
+    const atividade = await pedir(v, 'post', '/v1/atividades', {
+      tipo: 'LIGACAO',
+      direcao: 'SAIDA',
+      negocio_id: n.id,
+    });
+    expect(atividade.status).toBe(422);
+    const tarefa = await pedir(v, 'post', '/v1/tarefas', { titulo: 'X', negocio_id: n.id });
+    expect(tarefa.status).toBe(422);
+    expect(await ultimaInteracao(x, doDono.id)).toBeNull();
+  });
+});
+
 describe('timeline', () => {
   it('da mais recente à mais antiga, com páginas, desempate e filtros', async () => {
     const x = await conta('Conta Timeline');
