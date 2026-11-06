@@ -9,6 +9,7 @@ import {
   TipoDispositivo,
   Urgencia,
 } from '@ebisu/contracts';
+import { Carregando } from '@ebisu/ui/components/estados';
 import { Button } from '@ebisu/ui/components/ui/button';
 import {
   Dialog,
@@ -186,68 +187,82 @@ export function DialogoNegocio({
       }
       aoFechar={aoFechar}
     >
-      <form noValidate onSubmit={form.handleSubmit(salvar)} className="flex flex-col gap-4">
-        <ErroOuMensagem erro={erro} />
-        {!negocio && !contatoId ? (
-          <BuscaContato escolhido={contato} aoEscolher={setContato} />
-        ) : null}
-        <Campo rotulo="Título" erro={errors.titulo?.message} {...form.register('titulo')} />
-        <Selecao rotulo="Interesse" {...form.register('interesse')}>
-          {InteresseNegocio.options.map((i) => (
-            <option key={i} value={i}>
-              {INTERESSE[i]}
-            </option>
-          ))}
-        </Selecao>
-        <Selecao rotulo="Tipo de dispositivo" {...form.register('tipo_dispositivo')}>
-          <option value="">Não informado</option>
-          {TipoDispositivo.options.map((t) => (
-            <option key={t} value={t}>
-              {TIPO_DISPOSITIVO[t]}
-            </option>
-          ))}
-        </Selecao>
-        <AreaDeTexto
-          rotulo="Problema ou interesse"
-          erro={errors.descricao_problema?.message}
-          {...form.register('descricao_problema')}
-        />
-        <Selecao rotulo="Urgência" {...form.register('urgencia')}>
-          <option value="">Não informada</option>
-          {Urgencia.options.map((u) => (
-            <option key={u} value={u}>
-              {URGENCIA[u]}
-            </option>
-          ))}
-        </Selecao>
-        <Campo
-          rotulo="Valor estimado (R$)"
-          inputMode="decimal"
-          erro={errors.valor_estimado?.message}
-          {...form.register('valor_estimado')}
-        />
-        <Campo
-          rotulo="Previsão de fechamento"
-          type="date"
-          erro={errors.previsao_fechamento?.message}
-          {...form.register('previsao_fechamento')}
-        />
-        {semResponsavel ? null : (
-          <Selecao rotulo="Responsável" {...form.register('responsavel_id')}>
-            <option value="">Sem responsável</option>
-            {responsaveis.data?.dados.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.nome}
+      {/* O select de responsável só monta com as opções: o React Hook Form lê o valor do DOM ao
+          salvar, e um select sem a opção do responsável atual mandaria null (apagaria). */}
+      {!semResponsavel && !responsaveis.data ? (
+        responsaveis.isError ? (
+          <ErroOuMensagem erro={responsaveis.error} />
+        ) : (
+          <Carregando />
+        )
+      ) : (
+        <form noValidate onSubmit={form.handleSubmit(salvar)} className="flex flex-col gap-4">
+          <ErroOuMensagem erro={erro} />
+          {!negocio && !contatoId ? (
+            <BuscaContato escolhido={contato} aoEscolher={setContato} />
+          ) : null}
+          <Campo rotulo="Título" erro={errors.titulo?.message} {...form.register('titulo')} />
+          <Selecao rotulo="Interesse" {...form.register('interesse')}>
+            {InteresseNegocio.options.map((i) => (
+              <option key={i} value={i}>
+                {INTERESSE[i]}
               </option>
             ))}
           </Selecao>
-        )}
-        <Rodape
-          enviando={isSubmitting}
-          acao={negocio ? 'Salvar' : 'Criar negócio'}
-          aoFechar={aoFechar}
-        />
-      </form>
+          <Selecao rotulo="Tipo de dispositivo" {...form.register('tipo_dispositivo')}>
+            <option value="">Não informado</option>
+            {TipoDispositivo.options.map((t) => (
+              <option key={t} value={t}>
+                {TIPO_DISPOSITIVO[t]}
+              </option>
+            ))}
+          </Selecao>
+          <AreaDeTexto
+            rotulo="Problema ou interesse"
+            erro={errors.descricao_problema?.message}
+            {...form.register('descricao_problema')}
+          />
+          <Selecao rotulo="Urgência" {...form.register('urgencia')}>
+            <option value="">Não informada</option>
+            {Urgencia.options.map((u) => (
+              <option key={u} value={u}>
+                {URGENCIA[u]}
+              </option>
+            ))}
+          </Selecao>
+          <Campo
+            rotulo="Valor estimado (R$)"
+            inputMode="decimal"
+            erro={errors.valor_estimado?.message}
+            {...form.register('valor_estimado')}
+          />
+          <Campo
+            rotulo="Previsão de fechamento"
+            type="date"
+            erro={errors.previsao_fechamento?.message}
+            {...form.register('previsao_fechamento')}
+          />
+          {semResponsavel ? null : (
+            <Selecao rotulo="Responsável" {...form.register('responsavel_id')}>
+              <option value="">Sem responsável</option>
+              {responsaveis.data?.dados.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.nome}
+                </option>
+              ))}
+              {negocio?.responsavel_id &&
+              !responsaveis.data?.dados.some((r) => r.id === negocio.responsavel_id) ? (
+                <option value={negocio.responsavel_id}>Membro sem acesso à empresa</option>
+              ) : null}
+            </Selecao>
+          )}
+          <Rodape
+            enviando={isSubmitting}
+            acao={negocio ? 'Salvar' : 'Criar negócio'}
+            aoFechar={aoFechar}
+          />
+        </form>
+      )}
     </Janela>
   );
 }

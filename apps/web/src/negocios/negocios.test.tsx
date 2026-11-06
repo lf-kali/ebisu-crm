@@ -1,7 +1,7 @@
-import { criarProblema, ROTAS_NEGOCIOS } from '@ebisu/contracts';
+import { criarProblema, ROTAS_MEMBROS, ROTAS_NEGOCIOS } from '@ebisu/contracts';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import { USUARIOS } from '../simulacao/dados';
 import { renderizarApp } from '../teste/app';
@@ -130,6 +130,47 @@ describe('quadro', () => {
 });
 
 describe('ficha do negócio', () => {
+  it('editar espera a lista de responsáveis: salvar antes dela não apaga o responsável', async () => {
+    servidor.use(http.get(`*${ROTAS_MEMBROS.opcoes}`, async () => delay('infinite')));
+    renderizarApp(`/negocios/${idDo('Troca de tela')}`);
+    await screen.findByRole('heading', { level: 1, name: 'Troca de tela' });
+    await usuario().click(screen.getByRole('button', { name: 'Editar' }));
+    const janela = await screen.findByRole('dialog');
+    expect(within(janela).queryByRole('button', { name: 'Salvar' })).toBeNull();
+    expect(within(janela).getByRole('status')).toBeTruthy();
+  });
+
+  it('só com negocio.delete aparece "Excluir", sem as ações de edição', async () => {
+    simulada.definirPermissoes('ana@demo.test', {
+      'contato.read': 'EMPRESA',
+      'negocio.read': 'EMPRESA',
+      'negocio.delete': 'EMPRESA',
+    });
+    renderizarApp(`/negocios/${idDo('Troca de tela')}`);
+    await screen.findByRole('heading', { level: 1, name: 'Troca de tela' });
+    expect(screen.getByRole('button', { name: 'Excluir' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Editar' })).toBeNull();
+  });
+
+  it('PROPRIO: editar e criar negócio sem o select de responsável', async () => {
+    simulada.definirPermissoes('ana@demo.test', {
+      'contato.read': 'EMPRESA',
+      'negocio.read': 'EMPRESA',
+      'negocio.create': 'PROPRIO',
+      'negocio.update': 'PROPRIO',
+    });
+    const dados = simulada.negocios.dados(EMPRESA);
+    dados.negocios = dados.negocios.map((n) =>
+      n.titulo === 'Troca de tela' ? { ...n, responsavel_id: USUARIOS[0]!.contas[0]!.membroId } : n,
+    );
+    renderizarApp(`/negocios/${idDo('Troca de tela')}`);
+    await screen.findByRole('heading', { level: 1, name: 'Troca de tela' });
+    await usuario().click(screen.getByRole('button', { name: 'Editar' }));
+    const janela = await screen.findByRole('dialog');
+    await within(janela).findByLabelText('Título');
+    expect(within(janela).queryByLabelText('Responsável')).toBeNull();
+  });
+
   it('mostra o que falta; perder exige o motivo e o perdido fica só para leitura', async () => {
     const { container } = renderizarApp(`/negocios/${idDo('Troca de tela')}`);
     await screen.findByRole('heading', { level: 1, name: 'Troca de tela' });
@@ -201,5 +242,9 @@ describe('ficha do negócio', () => {
         /feito/,
       ),
     );
+    // Sair da Qualificação qualificou o contato: a ficha dele já mostra o ciclo novo.
+    await u.click(screen.getByRole('link', { name: 'João Araújo' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'João Araújo' })).toBeTruthy();
+    expect(await screen.findByText('Lead qualificado')).toBeTruthy();
   });
 });

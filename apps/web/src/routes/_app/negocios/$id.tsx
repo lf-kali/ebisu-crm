@@ -74,7 +74,13 @@ function Ficha({ negocio }: { negocio: NegocioDetalhado }) {
         }
         voltar={VOLTAR}
         acoes={
-          aberto && pode('negocio.update') ? <Acoes negocio={negocio} abrir={setDialogo} /> : null
+          (aberto && pode('negocio.update')) || pode('negocio.delete') ? (
+            <Acoes
+              negocio={negocio}
+              editavel={aberto && pode('negocio.update')}
+              abrir={setDialogo}
+            />
+          ) : null
         }
       />
       <div className="flex max-w-4xl flex-col gap-8">
@@ -131,7 +137,16 @@ function Ficha({ negocio }: { negocio: NegocioDetalhado }) {
   );
 }
 
-function Acoes({ negocio, abrir }: { negocio: NegocioDetalhado; abrir: (d: Dialogo) => void }) {
+/** Editar, nutrir e perder com `negocio.update` (só aberto); excluir com `negocio.delete`. */
+function Acoes({
+  negocio,
+  editavel,
+  abrir,
+}: {
+  negocio: NegocioDetalhado;
+  editavel: boolean;
+  abrir: (d: Dialogo) => void;
+}) {
   const { cliente } = Route.useRouteContext();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -146,17 +161,21 @@ function Acoes({ negocio, abrir }: { negocio: NegocioDetalhado; abrir: (d: Dialo
   });
   return (
     <>
-      <Button variant="outline" onClick={() => abrir('editar')}>
-        Editar
-      </Button>
-      {negocio.status === 'ABERTO' ? (
-        <Button variant="outline" onClick={() => abrir('nutrir')}>
-          Nutrir
-        </Button>
+      {editavel ? (
+        <>
+          <Button variant="outline" onClick={() => abrir('editar')}>
+            Editar
+          </Button>
+          {negocio.status === 'ABERTO' ? (
+            <Button variant="outline" onClick={() => abrir('nutrir')}>
+              Nutrir
+            </Button>
+          ) : null}
+          <Button variant="outline" onClick={() => abrir('perder')}>
+            Perder
+          </Button>
+        </>
       ) : null}
-      <Button variant="outline" onClick={() => abrir('perder')}>
-        Perder
-      </Button>
       {pode('negocio.delete') ? (
         <Confirmar
           gatilho={<Button variant="ghost">Excluir</Button>}

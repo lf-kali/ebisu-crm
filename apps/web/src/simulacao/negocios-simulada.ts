@@ -331,6 +331,18 @@ export function criarNegociosSimulados(
       .map(({ id: rid, chave, descricao }) => ({ id: rid, chave, descricao }));
   }
 
+  /** CRM-2: passar da segunda etapa aberta leva o contato LEAD a LEAD_QUALIFICADO. */
+  function qualificarSePassou(c: Ctx, n: Negocio, destino: Etapa) {
+    const abertas = c.dados.funil.etapas.filter((e) => e.tipo === 'ABERTA');
+    const origem = n.status === 'NUTRICAO' ? abertas[0]! : etapa(c, n.etapa_id);
+    const qualificacao = abertas[1];
+    const contato = contatos.contatos(c.empresaId).find((k) => k.id === n.contato_id);
+    const passou =
+      qualificacao && origem.ordem <= qualificacao.ordem && destino.ordem > qualificacao.ordem;
+    if (passou && contato?.ciclo_vida === 'LEAD')
+      contatos.atualizar(c.empresaId, n.contato_id, { ciclo_vida: 'LEAD_QUALIFICADO' });
+  }
+
   /** Negócio no escopo da permissão, com a versão que o cliente leu. */
   function exigirNegocio(c: Ctx, negocioId: string, chave: string, versao?: number) {
     const n = negocioDe(c, negocioId, chave);
@@ -437,6 +449,7 @@ export function criarNegociosSimulados(
         const faltam = pendentes(c, n, destino);
         if (faltam.length)
           return problema('requisitos_pendentes', { extras: { requisitos: faltam } });
+        qualificarSePassou(c, n, destino);
         const movido = gravar(c, n, {
           etapa_id: destino.id,
           status: 'ABERTO',
@@ -471,6 +484,7 @@ export function criarNegociosSimulados(
             etapa_id: ETAPAS_SIMULADAS.perdido,
             motivo_perda_id: e.data.motivo_perda_id,
             fechado_em: agora(),
+            entrou_etapa_em: agora(),
           }),
         );
       }),
@@ -484,11 +498,20 @@ export function criarNegociosSimulados(
         if (n.status !== 'ABERTO') return transicao('Só um negócio aberto vai para a nutrição.');
         if (new Date(e.data.nba_adiada_ate).getTime() <= Date.now())
           return invalido('nba_adiada_ate', 'A data de reativação precisa estar no futuro.');
+        // Como a API: só as tarefas do funil abertas são canceladas; as manuais continuam.
+        c.dados.tarefas = c.dados.tarefas.map((t) =>
+          t.negocio_id === n.id &&
+          t.origem === 'REQUISITO_ETAPA' &&
+          (t.status === 'PENDENTE' || t.status === 'EM_ANDAMENTO')
+            ? { ...t, status: 'CANCELADA' }
+            : t,
+        );
         return HttpResponse.json(
           gravar(c, n, {
             status: 'NUTRICAO',
             etapa_id: ETAPAS_SIMULADAS.nutricao,
             nba_adiada_ate: new Date(e.data.nba_adiada_ate).toISOString(),
+            entrou_etapa_em: agora(),
           }),
         );
       }),

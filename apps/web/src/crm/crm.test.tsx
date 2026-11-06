@@ -117,6 +117,89 @@ describe('timeline', () => {
 });
 
 describe('tarefas', () => {
+  it('PROPRIO: sem ações na tarefa de outra pessoa e sem o select de responsável', async () => {
+    simulada.definirPermissoes('ana@demo.test', {
+      'contato.read': 'EMPRESA',
+      'tarefa.read': 'EMPRESA',
+      'tarefa.create': 'PROPRIO',
+      'tarefa.update': 'PROPRIO',
+      'tarefa.delete': 'PROPRIO',
+    });
+    const agora = new Date().toISOString();
+    const base = {
+      empresa_id: EMPRESA,
+      contato_id: joao().id,
+      negocio_id: null,
+      descricao: null,
+      status: 'PENDENTE' as const,
+      prioridade: 'NORMAL' as const,
+      origem: 'MANUAL' as const,
+      requisito_id: null,
+      vence_em: null,
+      concluida_em: null,
+      created_at: agora,
+      updated_at: agora,
+    };
+    simulada.negocios
+      .dados(EMPRESA)
+      .tarefas.push(
+        { ...base, id: crypto.randomUUID(), titulo: 'Minha', responsavel_id: ANA.membroId },
+        { ...base, id: crypto.randomUUID(), titulo: 'Do Bruno', responsavel_id: BRUNO },
+      );
+    renderizarApp(`/contatos/${joao().id}`);
+    const linha = async (titulo: string) =>
+      (
+        await within(await secao('Tarefas')).findByText(titulo, { selector: '.font-medium' })
+      ).closest('li')!;
+    expect(
+      within(await linha('Minha')).getByRole('button', { name: 'Concluir Minha' }),
+    ).toBeTruthy();
+    expect(
+      within(await linha('Do Bruno')).queryByRole('button', { name: /Concluir|Iniciar|Cancelar/ }),
+    ).toBeNull();
+    await usuario().click(
+      within(await secao('Tarefas')).getByRole('button', { name: 'Nova tarefa' }),
+    );
+    const janela = await screen.findByRole('dialog');
+    expect(within(janela).queryByLabelText('Responsável')).toBeNull();
+  });
+
+  it('as abertas aparecem mesmo com mais de 100 tarefas fechadas antes delas', async () => {
+    const agora = new Date().toISOString();
+    const fechada = (i: number) => ({
+      id: crypto.randomUUID(),
+      empresa_id: EMPRESA,
+      contato_id: joao().id,
+      negocio_id: null,
+      titulo: `Antiga ${i}`,
+      descricao: null,
+      status: 'CONCLUIDA' as const,
+      prioridade: 'NORMAL' as const,
+      origem: 'MANUAL' as const,
+      requisito_id: null,
+      vence_em: '2020-01-01T00:00:00.000Z',
+      responsavel_id: null,
+      concluida_em: agora,
+      created_at: agora,
+      updated_at: agora,
+    });
+    simulada.negocios
+      .dados(EMPRESA)
+      .tarefas.push(...Array.from({ length: 120 }, (_, i) => fechada(i)), {
+        ...fechada(999),
+        titulo: 'Aberta no fim',
+        status: 'PENDENTE',
+        vence_em: null,
+        concluida_em: null,
+      });
+    renderizarApp(`/contatos/${joao().id}`);
+    expect(
+      await within(await secao('Tarefas')).findByText('Aberta no fim', {
+        selector: '.font-medium',
+      }),
+    ).toBeTruthy();
+  });
+
   it('cria, inicia e cancela; as fechadas ficam em "mostrar todas"', async () => {
     renderizarApp(`/contatos/${joao().id}`);
     const tarefas = await screen.findByRole('region', { name: 'Tarefas' });

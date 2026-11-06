@@ -16,7 +16,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@ebisu/ui/components/ui/dialog';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { getRouteApi } from '@tanstack/react-router';
 import { useId, useState } from 'react';
 import { useAcesso } from '../auth/acesso';
@@ -52,21 +58,12 @@ export const filtroDo = (vinculo: Vinculo) =>
     : { 'filtro[contato_id]': vinculo.contato_id };
 
 export function SecaoTarefas({ vinculo }: { vinculo: Vinculo }) {
-  const { cliente } = rotaApp.useRouteContext();
   const { pode } = useAcesso();
   const titulo = useId();
   const [todas, setTodas] = useState(false);
   const [criando, setCriando] = useState(false);
-  const tarefas = useQuery({
-    queryKey: [...CHAVE_CRM, 'tarefas', vinculo],
-    queryFn: ({ signal }) =>
-      cliente.get(ROTAS_TAREFAS.tarefas, {
-        resposta: ListaTarefas,
-        query: { ...filtroDo(vinculo), limit: 100 },
-        sinal: signal,
-      }),
-  });
-  const lista = tarefas.data?.dados.filter((t) => todas || aberta(t)) ?? [];
+  const tarefas = useTarefas(vinculo, todas);
+  const lista = tarefas.lista;
 
   return (
     <section aria-labelledby={titulo} className="flex flex-col gap-3">
@@ -85,10 +82,10 @@ export function SecaoTarefas({ vinculo }: { vinculo: Vinculo }) {
           ) : null}
         </div>
       </div>
-      {tarefas.isPending ? (
+      {tarefas.carregando ? (
         <Carregando />
-      ) : tarefas.isError ? (
-        <ErroDaApi erro={tarefas.error} />
+      ) : tarefas.erro ? (
+        <ErroDaApi erro={tarefas.erro} />
       ) : lista.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           {todas ? 'Nenhuma tarefa.' : 'Nenhuma tarefa aberta.'}
@@ -100,9 +97,69 @@ export function SecaoTarefas({ vinculo }: { vinculo: Vinculo }) {
           ))}
         </ul>
       )}
+      {tarefas.maisPaginas ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-fit"
+          disabled={tarefas.buscandoMais}
+          onClick={tarefas.carregarMais}
+        >
+          Carregar mais
+        </Button>
+      ) : null}
       {criando ? <DialogoTarefa vinculo={vinculo} aoFechar={() => setCriando(false)} /> : null}
     </section>
   );
+}
+
+const porVencimento = (a: TipoTarefa, b: TipoTarefa) =>
+  (a.vence_em ?? '9').localeCompare(b.vence_em ?? '9') || a.id.localeCompare(b.id);
+
+/**
+ * As abertas vêm de duas consultas com `filtro[status]` (PENDENTE e EM_ANDAMENTO): fechadas
+ * antigas não ocupam as vagas. "Mostrar todas" pagina com "Carregar mais".
+ */
+function useTarefas(vinculo: Vinculo, todas: boolean) {
+  const { cliente } = rotaApp.useRouteContext();
+  const buscar = (query: Record<string, string | number | undefined>, signal: AbortSignal) =>
+    cliente.get(ROTAS_TAREFAS.tarefas, {
+      resposta: ListaTarefas,
+      query: { ...filtroDo(vinculo), ...query },
+      sinal: signal,
+    });
+  const abertas = useQueries({
+    queries: (['PENDENTE', 'EM_ANDAMENTO'] as const).map((status) => ({
+      queryKey: [...CHAVE_CRM, 'tarefas', vinculo, status],
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        buscar({ 'filtro[status]': status, limit: 100 }, signal),
+      enabled: !todas,
+    })),
+  });
+  const historico = useInfiniteQuery({
+    queryKey: [...CHAVE_CRM, 'tarefas', vinculo, 'todas'],
+    queryFn: ({ signal, pageParam }) => buscar({ limit: 50, cursor: pageParam }, signal),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (ultima) => ultima.proximo_cursor ?? undefined,
+    enabled: todas,
+  });
+  if (todas)
+    return {
+      lista: historico.data?.pages.flatMap((p) => p.dados) ?? [],
+      carregando: historico.isPending,
+      erro: historico.error,
+      maisPaginas: historico.hasNextPage,
+      buscandoMais: historico.isFetchingNextPage,
+      carregarMais: () => void historico.fetchNextPage(),
+    };
+  return {
+    lista: abertas.flatMap((q) => q.data?.dados ?? []).sort(porVencimento),
+    carregando: abertas.some((q) => q.isPending),
+    erro: abertas.find((q) => q.error)?.error ?? null,
+    maisPaginas: false,
+    buscandoMais: false,
+    carregarMais: () => undefined,
+  };
 }
 
 function ItemTarefa({ tarefa }: { tarefa: TipoTarefa }) {
