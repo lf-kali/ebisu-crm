@@ -446,7 +446,7 @@ function Grupo({
   );
 }
 
-function AreaDeTexto({
+export function AreaDeTexto({
   rotulo,
   erro,
   ...props

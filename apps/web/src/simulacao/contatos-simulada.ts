@@ -371,5 +371,19 @@ export function criarContatosSimulados({ autenticado, usuarios }: BaseSimulada) 
     handlers,
     /** Testes: os contatos da empresa, como estão na simulação. */
     contatos: (empresaId: string) => daEmpresa(empresaId).contatos,
+    /** Para a simulação de negócios: a situação atual dos consentimentos do contato. */
+    situacao: (empresaId: string, contatoId: string) => {
+      const historico = daEmpresa(empresaId).consentimentos.get(contatoId) ?? [];
+      const atual = new Map<string, Consentimento>();
+      for (const r of historico) atual.set(`${r.canal}:${r.finalidade}`, r);
+      return [...atual.values()];
+    },
+    /** Para a simulação de negócios: muda o contato (ex.: ciclo de vida, última interação). */
+    atualizar: (empresaId: string, contatoId: string, campos: Partial<Contato>) => {
+      const empresa = daEmpresa(empresaId);
+      empresa.contatos = empresa.contatos.map((k) =>
+        k.id === contatoId ? { ...k, ...campos } : k,
+      );
+    },
   };
 }

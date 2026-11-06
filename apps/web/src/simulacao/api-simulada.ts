@@ -17,6 +17,7 @@ import {
 import { http, HttpResponse } from 'msw';
 import { criarConfiguracoesSimuladas } from './configuracoes-simulada';
 import { criarContatosSimulados } from './contatos-simulada';
+import { criarNegociosSimulados } from './negocios-simulada';
 import { USUARIOS, SENHA_DEMO, type UsuarioDemo } from './dados';
 
 // API simulada (MSW) do contrato de auth e do /v1/eu (packages/contracts/plataforma), usada pelo
@@ -151,10 +152,12 @@ export function criarApiSimulada({ persistir }: { persistir?: Storage } = {}) {
 
   const configuracoes = criarConfiguracoesSimuladas({ autenticado, usuarios });
   const contatos = criarContatosSimulados({ autenticado, usuarios });
+  const negocios = criarNegociosSimulados({ autenticado, usuarios }, contatos);
 
   const handlers = [
     // Contatos antes das Configurações: GET /v1/membros/opcoes vem antes de /v1/membros/:id.
     ...contatos.handlers,
+    ...negocios.handlers,
     ...configuracoes.handlers,
     http.post(`*${ROTAS_AUTH.login}`, async ({ request }) => {
       const entrada = EntradaLogin.safeParse(await request.json().catch(() => undefined));
@@ -272,6 +275,7 @@ export function criarApiSimulada({ persistir }: { persistir?: Storage } = {}) {
     temRefresh: () => refresh !== null,
     configuracoes,
     contatos,
+    negocios,
     /**
      * Testes: troca as permissões de quem tem este e-mail em todas as empresas da conta dada (a
      * primeira, por padrão). Vale a partir do próximo /v1/eu.

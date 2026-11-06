@@ -13,7 +13,17 @@ export const CONTAS = {
 } satisfies Record<string, ResumoConta>;
 
 const TODAS: EmpresaDoMembro['permissoes'] = Object.fromEntries(
-  ['contato', 'negocio', 'dispositivo', 'orcamento', 'os', 'estoque', 'financeiro']
+  [
+    'contato',
+    'negocio',
+    'tarefa',
+    'atividade',
+    'dispositivo',
+    'orcamento',
+    'os',
+    'estoque',
+    'financeiro',
+  ]
     .flatMap((recurso) => [`${recurso}.read`, `${recurso}.create`, `${recurso}.update`])
     .map((chave) => [chave, 'TENANT' as const]),
 );
@@ -22,6 +32,10 @@ const TODAS: EmpresaDoMembro['permissoes'] = Object.fromEntries(
 const DONO: EmpresaDoMembro['permissoes'] = {
   ...TODAS,
   'contato.delete': 'TENANT',
+  'negocio.delete': 'TENANT',
+  'tarefa.delete': 'TENANT',
+  'atividade.delete': 'TENANT',
+  'config.crm': 'TENANT',
   'config.empresa': 'TENANT',
   'config.membros': 'TENANT',
   'config.rbac': 'TENANT',
