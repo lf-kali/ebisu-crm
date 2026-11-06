@@ -5,3 +5,4 @@ export * from './origens.js';
 export * from './funil.js';
 export * from './negocios.js';
 export * from './tarefas.js';
+export * from './atividades.js';

@@ -165,6 +165,15 @@ só de `modules/completude` (CRM-6): o comando grava o valor calculado na mesma 
 para o audit log ter um registro por mudança. Cascatas (consentimento, contato → negócios, tarefa
 de requisito concluída, edição do funil) recalculam com escrita própria.
 
+## Atividades (timeline)
+
+`/v1/atividades` registra ligações, WhatsApp, e-mail, SMS, visitas, reuniões e notas no contato,
+no negócio ou nos dois (com o negócio, o contato é o dele). A lista vai da mais recente à mais
+antiga por `ocorreu_em`, que pode ser no passado. O escopo PROPRIO é pelo autor: ele corrige ou
+apaga a própria atividade nas 24 horas seguintes ao registro (`registrada_em`); com EMPRESA ou
+TENANT, qualquer uma e a qualquer tempo. SISTEMA e FORMULARIO nunca mudam. Conversas (ENTRADA ou
+SAIDA) mantêm `contato.ultima_interacao_em`; a nota interna não conta.
+
 ## Sequência de documentos
 
 `proximoNumero(ctx, tipo)` (`core/sequencias`) devolve o número do orçamento (`ORC-2610-0001`), da

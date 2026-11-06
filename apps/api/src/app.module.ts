@@ -14,6 +14,7 @@ import { OrigensModule } from './modules/origens/origens.module.js';
 import { FunilModule } from './modules/funil/funil.module.js';
 import { NegociosModule } from './modules/negocios/negocios.module.js';
 import { TarefasModule } from './modules/tarefas/tarefas.module.js';
+import { AtividadesModule } from './modules/atividades/atividades.module.js';
 
 // Registro de módulos (dono: F0). Uma linha por módulo de domínio.
 @Module({
@@ -33,6 +34,7 @@ import { TarefasModule } from './modules/tarefas/tarefas.module.js';
     FunilModule,
     NegociosModule,
     TarefasModule,
+    AtividadesModule,
   ],
 })
 export class AppModule {}

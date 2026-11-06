@@ -6,7 +6,8 @@ import { type CenarioConta, contaNova, criarCenarioConta, novoMembro } from '../
 import { type PedidoNaEmpresa, testarIsolamento } from './suite.js';
 
 // Isolamento das rotas da F4 (plano docs/planos/f4-1-contatos.md, decisão 8): contatos, origens e
-// motivos de perda na matriz por empresa, mais as opções de responsável (plano
+// motivos de perda na matriz por empresa (e, nos PRs 2a e 2b, negócios, tarefas, funil e
+// atividades), mais as opções de responsável (plano
 // docs/planos/f4-web-1-contatos.md, decisão 6). Conta X (empresas x1 e x2) e conta Y (y1); quem age é o
 // dono de X. Os ids só existem depois do beforeAll: a matriz lê os campos na hora do teste.
 
@@ -17,6 +18,7 @@ const origens = { a1: '', a2: '', b1: '' };
 const motivos = { a1: '', a2: '', b1: '' };
 const negocios = { a1: '', a2: '', b1: '' };
 const tarefas = { a1: '', a2: '', b1: '' };
+const atividades = { a1: '', a2: '', b1: '' };
 
 function pedir(
   token: string,
@@ -59,6 +61,13 @@ async function semear(token: string, empresa: string, sufixo: string) {
   return {
     contato,
     negocio,
+    atividade: await criado(
+      pedir(token, 'post', '/v1/atividades', empresa, {
+        tipo: 'LIGACAO',
+        direcao: 'SAIDA',
+        contato_id: contato,
+      }),
+    ),
     tarefa: await criado(
       pedir(token, 'post', '/v1/tarefas', empresa, { titulo: `T ${sufixo}`, negocio_id: negocio }),
     ),
@@ -98,6 +107,7 @@ beforeAll(async () => {
   Object.assign(motivos, { a1: a1.motivo, a2: a2.motivo, b1: b1.motivo });
   Object.assign(negocios, { a1: a1.negocio, a2: a2.negocio, b1: b1.negocio });
   Object.assign(tarefas, { a1: a1.tarefa, a2: a2.tarefa, b1: b1.tarefa });
+  Object.assign(atividades, { a1: a1.atividade, a2: a2.atividade, b1: b1.atividade });
 }, 180_000);
 afterAll(async () => {
   await c?.fechar();
@@ -185,6 +195,29 @@ describe('tarefas (por empresa)', () => {
       negocio_id: negocios.a2,
     });
     expect(r.status).toBe(422);
+  });
+});
+
+describe('atividades (por empresa)', () => {
+  testarIsolamento(acesso, {
+    rota: '/v1/atividades',
+    ids: atividades,
+    edicao: { resultado: 'Invadida' },
+    linha: (id) =>
+      linha(
+        `SELECT empresa_id, contato_id, resultado, ocorreu_em FROM atividade WHERE id = $1`,
+        id,
+      ),
+  });
+
+  it('não registra atividade em contato de outra empresa ou conta', async () => {
+    for (const alvo of [contatos.a2, contatos.b1]) {
+      const r = await naEmpresa('post', '/v1/atividades', x.x1, {
+        tipo: 'NOTA',
+        contato_id: alvo,
+      });
+      expect(r.status).toBe(422);
+    }
   });
 });
 
