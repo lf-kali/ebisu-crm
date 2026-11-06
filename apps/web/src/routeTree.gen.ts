@@ -26,6 +26,7 @@ import { Route as AppDispositivosIndexRouteImport } from './routes/_app/disposit
 import { Route as AppEstoqueIndexRouteImport } from './routes/_app/estoque/index'
 import { Route as AppFinanceiroIndexRouteImport } from './routes/_app/financeiro/index'
 import { Route as AppNegociosIndexRouteImport } from './routes/_app/negocios/index'
+import { Route as AppNegociosIdRouteImport } from './routes/_app/negocios/$id'
 import { Route as AppOrcamentosIndexRouteImport } from './routes/_app/orcamentos/index'
 import { Route as AppConfiguracoesMembrosIndexRouteImport } from './routes/_app/configuracoes/membros/index'
 import { Route as AppConfiguracoesMembrosIdRouteImport } from './routes/_app/configuracoes/membros/$id'
@@ -117,6 +118,11 @@ const AppNegociosIndexRoute = AppNegociosIndexRouteImport.update({
   path: '/negocios/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppNegociosIdRoute = AppNegociosIdRouteImport.update({
+  id: '/negocios/$id',
+  path: '/negocios/$id',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppOrcamentosIndexRoute = AppOrcamentosIndexRouteImport.update({
   id: '/orcamentos/',
   path: '/orcamentos/',
@@ -155,6 +161,7 @@ export interface FileRoutesByFullPath {
   '/configuracoes/api-keys': typeof AppConfiguracoesApiKeysRoute
   '/configuracoes/empresas': typeof AppConfiguracoesEmpresasRoute
   '/contatos/novo': typeof AppContatosNovoRoute
+  '/negocios/$id': typeof AppNegociosIdRoute
   '/bancada/': typeof AppBancadaIndexRoute
   '/configuracoes/': typeof AppConfiguracoesIndexRoute
   '/contatos/': typeof AppContatosIndexRoute
@@ -178,6 +185,7 @@ export interface FileRoutesByTo {
   '/configuracoes/api-keys': typeof AppConfiguracoesApiKeysRoute
   '/configuracoes/empresas': typeof AppConfiguracoesEmpresasRoute
   '/contatos/novo': typeof AppContatosNovoRoute
+  '/negocios/$id': typeof AppNegociosIdRoute
   '/bancada': typeof AppBancadaIndexRoute
   '/configuracoes': typeof AppConfiguracoesIndexRoute
   '/contatos': typeof AppContatosIndexRoute
@@ -203,6 +211,7 @@ export interface FileRoutesById {
   '/_app/configuracoes/api-keys': typeof AppConfiguracoesApiKeysRoute
   '/_app/configuracoes/empresas': typeof AppConfiguracoesEmpresasRoute
   '/_app/contatos/novo': typeof AppContatosNovoRoute
+  '/_app/negocios/$id': typeof AppNegociosIdRoute
   '/_app/bancada/': typeof AppBancadaIndexRoute
   '/_app/configuracoes/': typeof AppConfiguracoesIndexRoute
   '/_app/contatos/': typeof AppContatosIndexRoute
@@ -228,6 +237,7 @@ export interface FileRouteTypes {
     | '/configuracoes/api-keys'
     | '/configuracoes/empresas'
     | '/contatos/novo'
+    | '/negocios/$id'
     | '/bancada/'
     | '/configuracoes/'
     | '/contatos/'
@@ -251,6 +261,7 @@ export interface FileRouteTypes {
     | '/configuracoes/api-keys'
     | '/configuracoes/empresas'
     | '/contatos/novo'
+    | '/negocios/$id'
     | '/bancada'
     | '/configuracoes'
     | '/contatos'
@@ -275,6 +286,7 @@ export interface FileRouteTypes {
     | '/_app/configuracoes/api-keys'
     | '/_app/configuracoes/empresas'
     | '/_app/contatos/novo'
+    | '/_app/negocios/$id'
     | '/_app/bancada/'
     | '/_app/configuracoes/'
     | '/_app/contatos/'
@@ -418,6 +430,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppNegociosIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/negocios/$id': {
+      id: '/_app/negocios/$id'
+      path: '/negocios/$id'
+      fullPath: '/negocios/$id'
+      preLoaderRoute: typeof AppNegociosIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/orcamentos/': {
       id: '/_app/orcamentos/'
       path: '/orcamentos'
@@ -462,6 +481,7 @@ interface AppRouteChildren {
   AppConfiguracoesApiKeysRoute: typeof AppConfiguracoesApiKeysRoute
   AppConfiguracoesEmpresasRoute: typeof AppConfiguracoesEmpresasRoute
   AppContatosNovoRoute: typeof AppContatosNovoRoute
+  AppNegociosIdRoute: typeof AppNegociosIdRoute
   AppBancadaIndexRoute: typeof AppBancadaIndexRoute
   AppConfiguracoesIndexRoute: typeof AppConfiguracoesIndexRoute
   AppContatosIndexRoute: typeof AppContatosIndexRoute
@@ -482,6 +502,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppConfiguracoesApiKeysRoute: AppConfiguracoesApiKeysRoute,
   AppConfiguracoesEmpresasRoute: AppConfiguracoesEmpresasRoute,
   AppContatosNovoRoute: AppContatosNovoRoute,
+  AppNegociosIdRoute: AppNegociosIdRoute,
   AppBancadaIndexRoute: AppBancadaIndexRoute,
   AppConfiguracoesIndexRoute: AppConfiguracoesIndexRoute,
   AppContatosIndexRoute: AppContatosIndexRoute,

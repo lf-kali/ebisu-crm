@@ -25,6 +25,9 @@ import {
   TIPO_PESSOA,
 } from '../../../../contatos/formatacao';
 import { CabecalhoContatos } from '../../../../contatos/pagina';
+import { SecaoTarefas } from '../../../../crm/tarefas';
+import { SecaoTimeline } from '../../../../crm/timeline';
+import { NegociosDoContato } from '../../../../negocios/do-contato';
 
 // Ficha do contato (plano docs/planos/f4-web-1-contatos.md, decisões 7 e 8). Score, temperatura e
 // "o que falta" chegam com F11 e o PR 2 da F4; por ora, só o ciclo de vida.
@@ -138,6 +141,9 @@ function Ficha({ contato }: { contato: Contato }) {
           </dl>
         </section>
         <Consentimentos contato={contato} />
+        {pode('negocio.read') ? <NegociosDoContato contatoId={contato.id} /> : null}
+        {pode('tarefa.read') ? <SecaoTarefas vinculo={{ contato_id: contato.id }} /> : null}
+        {pode('atividade.read') ? <SecaoTimeline vinculo={{ contato_id: contato.id }} /> : null}
       </div>
     </>
   );

@@ -165,6 +165,20 @@ nos consentimentos, uma tabela canal × finalidade com o selo "Concedido" (`seco
 (`outline`) ou "Sem registro", e o histórico abaixo. Telefones do Brasil aparecem como
 `(11) 98765-4321`.
 
+**Quadro de negócios** (`/negocios`): uma coluna por etapa aberta (`section` com o nome da etapa
+no `h2` e a contagem), com rolagem horizontal no celular e "Carregar mais" por coluna. O cartão
+traz o título (link para a ficha), uma lista de definição com contato, valor, responsável e tempo
+na etapa, a barra de completude (`primary` sobre `muted`, com o percentual em texto) e o "Mover
+para…" (`DropdownMenu`, com `aria-label` que começa pelo texto visível e diz o negócio). O 409 de
+requisitos aparece em `Alert` "Falta para avançar:" logo abaixo do botão. Nutrição, Perdidos e
+Ganhos ficam em abas (`tablist`) com tabela, abaixo do quadro.
+
+**Ficha do negócio** e seções de **tarefas** e **timeline** (também na ficha do contato): o "O que
+falta" lista os requisitos com ícone de feito ou pendente (o estado também em texto para o leitor
+de tela); tarefas em lista com selos de situação, "Do funil" e prioridade; a timeline é uma `ol`
+com borda à esquerda, da atividade mais recente para a mais antiga. Botões de ação repetem o nome
+do item em `sr-only` (ex.: "Concluir Elaborar orçamento").
+
 ## Acessibilidade
 
 - Meta: Lighthouse acessibilidade ≥ 90 nas páginas base (spec §4 F12). Medido em 2026-10-28
@@ -172,7 +186,8 @@ nos consentimentos, uma tabela canal × finalidade com o selo "Concedido" (`seco
   Estoque com 100. Em 2026-10-31 (Lighthouse 12.8.2, celular e desktop): cadastro e aceite do
   convite (estado sem token) com 100. Em 2026-11-01 (Lighthouse 12.8.2, celular e desktop, logado):
   Configurações, Empresas, Membros e convites e API keys com 100. No mesmo dia e com a mesma
-  versão: lista de contatos, novo contato e ficha do contato com 100.
+  versão: lista de contatos, novo contato e ficha do contato com 100. Em 2026-11-06, mesma versão:
+  quadro de negócios, ficha do negócio e ficha do contato (com negócios, tarefas e timeline) com 100.
 - Testes de componente rodam o axe-core (`apps/web/src/teste/axe.ts`); contraste não é avaliável
   no jsdom, por isso a tabela acima.
 - Foco sempre visível (`ring` do `primary`). Ícones decorativos com `aria-hidden`; botão só com
