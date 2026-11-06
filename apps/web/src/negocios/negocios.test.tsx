@@ -152,6 +152,25 @@ describe('ficha do negócio', () => {
     expect(screen.queryByRole('button', { name: 'Editar' })).toBeNull();
   });
 
+  it('editar negócio cujo responsável perdeu o acesso salva sem obrigar a trocá-lo', async () => {
+    const dados = simulada.negocios.dados(EMPRESA);
+    dados.negocios = dados.negocios.map((n) =>
+      n.titulo === 'Troca de tela' ? { ...n, responsavel_id: crypto.randomUUID() } : n,
+    );
+    renderizarApp(`/negocios/${idDo('Troca de tela')}`);
+    await screen.findByRole('heading', { level: 1, name: 'Troca de tela' });
+    const u = usuario();
+    await u.click(screen.getByRole('button', { name: 'Editar' }));
+    const janela = await screen.findByRole('dialog');
+    const titulo = await within(janela).findByLabelText('Título');
+    await u.clear(titulo);
+    await u.type(titulo, 'Troca de tela e bateria');
+    await u.click(within(janela).getByRole('button', { name: 'Salvar' }));
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Troca de tela e bateria' }),
+    ).toBeTruthy();
+  });
+
   it('PROPRIO: editar e criar negócio sem o select de responsável', async () => {
     simulada.definirPermissoes('ana@demo.test', {
       'contato.read': 'EMPRESA',

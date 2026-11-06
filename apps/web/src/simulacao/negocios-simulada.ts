@@ -227,6 +227,14 @@ export function criarNegociosSimulados(
   }
   type Ctx = Exclude<ReturnType<typeof exigir>, { erro: unknown }>;
 
+  /** Membro com acesso à empresa (como `membroComAcesso` da API): senão, 422 no responsável. */
+  const comAcesso = (c: Ctx, membroId: string) =>
+    usuarios.some((u) =>
+      u.contas.some((v) => v.membroId === membroId && v.empresas.some((e) => e.id === c.empresaId)),
+    );
+  const responsavelInvalido = () =>
+    invalido('responsavel_id', 'Responsável sem acesso a esta empresa.');
+
   /** No escopo PROPRIO, só o que é da pessoa (responsável ou autor). */
   const meu = (c: Ctx, chave: string, dono: string | null) =>
     c.escopo(chave) !== 'PROPRIO' || dono === c.membroId;
@@ -407,6 +415,8 @@ export function criarNegociosSimulados(
         const proprio = c.escopo('negocio.create') === 'PROPRIO';
         if (proprio && e.data.responsavel_id && e.data.responsavel_id !== c.membroId)
           return problema('sem_permissao');
+        if (e.data.responsavel_id && !comAcesso(c, e.data.responsavel_id))
+          return responsavelInvalido();
         const n = negocioNovo(c.empresaId, ETAPAS_SIMULADAS.novo, {
           ...e.data,
           ...(proprio ? { responsavel_id: c.membroId } : {}),
@@ -422,6 +432,8 @@ export function criarNegociosSimulados(
         if (!e.success) return problema('validacao', { campos: camposDoZod(e.error) });
         const { versao_registro, ...campos } = e.data;
         const n = exigirNegocio(c, params.id as string, 'negocio.update', versao_registro);
+        if (campos.responsavel_id && !comAcesso(c, campos.responsavel_id))
+          return responsavelInvalido();
         return n instanceof Response
           ? n
           : HttpResponse.json(gravar(c, n, campos as Partial<Negocio>));

@@ -103,8 +103,14 @@ type Valores = z.infer<typeof Valores>;
 /** "450,5" → "450.50" (o formato do contrato). */
 const dinheiro = (v: string) => Number(v.replace(',', '.')).toFixed(2);
 
-function corpoDoNegocio(v: Valores, semResponsavel: boolean) {
+/**
+ * Corpo do POST/PATCH. O responsável só vai quando muda (na edição): reenviar o atual, que pode ter
+ * perdido o acesso à empresa, faria a API recusar a edição inteira (422).
+ */
+function corpoDoNegocio(v: Valores, semResponsavel: boolean, atual: NegocioDetalhado | null) {
   const nulo = (x: string) => (x === '' ? null : x);
+  const responsavel = nulo(v.responsavel_id);
+  const mudouResponsavel = !atual || responsavel !== atual.responsavel_id;
   return {
     titulo: v.titulo,
     interesse: v.interesse,
@@ -113,7 +119,7 @@ function corpoDoNegocio(v: Valores, semResponsavel: boolean) {
     urgencia: nulo(v.urgencia),
     valor_estimado: v.valor_estimado ? dinheiro(v.valor_estimado) : null,
     previsao_fechamento: nulo(v.previsao_fechamento),
-    ...(semResponsavel ? {} : { responsavel_id: nulo(v.responsavel_id) }),
+    ...(semResponsavel || !mudouResponsavel ? {} : { responsavel_id: responsavel }),
   };
 }
 
@@ -155,7 +161,7 @@ export function DialogoNegocio({
   async function salvar(v: Valores) {
     setErro(null);
     if (!negocio && !contato) return setErro(new Error('Escolha o contato do negócio.'));
-    const corpo = corpoDoNegocio(v, semResponsavel);
+    const corpo = corpoDoNegocio(v, semResponsavel, negocio);
     try {
       const salvo = negocio
         ? await cliente.patch(`${ROTAS_NEGOCIOS.negocios}/${negocio.id}`, {
